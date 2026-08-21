@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "note": "각 상위 카테고리(Vv 로 시작하는 태그) 마다 표시 설정. label 이 없으면 slug 에서 자동으로 Vv 제거해 표시.",
+  "categories": {
+    "_example_VvAI": {
+      "label": "AI",
+      "image": null,
+      "color": "#0F3A3A",
+      "defaultCollapsed": false,
+      "checklist": [],
+      "memo": ""
+    }
+  }
+}
