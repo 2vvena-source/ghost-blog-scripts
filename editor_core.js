@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19i-fix';
+  var VERSION = 'v2.0-β-p19i-safe';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -12078,36 +12078,49 @@
     });
   }
 
+  // p19i-safe: Ghost 관리자 페이지(/ghost/) 에서는 무한 loop 방지 위해 skip.
+  //   Ghost admin 은 자체 DOM 을 끊임없이 변경 → MutationObserver 폭주 → 페이지 멈춤.
+  //   우리 편집기(/editor/) 는 안전 (별도 프리뷰 iframe 없음).
+  //   블로그 페이지(그 외) 는 정적이라 안전.
+  function _isGhostAdmin(){
+    try {
+      var p = window.location.pathname || '';
+      var h = window.location.hash || '';
+      return p.indexOf('/ghost') === 0 || h.indexOf('#/editor') === 0 || h.indexOf('#/posts') === 0;
+    } catch(_){ return false; }
+  }
+
   function runGlobalHooks(){
     injectSiteGlobalCSS();
+    if (_isGhostAdmin()) return; // admin 페이지에서는 마커 복원 skip
     try { restoreRubyMarkers(document.body); } catch(_){}
   }
 
-  // 즉시 실행
   runGlobalHooks();
-  // DOM ready 안전망 (body 늦게 만들어지는 케이스)
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', runGlobalHooks, { once: true });
   }
-  // 동적 콘텐트 대응: body 변경 감지해서 새로 나타난 마커도 복원
-  try {
-    var _mo = new MutationObserver(function(muts){
-      for (var i=0; i<muts.length; i++){
-        var mut = muts[i];
-        if (mut.type === 'childList' && mut.addedNodes && mut.addedNodes.length){
-          for (var j=0; j<mut.addedNodes.length; j++){
-            var nn = mut.addedNodes[j];
-            if (nn.nodeType === 1) { restoreRubyMarkers(nn); }
-            else if (nn.nodeType === 3 && nn.nodeValue && nn.nodeValue.indexOf('\u27EArt') >= 0) {
-              restoreRubyMarkers(nn.parentNode || document.body);
+  // MutationObserver 도 admin 페이지에서는 등록 안 함
+  if (!_isGhostAdmin()) {
+    try {
+      var _mo = new MutationObserver(function(muts){
+        for (var i=0; i<muts.length; i++){
+          var mut = muts[i];
+          if (mut.type === 'childList' && mut.addedNodes && mut.addedNodes.length){
+            for (var j=0; j<mut.addedNodes.length; j++){
+              var nn = mut.addedNodes[j];
+              if (nn.nodeType === 1) { restoreRubyMarkers(nn); }
+              else if (nn.nodeType === 3 && nn.nodeValue && nn.nodeValue.indexOf('\u27EArt') >= 0) {
+                restoreRubyMarkers(nn.parentNode || document.body);
+              }
             }
           }
         }
-      }
-    });
-    if (document.body) _mo.observe(document.body, { childList:true, subtree:true });
-    else document.addEventListener('DOMContentLoaded', function(){ _mo.observe(document.body, { childList:true, subtree:true }); }, { once:true });
-  } catch(_){}
+      });
+      if (document.body) _mo.observe(document.body, { childList:true, subtree:true });
+      else document.addEventListener('DOMContentLoaded', function(){ _mo.observe(document.body, { childList:true, subtree:true }); }, { once:true });
+    } catch(_){}
+  }
 
   function boot(){
     // 편집기 페이지 아니면 접근 매크로만 설치하고 종료
