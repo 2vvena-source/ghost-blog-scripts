@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19i-safe';
+  var VERSION = 'v2.0-β-p19j';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -9068,11 +9068,26 @@
       return open + inner.replace(/<span[^>]*class="ddl-ruby-rt"[^>]*>[\s\S]*?<\/span>/g, '') + close;
     });
 
-    // p19g/i: 루비 → 마커 텍스트. data-rt 에 < 있으면 rt-html, 없으면 rt.
+    // p19j: 루비 마커. HTML 서식 있는 경우 base64-url-safe 로 인코딩해
+    // Ghost 파서가 < 문자를 만나지 않도록 함.
+    //   ⟪rt:루비⟫Y⟪/rt⟫              — 순수 텍스트
+    //   ⟪rt-enc:aGVsbG8⟫Y⟪/rt-enc⟫  — base64url 인코딩된 HTML
     function _rubyMarker(_m, rt, inner){
       var dec = rt.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&amp;/g,'&');
-      var tag = (dec.indexOf('<') >= 0) ? 'rt-html' : 'rt';
-      return '\u27EA' + tag + ':' + dec + '\u27EB' + inner + '\u27EA/' + tag + '\u27EB';
+      if (dec.indexOf('<') < 0) {
+        // 순수 텍스트: 예전 방식 그대로
+        return '\u27EArt:' + dec + '\u27EB' + inner + '\u27EA/rt\u27EB';
+      }
+      // HTML 포함: base64url 인코딩 (한글 안전: encodeURIComponent 먼저)
+      var enc;
+      try {
+        enc = btoa(unescape(encodeURIComponent(dec)))
+                .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      } catch(e){
+        // 실패 시 안전하게 텍스트로 fallback (서식 손실)
+        return '\u27EArt:' + dec.replace(/<[^>]+>/g,'') + '\u27EB' + inner + '\u27EA/rt\u27EB';
+      }
+      return '\u27EArt-enc:' + enc + '\u27EB' + inner + '\u27EA/rt-enc\u27EB';
     }
     html = html.replace(/<mark\s[^>]*class="ddl-ruby"[^>]*data-rt="([^"]*)"[^>]*>([\s\S]*?)<\/mark>/g, _rubyMarker);
     html = html.replace(/<mark\s[^>]*data-rt="([^"]*)"[^>]*class="ddl-ruby"[^>]*>([\s\S]*?)<\/mark>/g, _rubyMarker);
@@ -12023,7 +12038,7 @@
   }
 
   // p19g/i: 루비 마커 복원. rt (텍스트) / rt-html (HTML 서식) 두 종류.
-  var RUBY_MARKER_RE = /\u27EA(rt(?:-html)?):([^\u27EA\u27EB]*)\u27EB([\s\S]*?)\u27EA\/\1\u27EB/g;
+  var RUBY_MARKER_RE = /\u27EA(rt(?:-enc|-html)?):([^\u27EA\u27EB]*)\u27EB([\s\S]*?)\u27EA\/\1\u27EB/g;
 
   function restoreRubyMarkers(root){
     root = root || document.body;
@@ -12063,10 +12078,23 @@
         mark.style.background = 'transparent';
         mark.style.color = 'inherit';
         // rt-html 이면 자식 span 으로 innerHTML 삽입 (CSS ::before 대신)
-        if (m[1] === 'rt-html' && rtVal.indexOf('<') >= 0) {
+        // p19j: rt-enc 는 base64url 디코딩, rt-html 은 그대로 (호환성)
+        var htmlVal = null;
+        if (m[1] === 'rt-enc') {
+          try {
+            var b64 = rtVal.replace(/-/g,'+').replace(/_/g,'/');
+            while (b64.length % 4) b64 += '=';
+            htmlVal = decodeURIComponent(escape(atob(b64)));
+            mark.setAttribute('data-rt', htmlVal);
+            mark.setAttribute('title', htmlVal.replace(/<[^>]+>/g,''));
+          } catch(_){ htmlVal = null; }
+        } else if (m[1] === 'rt-html' && rtVal.indexOf('<') >= 0) {
+          htmlVal = rtVal;
+        }
+        if (htmlVal) {
           var rtSpan = document.createElement('span');
           rtSpan.className = 'ddl-ruby-rt';
-          rtSpan.innerHTML = rtVal;
+          rtSpan.innerHTML = htmlVal;
           mark.appendChild(rtSpan);
         }
         mark.appendChild(document.createTextNode(m[3]));
