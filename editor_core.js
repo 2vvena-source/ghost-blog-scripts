@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p18g';
+  var VERSION = 'v2.0-β-p18h';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -4307,6 +4307,8 @@
     var opacity = parseInt(box.getAttribute('data-border-opacity') || '100', 10);
 
     // p18g: 테두리는 단색 전용 (그라데이션 제거)
+    // p18h: opacity 를 항상 rgba 로 재조립 — data-border-color 에 rgba 가 저장
+    //       되어 있어도 슬라이더 값이 최종 알파가 되도록 통일.
     box.style.borderImage = '';
     box.style.borderImageSlice = '';
     var cutout = box.getAttribute('data-border-cutout') === '1';
@@ -4316,9 +4318,11 @@
     } else {
       var color = box.getAttribute('data-border-color') || '#0F3A3A';
       var rgb = parseRgb(color);
-      finalColor = color;
-      if (rgb && opacity < 100) {
+      if (rgb) {
+        // 슬라이더 값을 최종 알파로 강제 (원본 알파는 무시)
         finalColor = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + (opacity/100) + ')';
+      } else {
+        finalColor = color;
       }
     }
     box.style.border = width + 'px ' + style + ' ' + finalColor;
