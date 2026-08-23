@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19j-fix3';
+  var VERSION = 'v2.0-β-p19k';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1098,6 +1098,32 @@
     '  white-space: nowrap !important;',
     '}',
     'html body ruby rp { display: none !important; }',
+    '/* p19k: 형광펜 3종 (마커 / 끝흐림 마커 / 페인트) */',
+    'html body mark.ddl-hl, html body .gh-content mark.ddl-hl, html body [contenteditable] mark.ddl-hl {',
+    '  color: inherit !important;',
+    '  background: transparent;',
+    '  border-radius: 2px;',
+    '  padding: 0 0.05em;',
+    '}',
+    'html body mark.ddl-hl[data-hl-mode="marker"] {',
+    '  background: var(--ddl-hl-c1, #fff59d) !important;',
+    '}',
+    'html body mark.ddl-hl[data-hl-mode="fade"] {',
+    '  background: linear-gradient(90deg, transparent 0%, var(--ddl-hl-c1, #fff59d) 15%, var(--ddl-hl-c1, #fff59d) 85%, transparent 100%) !important;',
+    '}',
+    'html body mark.ddl-hl[data-hl-mode="paint"] {',
+    '  background: linear-gradient(180deg, transparent 0%, transparent 50%, var(--ddl-hl-c1, #fff59d) 50%, var(--ddl-hl-c1, #fff59d) 100%) !important;',
+    '}',
+    'html body mark.ddl-hl[data-hl-mode="paint"][data-hl-pos="top"] {',
+    '  background: linear-gradient(180deg, var(--ddl-hl-c1, #fff59d) 0%, var(--ddl-hl-c1, #fff59d) 50%, transparent 50%, transparent 100%) !important;',
+    '}',
+    'html body mark.ddl-hl[data-hl-mode="paint"][data-hl-pos="middle"] {',
+    '  background: linear-gradient(180deg, transparent 0%, transparent 35%, var(--ddl-hl-c1, #fff59d) 35%, var(--ddl-hl-c1, #fff59d) 65%, transparent 65%, transparent 100%) !important;',
+    '}',
+    'html body mark.ddl-hl[data-hl-mode="paint"][data-hl-ratio="30"] {',
+    '  background: linear-gradient(180deg, transparent 0%, transparent 70%, var(--ddl-hl-c1, #fff59d) 70%, var(--ddl-hl-c1, #fff59d) 100%) !important;',
+    '}',
+
     /* p14a: 크롭 팝업 */
     '.ep-crop-popup {',
     '  position: fixed;',
@@ -9083,7 +9109,75 @@
     // Ghost 파서가 < 문자를 만나지 않도록 함.
     //   ⟪rt:루비⟫Y⟪/rt⟫              — 순수 텍스트
     //   ⟪rt-enc:aGVsbG8⟫Y⟪/rt-enc⟫  — base64url 인코딩된 HTML
-    function _rubyMarker(_m, rt, inner){
+    
+  // ─────────────────────────────────────────────
+  // p19k: 형광펜 마커 텍스트 변환 (Ghost sanitizer 회피)
+  //   저장: <mark class="ddl-hl" data-hl-mode="marker" data-hl-c1="#ff0" ...>텍스트</mark>
+  //     → ⟪hl:모드|색상base64⟫텍스트⟪/hl⟫
+  //   복원: 반대 방향
+  // ─────────────────────────────────────────────
+  function _hlEncodeSpec(spec){
+    try {
+      var json = JSON.stringify(spec || {});
+      var b64 = btoa(unescape(encodeURIComponent(json)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      return b64;
+    } catch(e){ return ''; }
+  }
+  function _hlDecodeSpec(b64){
+    try {
+      var s = b64.replace(/-/g, '+').replace(/_/g, '/');
+      while (s.length % 4) s += '=';
+      var json = decodeURIComponent(escape(atob(s)));
+      return JSON.parse(json);
+    } catch(e){ return null; }
+  }
+  function _highlightSaveMarkerize(html){
+    if (!html || html.indexOf('ddl-hl') < 0) return html;
+    // <mark class="ddl-hl" ...>content</mark>
+    return html.replace(
+      /<mark\b([^>]*\bclass="[^"]*\bddl-hl\b[^"]*"[^>]*)>([\s\S]*?)<\/mark>/gi,
+      function(_, attrs, inner){
+        // attrs 에서 data-hl-* 수집
+        var spec = {};
+        var re = /data-hl-([a-z0-9-]+)="([^"]*)"/gi, m;
+        while ((m = re.exec(attrs)) !== null){ spec[m[1]] = m[2]; }
+        var enc = _hlEncodeSpec(spec);
+        return '⟪hl:' + enc + '⟫' + inner + '⟪/hl⟫';
+      }
+    );
+  }
+  function _highlightRestoreMarkers(root){
+    if (!root) return;
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+    var texts = [], node;
+    while ((node = walker.nextNode())){
+      if (node.nodeValue && node.nodeValue.indexOf('⟪hl:') >= 0) texts.push(node);
+    }
+    texts.forEach(function(tn){
+      var v = tn.nodeValue;
+      var re = /⟪hl:([A-Za-z0-9_-]+)⟫([\s\S]*?)⟪\/hl⟫/g;
+      if (!re.test(v)) return;
+      re.lastIndex = 0;
+      var frag = document.createDocumentFragment();
+      var last = 0, mm;
+      while ((mm = re.exec(v)) !== null){
+        if (mm.index > last) frag.appendChild(document.createTextNode(v.slice(last, mm.index)));
+        var spec = _hlDecodeSpec(mm[1]) || {};
+        var mk = document.createElement('mark');
+        mk.className = 'ddl-hl';
+        Object.keys(spec).forEach(function(k){ mk.setAttribute('data-hl-' + k, spec[k]); });
+        mk.textContent = mm[2];
+        frag.appendChild(mk);
+        last = re.lastIndex;
+      }
+      if (last < v.length) frag.appendChild(document.createTextNode(v.slice(last)));
+      if (tn.parentNode) tn.parentNode.replaceChild(frag, tn);
+    });
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.highlightRestoreMarkers = _highlightRestoreMarkers; } catch(e){}
+
+  function _rubyMarker(_m, rt, inner){
       var dec = rt.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&amp;/g,'&');
       if (dec.indexOf('<') < 0) {
         // 순수 텍스트: 예전 방식 그대로
@@ -10196,7 +10290,24 @@
       + '<button type="button" data-rcmd="clearFormat" class="pop-btn" title="서식 지우기" style="margin-left:auto;">✕서식</button>';
     wrap.appendChild(toolbar);
 
-    toolbar.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    tool
+    // p19k: 확장 버튼 stub (헤딩/정렬/목록) — 다음 배포 예고
+    bar.addEventListener('click', function(e){
+      var b = e.target.closest && e.target.closest('button[data-cmd]');
+      if (!b) return;
+      var cmd = b.getAttribute('data-cmd');
+      if (cmd === 'heading-expand' || cmd === 'align-expand' || cmd === 'list-expand'){
+        e.preventDefault(); e.stopPropagation();
+        // 임시: 안내 팝오버
+        var msg = { 'heading-expand':'헤딩(H1-H6)', 'align-expand':'정렬', 'list-expand':'목록' }[cmd];
+        var t = document.createElement('div');
+        t.textContent = msg + ' — 다음 배포에서 지원 예정';
+        t.style.cssText = 'position:fixed;left:50%;top:20%;transform:translate(-50%,0);background:#0F3A3A;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:99999;box-shadow:0 6px 20px rgba(0,0,0,0.2);';
+        document.body.appendChild(t);
+        setTimeout(function(){ t.style.transition='opacity 0.3s'; t.style.opacity='0'; setTimeout(function(){t.remove();}, 300); }, 1500);
+      }
+    }, true);
+        bar.addEventListener('mousedown', function(e){ e.preventDefault(); });
     toolbar.addEventListener('click', function(e){
       var btn = e.target.closest('[data-rcmd]');
       if (!btn) return;
@@ -10415,6 +10526,55 @@
     });
   }
 
+  
+  // p19k: 설정 창 (stub) - 앞으로 모든 편집기 설정 이곳으로 통합
+  function openDdlSettings(){
+    var old = document.getElementById('ddl-settings-modal');
+    if (old) { old.remove(); return; }
+    var mask = document.createElement('div');
+    mask.id = 'ddl-settings-modal';
+    mask.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(15,58,58,0.28);display:flex;align-items:center;justify-content:center;';
+    var box = document.createElement('div');
+    box.style.cssText = 'width:min(520px,92vw);max-height:80vh;overflow:auto;background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,0.24);font-family:inherit;color:#0F3A3A;';
+    var toolbarStyle = 'classic';
+    try { toolbarStyle = localStorage.getItem('ddl.toolbarStyle') || 'classic'; } catch(e){}
+    box.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">' +
+        '<div style="font-size:16px;font-weight:700;">편집기 설정</div>' +
+        '<button id="dset-close" style="border:none;background:transparent;font-size:20px;cursor:pointer;color:#0F3A3A;">×</button>' +
+      '</div>' +
+      '<div style="border-top:1px solid rgba(15,58,58,0.1);padding-top:14px;">' +
+        '<div style="font-size:13px;font-weight:600;margin-bottom:8px;">플로팅 툴바 스타일</div>' +
+        '<div style="display:flex;gap:8px;">' +
+          '<button data-ts="classic" class="dset-tsbtn" style="flex:1;padding:8px 10px;border:1px solid ' + (toolbarStyle==='classic'?'#0F3A3A':'rgba(15,58,58,0.2)') + ';border-radius:8px;background:' + (toolbarStyle==='classic'?'#f0f5f5':'#fff') + ';cursor:pointer;color:#0F3A3A;">클래식 (현재)</button>' +
+          '<button data-ts="modern" class="dset-tsbtn" style="flex:1;padding:8px 10px;border:1px solid ' + (toolbarStyle==='modern'?'#0F3A3A':'rgba(15,58,58,0.2)') + ';border-radius:8px;background:' + (toolbarStyle==='modern'?'#f0f5f5':'#fff') + ';cursor:pointer;color:#0F3A3A;">모던 (버튼+확장)</button>' +
+        '</div>' +
+        '<div style="font-size:11px;color:#6a7a7a;margin-top:6px;">모던 스타일은 다음 배포에서 정식 지원됩니다. 현재는 자리만 확보되어 있습니다.</div>' +
+      '</div>' +
+      '<div style="border-top:1px solid rgba(15,58,58,0.1);padding-top:14px;margin-top:14px;color:#6a7a7a;font-size:12px;">' +
+        '<div style="margin-bottom:4px;">■ 앞으로 여기 추가될 항목</div>' +
+        '<ul style="margin:4px 0 0 18px;padding:0;line-height:1.7;">' +
+          '<li>블록 헤더 (H1-H6) 스타일 프리셋</li>' +
+          '<li>목록 스타일 기본값</li>' +
+          '<li>형광펜 기본 모드 (마커 / 끝흐림 / 페인트)</li>' +
+          '<li>단축키 설정</li>' +
+        '</ul>' +
+      '</div>';
+    mask.appendChild(box);
+    document.body.appendChild(mask);
+    mask.addEventListener('click', function(e){ if (e.target === mask) mask.remove(); });
+    box.querySelector('#dset-close').addEventListener('click', function(){ mask.remove(); });
+    box.querySelectorAll('.dset-tsbtn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var v = btn.getAttribute('data-ts');
+        try { localStorage.setItem('ddl.toolbarStyle', v); } catch(e){}
+        mask.remove();
+        setTimeout(openDdlSettings, 10);
+      });
+    });
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.openSettings = openDdlSettings; } catch(e){}
+
   function setupFloatingToolbar(){
     var bar = document.createElement('div');
     bar.className = 'ep-float-toolbar';
@@ -10444,7 +10604,7 @@
       '<button data-cmd="createLink" title="링크">' + _svg_link + '</button>' +
       '<button data-cmd="removeFormat" title="서식 지우기">' + _svg_clear + '</button>' +
       '<span class="ftb-sep"></span>' +
-      '<button data-cmd="open-presets" title="인라인 서식 프리셋" style="display:inline-flex; align-items:center; gap:0.25em;">' + _svg_star + '<span>서식</span></button>';
+      '<button data-cmd="heading-expand" title="헤딩 (H1-H6)" style="font-weight:700;">H<span style="font-size:0.7em;">▸</span></button>' + '<button data-cmd="align-expand" title="정렬"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg></button>' + '<button data-cmd="list-expand" title="목록"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg></button>' + '<span class="ftb-sep"></span>' + '<button data-cmd="open-presets" title="인라인 서식 프리셋" style="display:inline-flex; align-items:center; gap:0.25em;">' + _svg_star + '<span>서식</span></button>';
     document.body.appendChild(bar);
 
     // 형광펜 팔레트 팝오버 (분리 요소)
@@ -12157,7 +12317,7 @@
           if (mut.type === 'childList' && mut.addedNodes && mut.addedNodes.length){
             for (var j=0; j<mut.addedNodes.length; j++){
               var nn = mut.addedNodes[j];
-              if (nn.nodeType === 1) { restoreRubyMarkers(nn); }
+              if (nn.nodeType === 1) { restoreRubyMarkers(nn); try { _highlightRestoreMarkers(nn); } catch(e){} }
               else if (nn.nodeType === 3 && nn.nodeValue && nn.nodeValue.indexOf('\u27EArt') >= 0) {
                 restoreRubyMarkers(nn.parentNode || document.body);
               }
@@ -12190,12 +12350,25 @@
 
       // β 기능
       setupFloatingToolbar();
+      // p19k: 편집기 상단 톱니 아이콘 (설정 창 stub)
+      try {
+        if (!document.getElementById('ddl-settings-gear')){
+          var gear = document.createElement('button');
+          gear.id = 'ddl-settings-gear';
+          gear.title = '2vvena 편집기 설정';
+          gear.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+          gear.style.cssText = 'position:fixed;top:12px;right:12px;z-index:99997;width:36px;height:36px;border:1px solid rgba(15,58,58,0.18);border-radius:10px;background:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;box-shadow:0 2px 8px rgba(15,58,58,0.08);';
+          gear.addEventListener('click', function(){ openDdlSettings(); });
+          document.body.appendChild(gear);
+        }
+      } catch(e){ console.warn('gear icon failed', e); }
+
       setupRubyEditHandler(); // p19h
       // p19j-fix2: 우리 편집기에서도 마커 복원 (편집 캔버스 안 스캔)
-      try { restoreRubyMarkers(contentEl); } catch(_){}
+      try { restoreRubyMarkers(contentEl); try { _highlightRestoreMarkers(contentEl); } catch(e){} } catch(_){}
       // 편집 시작 후 3초까지 다시 한 번 (편집기 콘텐츠 지연 로드 대비)
-      setTimeout(function(){ try { restoreRubyMarkers(contentEl); } catch(_){} }, 500);
-      setTimeout(function(){ try { restoreRubyMarkers(contentEl); } catch(_){} }, 2000);
+      setTimeout(function(){ try { restoreRubyMarkers(contentEl); try { _highlightRestoreMarkers(contentEl); } catch(e){} } catch(_){} }, 500);
+      setTimeout(function(){ try { restoreRubyMarkers(contentEl); try { _highlightRestoreMarkers(contentEl); } catch(e){} } catch(_){} }, 2000);
       // p14c: 블록 정렬·폭 시스템
       setupBlockToolbar();
       setupBlockPanelListeners();
