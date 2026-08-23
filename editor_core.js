@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p18i';
+  var VERSION = 'v2.0-β-p18j';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1204,37 +1204,138 @@
     '}',
 
     // ─── β: 플로팅 툴바 ───
+    // p18j: 사이트 톤으로 재작성 — 흰 배경 + 얇은 실선 + #0F3A3A 텍스트
     '.ep-float-toolbar {',
     '  position: absolute;',
     '  z-index: 9990;',
     '  display: none;',
-    '  background: var(--color, #0F3A3A);',
-    '  color: var(--base, #F5F5F5);',
-    '  border-radius: 4px;',
-    '  padding: 0.3em 0.4em;',
-    '  box-shadow: 0 4px 12px rgba(0,0,0,0.25);',
+    '  background: #ffffff;',
+    '  color: var(--color, #0F3A3A);',
+    '  border: 1px solid rgba(15, 58, 58, 0.35);',
+    '  border-radius: 2px;',
+    '  padding: 0.25em 0.35em;',
     '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
-    '  gap: 0.1em;',
+    '  font-size: 0.9em;',
+    '  gap: 0.05em;',
     '  align-items: center;',
     '  white-space: nowrap;',
+    '  transition: transform 0.15s ease;',
     '}',
     '.ep-float-toolbar.is-open { display: inline-flex; }',
     '.ep-float-toolbar button {',
     '  background: transparent;',
-    '  color: var(--base, #F5F5F5);',
+    '  color: var(--color, #0F3A3A);',
     '  border: none;',
-    '  padding: 0.35em 0.55em;',
-    '  font-size: 0.9em;',
+    '  padding: 0.25em 0.5em;',
     '  cursor: pointer;',
-    '  border-radius: 2px;',
     '  font-family: inherit;',
-    '  min-width: 1.8em;',
+    '  font-size: inherit;',
+    '  min-width: 1.6em;',
+    '  line-height: 1;',
+    '  transition: color 0.12s ease, transform 0.12s ease;',
     '}',
-    '.ep-float-toolbar button:hover { background: rgba(255,154,118,0.35); }',
+    '.ep-float-toolbar button:hover {',
+    '  color: var(--point, #FF9A76);',
+    '  text-decoration: underline double var(--point, #FF9A76);',
+    '  text-underline-offset: 3px;',
+    '  transform: translateY(-1px);',
+    '}',
+    '.ep-float-toolbar button.is-active {',
+    '  color: var(--point, #FF9A76);',
+    '  text-decoration: underline double var(--point, #FF9A76);',
+    '  text-underline-offset: 3px;',
+    '}',
     '.ep-float-toolbar .ftb-sep {',
-    '  width: 1px; height: 1.2em;',
-    '  background: rgba(255,255,255,0.2);',
-    '  margin: 0 0.2em;',
+    '  width: 1px; height: 1em;',
+    '  background: rgba(15, 58, 58, 0.25);',
+    '  margin: 0 0.15em;',
+    '}',
+    // 형광펜 팔레트 팝오버
+    '.ep-hl-palette {',
+    '  position: absolute;',
+    '  z-index: 9995;',
+    '  display: none;',
+    '  background: #ffffff;',
+    '  border: 1px solid rgba(15, 58, 58, 0.35);',
+    '  border-radius: 2px;',
+    '  padding: 0.6em 0.7em;',
+    '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
+    '  color: var(--color, #0F3A3A);',
+    '  min-width: 220px;',
+    '  font-size: 12px;',
+    '}',
+    '.ep-hl-palette.is-open { display: block; }',
+    '.ep-hl-palette .hl-title {',
+    '  font-family: "Cafe24Danjunghae","Gowun Batang",serif;',
+    '  font-size: 1em;',
+    '  border-bottom: 1px solid var(--color, #0F3A3A);',
+    '  padding-bottom: 0.25em;',
+    '  margin-bottom: 0.5em;',
+    '}',
+    '.ep-hl-palette .hl-grid {',
+    '  display: grid;',
+    '  grid-template-columns: repeat(5, 1fr);',
+    '  gap: 5px;',
+    '}',
+    '.ep-hl-palette .hl-sw {',
+    '  aspect-ratio: 1;',
+    '  border: 1px solid rgba(15, 58, 58, 0.2);',
+    '  border-radius: 2px;',
+    '  cursor: pointer;',
+    '  position: relative;',
+    '  transition: transform 0.12s ease, border-color 0.12s ease;',
+    '}',
+    '.ep-hl-palette .hl-sw:hover { border-color: var(--point, #FF9A76); transform: translateY(-2px); }',
+    '.ep-hl-palette .hl-sw.is-none {',
+    '  background: repeating-linear-gradient(-45deg, transparent 0, transparent 4px, rgba(15,58,58,0.3) 4px, rgba(15,58,58,0.3) 5px), #ffffff;',
+    '}',
+    '.ep-hl-palette .hl-del {',
+    '  position: absolute;',
+    '  top: -5px; right: -5px;',
+    '  width: 14px; height: 14px;',
+    '  border-radius: 50%;',
+    '  background: var(--color, #0F3A3A);',
+    '  color: #fff;',
+    '  border: none;',
+    '  font-size: 9px;',
+    '  line-height: 12px;',
+    '  cursor: pointer;',
+    '  padding: 0;',
+    '  opacity: 0;',
+    '  transition: opacity 0.12s;',
+    '}',
+    '.ep-hl-palette .hl-sw:hover .hl-del { opacity: 1; }',
+    '.ep-hl-palette .hl-add {',
+    '  margin-top: 0.6em;',
+    '  display: flex;',
+    '  gap: 0.3em;',
+    '  align-items: center;',
+    '}',
+    '.ep-hl-palette .hl-add input[type=color] {',
+    '  width: 26px; height: 24px; padding: 0;',
+    '  border: 1px solid rgba(15,58,58,0.35);',
+    '}',
+    '.ep-hl-palette .hl-add button {',
+    '  flex: 1;',
+    '  border: 1px solid rgba(15,58,58,0.35);',
+    '  background: transparent;',
+    '  color: var(--color, #0F3A3A);',
+    '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
+    '  font-size: 11px;',
+    '  padding: 0.35em 0.5em;',
+    '  cursor: pointer;',
+    '  transition: color 0.12s, border-color 0.12s;',
+    '}',
+    '.ep-hl-palette .hl-add button:hover { color: var(--point, #FF9A76); border-color: var(--point, #FF9A76); }',
+    '.ep-hl-palette .hl-group-label {',
+    '  font-size: 10.5px; opacity: 0.6; margin: 0.6em 0 0.3em;',
+    '}',
+    // 방점(강조점) 시각 규칙
+    '.ep-emphasis {',
+    '  text-emphasis: dot;',
+    '  -webkit-text-emphasis: dot;',
+    '  text-emphasis-position: over;',
+    '  -webkit-text-emphasis-position: over;',
     '}',
 
     // ─── β: 다중 블록 선택 ───
@@ -4694,329 +4795,6 @@
     var img = iconEl.querySelector('img');
     if (img) img.remove();
   }
-
-  // ══════════════════════════════════════════════════════════
-  //  p18i: 텍스트 서식 플로팅 툴바
-  //  콜아웃 body(.callout-body) 안에서 셀렉션이 생기면 상단에 툴바 표시
-  //  - B / I / U / S / X² / X₂ (execCommand)
-  //  - 방점 토글 · 하이라이트 · 링크
-  // ══════════════════════════════════════════════════════════
-  var textToolbarEl = null;
-  var textToolbarRange = null;
-
-  function ensureTextToolbar(){
-    if (textToolbarEl) return textToolbarEl;
-    var bar = document.createElement('div');
-    bar.className = 'ep-text-toolbar';
-    bar.setAttribute('contenteditable', 'false');
-    bar.style.cssText = 'position:absolute; z-index:9999; display:none; background:#0F3A3A; color:#fff; padding:4px 6px; border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,0.25); font-size:13px; gap:2px; align-items:center; white-space:nowrap; user-select:none;';
-    bar.innerHTML =
-        '<button type="button" data-tt="bold" title="굵게" style="background:none; border:none; color:#fff; padding:4px 8px; cursor:pointer; font-weight:800; font-family:serif;">B</button>'
-      + '<button type="button" data-tt="italic" title="기울임" style="background:none; border:none; color:#fff; padding:4px 8px; cursor:pointer; font-style:italic; font-family:serif;">I</button>'
-      + '<button type="button" data-tt="underline" title="밑줄" style="background:none; border:none; color:#fff; padding:4px 8px; cursor:pointer; text-decoration:underline;">U</button>'
-      + '<button type="button" data-tt="strike" title="취소선" style="background:none; border:none; color:#fff; padding:4px 8px; cursor:pointer; text-decoration:line-through;">S</button>'
-      + '<button type="button" data-tt="sup" title="위첨자" style="background:none; border:none; color:#fff; padding:4px 6px; cursor:pointer; font-size:11px;">X<sup>2</sup></button>'
-      + '<button type="button" data-tt="sub" title="아래첨자" style="background:none; border:none; color:#fff; padding:4px 6px; cursor:pointer; font-size:11px;">X<sub>2</sub></button>'
-      + '<span style="width:1px; height:16px; background:rgba(255,255,255,0.25); margin:0 4px;"></span>'
-      + '<button type="button" data-tt="emphasis" title="방점(강조점)" style="background:none; border:none; color:#fff; padding:4px 6px; cursor:pointer; font-size:11px;">•̇A</button>'
-      + '<button type="button" data-tt="highlight" title="하이라이트(형광펜)" style="background:none; border:none; color:#fff; padding:4px 6px; cursor:pointer;">🖍️</button>'
-      + '<button type="button" data-tt="highlight-color" title="하이라이트 색 선택" style="background:none; border:none; color:#fff; padding:4px 4px; cursor:pointer; position:relative;">'
-          + '<span data-hl-swatch style="display:inline-block; width:14px; height:14px; background:#FFF176; border:1px solid rgba(255,255,255,0.4); border-radius:2px; vertical-align:middle;"></span>'
-          + '<span style="font-size:9px; margin-left:2px;">▾</span>'
-      + '</button>'
-      + '<button type="button" data-tt="link" title="링크 삽입" style="background:none; border:none; color:#fff; padding:4px 8px; cursor:pointer;">🔗</button>'
-      + '<button type="button" data-tt="clear" title="서식 지우기" style="background:none; border:none; color:#fff; padding:4px 6px; cursor:pointer; font-size:11px;">✕서식</button>';
-    document.body.appendChild(bar);
-
-    // 하이라이트 색상 팝오버 (그룹 지원 - 배경 프리셋 재사용)
-    var pop = document.createElement('div');
-    pop.className = 'ep-hl-popover';
-    pop.setAttribute('contenteditable', 'false');
-    pop.style.cssText = 'position:absolute; z-index:10000; display:none; background:#fff; color:#0F3A3A; padding:8px; border-radius:6px; box-shadow:0 6px 20px rgba(0,0,0,0.2); font-size:12px; min-width:200px;';
-    document.body.appendChild(pop);
-    bar._hlPop = pop;
-
-    // 클릭 처리
-    bar.addEventListener('mousedown', function(e){
-      // 클릭 전 셀렉션 유지
-      var sel = window.getSelection();
-      if (sel && sel.rangeCount > 0) textToolbarRange = sel.getRangeAt(0).cloneRange();
-    });
-    bar.addEventListener('click', function(e){
-      var btn = e.target.closest('[data-tt]');
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      // 선택 복원
-      if (textToolbarRange) {
-        var sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(textToolbarRange);
-      }
-      var cmd = btn.getAttribute('data-tt');
-      handleTextToolbarCommand(cmd, btn);
-    });
-    // 하이라이트 팝오버 클릭
-    pop.addEventListener('mousedown', function(e){
-      var sel = window.getSelection();
-      if (sel && sel.rangeCount > 0) textToolbarRange = sel.getRangeAt(0).cloneRange();
-    });
-    pop.addEventListener('click', function(e){
-      var sw = e.target.closest('[data-hl-color]');
-      if (!sw) return;
-      e.preventDefault(); e.stopPropagation();
-      var color = sw.getAttribute('data-hl-color');
-      if (textToolbarRange) {
-        var sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(textToolbarRange);
-      }
-      applyHighlight(color);
-      // 스와치 업데이트
-      var swMain = bar.querySelector('[data-hl-swatch]');
-      if (swMain) swMain.style.background = color;
-      pop.style.display = 'none';
-    });
-
-    textToolbarEl = bar;
-    return bar;
-  }
-
-  function handleTextToolbarCommand(cmd, btn){
-    var body = getCurrentEditableBody();
-    if (!body) return;
-    if (cmd === 'bold') document.execCommand('bold');
-    else if (cmd === 'italic') document.execCommand('italic');
-    else if (cmd === 'underline') document.execCommand('underline');
-    else if (cmd === 'strike') document.execCommand('strikeThrough');
-    else if (cmd === 'sup') document.execCommand('superscript');
-    else if (cmd === 'sub') document.execCommand('subscript');
-    else if (cmd === 'emphasis') toggleEmphasis();
-    else if (cmd === 'highlight') applyHighlight(getCurrentHighlightColor());
-    else if (cmd === 'highlight-color') openHighlightPopover(btn);
-    else if (cmd === 'link') insertLink();
-    else if (cmd === 'clear') document.execCommand('removeFormat');
-    // 셀렉션 유지 & 툴바 위치 재계산
-    updateTextToolbarPosition();
-  }
-
-  function getCurrentEditableBody(){
-    var sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return null;
-    var node = sel.anchorNode;
-    if (!node) return null;
-    var el = node.nodeType === 1 ? node : node.parentElement;
-    if (!el) return null;
-    return el.closest('.callout-body, [contenteditable="true"]');
-  }
-
-  function toggleEmphasis(){
-    // 선택 범위를 <span class="ep-emphasis"> 로 감싸거나 해제
-    var sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-    var range = sel.getRangeAt(0);
-    // 이미 emphasis span 안이면 해제
-    var container = range.commonAncestorContainer;
-    var el = container.nodeType === 1 ? container : container.parentElement;
-    var wrap = el && el.closest('.ep-emphasis');
-    if (wrap) {
-      // 언랩
-      var parent = wrap.parentNode;
-      while (wrap.firstChild) parent.insertBefore(wrap.firstChild, wrap);
-      parent.removeChild(wrap);
-      return;
-    }
-    var span = document.createElement('span');
-    span.className = 'ep-emphasis';
-    span.style.cssText = 'text-emphasis: dot; -webkit-text-emphasis: dot; text-emphasis-position: over; -webkit-text-emphasis-position: over;';
-    try {
-      span.appendChild(range.extractContents());
-      range.insertNode(span);
-      // 선택 유지
-      sel.removeAllRanges();
-      var newRange = document.createRange();
-      newRange.selectNodeContents(span);
-      sel.addRange(newRange);
-    } catch(err){ console.warn('[p18i] emphasis error', err); }
-  }
-
-  function getCurrentHighlightColor(){
-    try {
-      var stored = GM_getValue('text_hl_last_color', '#FFF176');
-      return stored || '#FFF176';
-    } catch(_){ return '#FFF176'; }
-  }
-  function setCurrentHighlightColor(c){
-    try { GM_setValue('text_hl_last_color', c); } catch(_){}
-  }
-
-  function applyHighlight(color){
-    var sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-    setCurrentHighlightColor(color);
-    // 이미 mark 안이면 색만 갱신
-    var range = sel.getRangeAt(0);
-    var container = range.commonAncestorContainer;
-    var el = container.nodeType === 1 ? container : container.parentElement;
-    var mark = el && el.closest('mark');
-    if (mark) {
-      mark.style.backgroundColor = color;
-      return;
-    }
-    // 새로 감싸기
-    var m = document.createElement('mark');
-    m.style.backgroundColor = color;
-    m.style.color = 'inherit';
-    try {
-      m.appendChild(range.extractContents());
-      range.insertNode(m);
-      sel.removeAllRanges();
-      var nr = document.createRange();
-      nr.selectNodeContents(m);
-      sel.addRange(nr);
-    } catch(err){ console.warn('[p18i] highlight error', err); }
-  }
-
-  var HL_COLORS_BASIC = [
-    { name:'노랑', c:'#FFF176' }, { name:'분홍', c:'#F8BBD0' },
-    { name:'하늘', c:'#B3E5FC' }, { name:'연두', c:'#DCEDC8' },
-    { name:'주황', c:'#FFCCBC' }, { name:'라벤더', c:'#D1C4E9' },
-    { name:'회색', c:'#EEEEEE' }, { name:'복숭아', c:'#FFE0B2' }
-  ];
-
-  function openHighlightPopover(btn){
-    var bar = textToolbarEl;
-    if (!bar) return;
-    var pop = bar._hlPop;
-    // 사용자 프리셋 로드
-    var userHL = [];
-    try {
-      var raw = GM_getValue('text_hl_presets', '[]');
-      userHL = JSON.parse(raw) || [];
-    } catch(_){}
-    var html = '<div style="font-weight:600; margin-bottom:6px;">하이라이트 색</div>'
-      + '<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">';
-    HL_COLORS_BASIC.forEach(function(o){
-      html += '<button type="button" data-hl-color="' + o.c + '" title="' + o.name + '" style="width:100%; aspect-ratio:1; background:' + o.c + '; border:1px solid rgba(0,0,0,0.1); border-radius:4px; cursor:pointer;"></button>';
-    });
-    html += '</div>';
-    if (userHL.length) {
-      html += '<div style="font-weight:600; margin-top:8px; margin-bottom:4px; font-size:11px; opacity:0.7;">내 프리셋</div>'
-        + '<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">';
-      userHL.forEach(function(o, i){
-        html += '<button type="button" data-hl-color="' + o.c + '" title="' + (o.name||'') + '" style="width:100%; aspect-ratio:1; background:' + o.c + '; border:1px solid rgba(0,0,0,0.1); border-radius:4px; cursor:pointer; position:relative;">'
-          + '<button type="button" data-hl-del="' + i + '" title="삭제" style="position:absolute; top:-4px; right:-4px; width:14px; height:14px; border-radius:50%; background:#000; color:#fff; border:none; font-size:9px; cursor:pointer; line-height:12px; padding:0;">×</button>'
-          + '</button>';
-      });
-      html += '</div>';
-    }
-    html += '<div style="margin-top:8px; display:flex; gap:4px; align-items:center;">'
-      + '<input type="color" data-hl-picker value="' + getCurrentHighlightColor() + '" style="flex:0 0 30px; height:26px; padding:0; border:1px solid #ddd;">'
-      + '<button type="button" data-hl-save style="flex:1; padding:4px 8px; font-size:11px; background:#0F3A3A; color:#fff; border:none; border-radius:4px; cursor:pointer;">현재 색 저장</button>'
-      + '</div>';
-    pop.innerHTML = html;
-
-    // 사용자 프리셋 삭제 · 저장 이벤트
-    pop.querySelectorAll('[data-hl-del]').forEach(function(delBtn){
-      delBtn.addEventListener('click', function(e){
-        e.preventDefault(); e.stopPropagation();
-        var i = parseInt(delBtn.getAttribute('data-hl-del'), 10);
-        var list = [];
-        try { list = JSON.parse(GM_getValue('text_hl_presets', '[]')) || []; } catch(_){}
-        list.splice(i, 1);
-        try { GM_setValue('text_hl_presets', JSON.stringify(list)); } catch(_){}
-        openHighlightPopover(btn); // 재렌더
-      });
-    });
-    var saveBtn = pop.querySelector('[data-hl-save]');
-    var pickerEl = pop.querySelector('[data-hl-picker]');
-    if (pickerEl) {
-      pickerEl.addEventListener('input', function(){ setCurrentHighlightColor(pickerEl.value); });
-    }
-    if (saveBtn) {
-      saveBtn.addEventListener('click', function(e){
-        e.preventDefault(); e.stopPropagation();
-        var c = pickerEl ? pickerEl.value : getCurrentHighlightColor();
-        var list = [];
-        try { list = JSON.parse(GM_getValue('text_hl_presets', '[]')) || []; } catch(_){}
-        list.push({ name:'', c:c });
-        try { GM_setValue('text_hl_presets', JSON.stringify(list)); } catch(_){}
-        openHighlightPopover(btn);
-      });
-    }
-
-    // 위치
-    var r = btn.getBoundingClientRect();
-    pop.style.display = 'block';
-    pop.style.left = (r.left + window.pageXOffset) + 'px';
-    pop.style.top = (r.bottom + window.pageYOffset + 6) + 'px';
-
-    // 팝오버 밖 클릭 시 닫기
-    setTimeout(function(){
-      var closer = function(ev){
-        if (pop.contains(ev.target) || btn.contains(ev.target)) return;
-        pop.style.display = 'none';
-        document.removeEventListener('mousedown', closer, true);
-      };
-      document.addEventListener('mousedown', closer, true);
-    }, 0);
-  }
-
-  function insertLink(){
-    var url = prompt('링크 URL을 입력하세요 (비우면 링크 해제)', '');
-    if (url === null) return;
-    if (url === '') {
-      document.execCommand('unlink');
-    } else {
-      document.execCommand('createLink', false, url);
-    }
-  }
-
-  function updateTextToolbarPosition(){
-    var sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
-      if (textToolbarEl) textToolbarEl.style.display = 'none';
-      return;
-    }
-    var body = getCurrentEditableBody();
-    // 콜아웃 body 안에서만 표시
-    if (!body || !body.classList.contains('callout-body')) {
-      if (textToolbarEl) textToolbarEl.style.display = 'none';
-      return;
-    }
-    var range = sel.getRangeAt(0);
-    var rect = range.getBoundingClientRect();
-    if (!rect || (rect.width === 0 && rect.height === 0)) return;
-    var bar = ensureTextToolbar();
-    bar.style.display = 'flex';
-    // 위치: 셀렉션 위, 화면 좌표 → 문서 좌표
-    var top = rect.top + window.pageYOffset - bar.offsetHeight - 8;
-    var left = rect.left + window.pageXOffset + (rect.width / 2) - (bar.offsetWidth / 2);
-    // 뷰포트 위로 넘어가면 아래에 붙임
-    if (top < window.pageYOffset + 4) {
-      top = rect.bottom + window.pageYOffset + 8;
-    }
-    // 좌우 클램프
-    var maxLeft = document.documentElement.clientWidth - bar.offsetWidth - 8;
-    if (left < 8) left = 8;
-    if (left > maxLeft) left = maxLeft;
-    bar.style.top = top + 'px';
-    bar.style.left = left + 'px';
-    // 스와치 최신화
-    var sw = bar.querySelector('[data-hl-swatch]');
-    if (sw) sw.style.background = getCurrentHighlightColor();
-  }
-
-  // 셀렉션 변경 감지
-  document.addEventListener('selectionchange', function(){
-    // 툴바나 팝오버 내부 조작 중에는 숨기지 않기
-    var active = document.activeElement;
-    if (textToolbarEl && (textToolbarEl.contains(active) || (textToolbarEl._hlPop && textToolbarEl._hlPop.contains(active)))) return;
-    updateTextToolbarPosition();
-  });
-  // 창 크기 바뀌면 재배치
-  window.addEventListener('scroll', function(){ if (textToolbarEl && textToolbarEl.style.display !== 'none') updateTextToolbarPosition(); }, true);
-  window.addEventListener('resize', function(){ if (textToolbarEl && textToolbarEl.style.display !== 'none') updateTextToolbarPosition(); });
 
   // p11: 노션식 - 편집기 빈 영역 클릭 시 마지막 블록 뒤에 새 p 생성 후 포커스
   function setupBlankClickCreate(){
@@ -9699,6 +9477,192 @@
     }
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // p18j: 형광펜 기본 팔레트 & 사용자 프리셋
+  // ═══════════════════════════════════════════════════════════
+  var HL_PALETTE_BASIC = [
+    { name:'노랑',   c:'#FFF176' },
+    { name:'분홍',   c:'#F8BBD0' },
+    { name:'하늘',   c:'#B3E5FC' },
+    { name:'연두',   c:'#DCEDC8' },
+    { name:'주황',   c:'#FFCCBC' },
+    { name:'라벤더', c:'#D1C4E9' },
+    { name:'회색',   c:'#EEEEEE' },
+    { name:'복숭아', c:'#FFE0B2' },
+    { name:'살구',   c:'rgba(255,154,118,0.4)' }
+  ];
+  function getLastHlColor(){
+    try { return GM_getValue('inline_hl_last', '#FFF176') || '#FFF176'; }
+    catch(_) { return '#FFF176'; }
+  }
+  function setLastHlColor(c){ try { GM_setValue('inline_hl_last', c); } catch(_){} }
+  function loadHlUserPresets(){
+    try { return JSON.parse(GM_getValue('inline_hl_presets', '[]')) || []; }
+    catch(_) { return []; }
+  }
+  function saveHlUserPresets(list){
+    try { GM_setValue('inline_hl_presets', JSON.stringify(list)); } catch(_){}
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // p18j: 인라인 조작 유틸 (형광펜 · 방점 · 루비 · 위첨자 · 아래첨자 · 서식 지우기)
+  // ═══════════════════════════════════════════════════════════
+  function applyHighlightColor(color){
+    // color === '' 또는 'none' 이면 형광펜 해제
+    if (!savedRange) return;
+    restoreRange();
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    var range = sel.getRangeAt(0);
+    // 이미 mark 로 감싸져 있으면 색 변경 or 언랩
+    var container = range.commonAncestorContainer;
+    var el = container.nodeType === 1 ? container : container.parentElement;
+    var innerMark = el && el.closest && el.closest('mark');
+    if (innerMark) {
+      if (!color || color === 'none') {
+        // 언랩
+        var parent = innerMark.parentNode;
+        while (innerMark.firstChild) parent.insertBefore(innerMark.firstChild, innerMark);
+        parent.removeChild(innerMark);
+        return;
+      }
+      innerMark.style.backgroundColor = color;
+      innerMark.style.color = 'inherit';
+      return;
+    }
+    if (!color || color === 'none') return; // 이미 없음
+    setLastHlColor(color);
+    var m = document.createElement('mark');
+    m.style.backgroundColor = color;
+    m.style.color = 'inherit';
+    m.style.padding = '0.02em 0.15em';
+    m.style.borderRadius = '2px';
+    try {
+      m.appendChild(range.extractContents());
+      range.insertNode(m);
+      sel.removeAllRanges();
+      var nr = document.createRange();
+      nr.selectNodeContents(m);
+      sel.addRange(nr);
+      saveRange();
+    } catch(err){ console.warn('[p18j] highlight error', err); }
+  }
+
+  function toggleEmphasisDot(){
+    if (!savedRange) return;
+    restoreRange();
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    var range = sel.getRangeAt(0);
+    var container = range.commonAncestorContainer;
+    var el = container.nodeType === 1 ? container : container.parentElement;
+    var wrap = el && el.closest && el.closest('.ep-emphasis');
+    if (wrap) {
+      var parent = wrap.parentNode;
+      while (wrap.firstChild) parent.insertBefore(wrap.firstChild, wrap);
+      parent.removeChild(wrap);
+      return;
+    }
+    var span = document.createElement('span');
+    span.className = 'ep-emphasis';
+    try {
+      span.appendChild(range.extractContents());
+      range.insertNode(span);
+      sel.removeAllRanges();
+      var nr = document.createRange();
+      nr.selectNodeContents(span);
+      sel.addRange(nr);
+      saveRange();
+    } catch(err){ console.warn('[p18j] emphasis error', err); }
+  }
+
+  function insertRuby(){
+    if (!savedRange) return;
+    restoreRange();
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      alert('루비(후리가나)를 달 텍스트를 먼저 선택하세요.');
+      return;
+    }
+    var baseText = sel.toString();
+    var rubyText = prompt('선택한 "' + baseText + '" 위에 표시할 텍스트를 입력하세요.\n(한글·한자·일본어·영문·특수문자 모두 가능)', '');
+    if (rubyText == null) return;
+    rubyText = String(rubyText).trim();
+    if (!rubyText) return;
+    restoreRange();
+    sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    var range = sel.getRangeAt(0);
+    var ruby = document.createElement('ruby');
+    var rt = document.createElement('rt');
+    rt.textContent = rubyText;
+    try {
+      ruby.appendChild(range.extractContents());
+      ruby.appendChild(rt);
+      range.insertNode(ruby);
+      sel.removeAllRanges();
+      var nr = document.createRange();
+      nr.selectNodeContents(ruby);
+      sel.addRange(nr);
+      saveRange();
+    } catch(err){ console.warn('[p18j] ruby error', err); }
+  }
+
+  function toggleSupSub(which){
+    if (!savedRange) return;
+    restoreRange();
+    var cmd = which === 'sup' ? 'superscript' : 'subscript';
+    document.execCommand(cmd, false, null);
+  }
+
+  function clearInlineFormat(){
+    // 1) 브라우저 기본 removeFormat
+    if (!savedRange) return;
+    restoreRange();
+    document.execCommand('removeFormat');
+    // 2) 추가로 mark / .ep-emphasis / ruby / rt / sub / sup 언랩
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    var range = sel.getRangeAt(0);
+    var frag = range.cloneContents();
+    // 선택 영역 안의 특수 태그 언랩용 헬퍼
+    function stripSpecial(root){
+      // Node List 스냅샷 (라이브면 변형 중 오동작)
+      var nodes = root.querySelectorAll('mark, .ep-emphasis, sup, sub, ruby, rt, rp');
+      // 언랩은 실제 문서(range 안)에서 해야 함 → root 는 참고만
+    }
+    // 실제 문서에서 처리: 공통 조상 안의 특수 태그를 찾아, 셀렉션과 교차하면 언랩
+    var common = range.commonAncestorContainer;
+    var scope = common.nodeType === 1 ? common : common.parentElement;
+    if (!scope) return;
+    // scope 는 너무 좁을 수 있음 → 편집 가능 조상까지 넓히기
+    var editable = scope.closest && scope.closest('[contenteditable="true"], .callout-body');
+    if (editable) scope = editable;
+    var candidates = scope.querySelectorAll('mark, .ep-emphasis, ruby');
+    candidates.forEach(function(node){
+      if (!range.intersectsNode(node)) return;
+      // ruby 는 rt 도 함께 제거
+      if (node.tagName === 'RUBY') {
+        var rtEl = node.querySelector('rt');
+        if (rtEl) rtEl.remove();
+        var rpEls = node.querySelectorAll('rp');
+        rpEls.forEach(function(rp){ rp.remove(); });
+      }
+      var parent = node.parentNode;
+      while (node.firstChild) parent.insertBefore(node.firstChild, node);
+      parent.removeChild(node);
+    });
+    // sup / sub 는 execCommand removeFormat 이 대부분 처리하지만, 잔재가 있으면 강제 언랩
+    scope.querySelectorAll('sup, sub').forEach(function(node){
+      if (!range.intersectsNode(node)) return;
+      var parent = node.parentNode;
+      while (node.firstChild) parent.insertBefore(node.firstChild, node);
+      parent.removeChild(node);
+    });
+    // 링크 해제
+    document.execCommand('unlink');
+  }
+
   function setupFloatingToolbar(){
     var bar = document.createElement('div');
     bar.className = 'ep-float-toolbar';
@@ -9708,11 +9672,118 @@
       '<button data-cmd="underline" title="밑줄"><u>U</u></button>' +
       '<button data-cmd="strikeThrough" title="취소선"><s>S</s></button>' +
       '<span class="ftb-sep"></span>' +
+      '<button data-cmd="sup" title="위첨자">X<sup style="font-size:0.7em;">2</sup></button>' +
+      '<button data-cmd="sub" title="아래첨자">X<sub style="font-size:0.7em;">2</sub></button>' +
+      '<button data-cmd="emphasis" title="방점(강조점)">·A·</button>' +
+      '<button data-cmd="ruby" title="루비(후리가나)">ル</button>' +
+      '<span class="ftb-sep"></span>' +
+      '<button data-cmd="highlight-quick" title="형광펜 (마지막 색)">🖍</button>' +
+      '<button data-cmd="highlight-palette" title="형광펜 색 선택">▾</button>' +
+      '<span class="ftb-sep"></span>' +
       '<button data-cmd="createLink" title="링크">\u2398</button>' +
       '<button data-cmd="removeFormat" title="서식 지우기">\u2205</button>' +
       '<span class="ftb-sep"></span>' +
-      '<button data-cmd="open-presets" title="서식 프리셋">\u2605 서식</button>';
+      '<button data-cmd="open-presets" title="인라인 서식 프리셋">\u2605 서식</button>';
     document.body.appendChild(bar);
+
+    // 형광펜 팔레트 팝오버 (분리 요소)
+    var palette = document.createElement('div');
+    palette.className = 'ep-hl-palette';
+    document.body.appendChild(palette);
+
+    function renderPalette(){
+      var user = loadHlUserPresets();
+      var html = '<div class="hl-title">형광펜 색</div>';
+      html += '<div class="hl-grid">';
+      // '없음' (해제) 스와치
+      html += '<div class="hl-sw is-none" data-hl="none" title="형광펜 없음"></div>';
+      HL_PALETTE_BASIC.forEach(function(o){
+        html += '<div class="hl-sw" data-hl="' + o.c + '" title="' + o.name + '" style="background:' + o.c + '"></div>';
+      });
+      html += '</div>';
+      if (user.length) {
+        html += '<div class="hl-group-label">내 색</div>';
+        html += '<div class="hl-grid">';
+        user.forEach(function(o, i){
+          html += '<div class="hl-sw" data-hl="' + o.c + '" title="' + (o.name || '') + '" style="background:' + o.c + '">'
+            + '<button type="button" class="hl-del" data-hl-del="' + i + '" title="삭제">×</button>'
+            + '</div>';
+        });
+        html += '</div>';
+      }
+      html += '<div class="hl-add">'
+        + '<input type="color" data-hl-picker value="' + getLastHlColor() + '">'
+        + '<button type="button" data-hl-save>현재 색 저장</button>'
+        + '</div>';
+      palette.innerHTML = html;
+    }
+
+    function positionPalette(anchorBtn){
+      var r = anchorBtn.getBoundingClientRect();
+      palette.style.top = (r.bottom + window.pageYOffset + 6) + 'px';
+      var left = r.left + window.pageXOffset;
+      // 화면 우측 넘침 방지
+      var maxLeft = document.documentElement.clientWidth - palette.offsetWidth - 8;
+      if (left > maxLeft) left = maxLeft;
+      if (left < 8) left = 8;
+      palette.style.left = left + 'px';
+    }
+
+    function openPalette(anchorBtn){
+      renderPalette();
+      palette.classList.add('is-open');
+      positionPalette(anchorBtn);
+      // 밖 클릭 시 닫기
+      setTimeout(function(){
+        var closer = function(ev){
+          if (palette.contains(ev.target) || anchorBtn.contains(ev.target)) return;
+          palette.classList.remove('is-open');
+          document.removeEventListener('mousedown', closer, true);
+        };
+        document.addEventListener('mousedown', closer, true);
+      }, 0);
+    }
+
+    palette.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    palette.addEventListener('click', function(e){
+      // 삭제
+      var del = e.target.closest('[data-hl-del]');
+      if (del) {
+        e.stopPropagation();
+        var i = parseInt(del.getAttribute('data-hl-del'), 10);
+        var list = loadHlUserPresets();
+        list.splice(i, 1);
+        saveHlUserPresets(list);
+        renderPalette();
+        return;
+      }
+      // 스와치 (없음 포함)
+      var sw = e.target.closest('[data-hl]');
+      if (sw) {
+        var c = sw.getAttribute('data-hl');
+        applyHighlightColor(c === 'none' ? '' : c);
+        palette.classList.remove('is-open');
+        updateBar();
+        return;
+      }
+      // 저장
+      var saveBtn = e.target.closest('[data-hl-save]');
+      if (saveBtn) {
+        var pk = palette.querySelector('[data-hl-picker]');
+        var c2 = pk ? pk.value : getLastHlColor();
+        var list2 = loadHlUserPresets();
+        list2.push({ name:'', c:c2 });
+        saveHlUserPresets(list2);
+        setLastHlColor(c2);
+        renderPalette();
+        return;
+      }
+    });
+    palette.addEventListener('input', function(e){
+      if (e.target.hasAttribute && e.target.hasAttribute('data-hl-picker')) {
+        setLastHlColor(e.target.value);
+      }
+    });
 
     function updateBar(){
       var sel = window.getSelection();
@@ -9720,35 +9791,71 @@
       var range = sel.getRangeAt(0);
       var container = range.commonAncestorContainer;
       if (container.nodeType === 3) container = container.parentNode;
-      if (!contentEl.contains(container)) { bar.classList.remove('is-open'); return; }
+      if (!contentEl || !contentEl.contains(container)) { bar.classList.remove('is-open'); return; }
       var rect = range.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) { bar.classList.remove('is-open'); return; }
       bar.classList.add('is-open');
       var top = rect.top + window.pageYOffset - bar.offsetHeight - 8;
       var left = rect.left + window.pageXOffset + (rect.width/2) - (bar.offsetWidth/2);
       if (top < window.pageYOffset + 4) top = rect.bottom + window.pageYOffset + 8;
+      // 좌우 클램프
+      var maxLeft = document.documentElement.clientWidth - bar.offsetWidth - 8;
+      if (left > maxLeft) left = maxLeft;
+      if (left < 4) left = 4;
       bar.style.top = Math.max(0, top) + 'px';
-      bar.style.left = Math.max(4, left) + 'px';
+      bar.style.left = left + 'px';
+
+      // 활성 상태 갱신 (B / I / U / S / sup / sub)
+      var stateMap = { bold:'bold', italic:'italic', underline:'underline', strikeThrough:'strikeThrough', sup:'superscript', sub:'subscript' };
+      Object.keys(stateMap).forEach(function(cmd){
+        var b = bar.querySelector('[data-cmd="' + cmd + '"]');
+        if (!b) return;
+        try { b.classList.toggle('is-active', !!document.queryCommandState(stateMap[cmd])); } catch(_){}
+      });
     }
+
     document.addEventListener('selectionchange', function(){ setTimeout(updateBar, 10); });
-    bar.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    window.addEventListener('scroll', function(){ if (bar.classList.contains('is-open')) updateBar(); }, true);
+    window.addEventListener('resize', function(){ if (bar.classList.contains('is-open')) updateBar(); });
+
+    bar.addEventListener('mousedown', function(e){
+      // 셀렉션 손실 방지 + 저장
+      e.preventDefault();
+      saveRange();
+    });
     bar.addEventListener('click', function(e){
       var btn = e.target.closest('button[data-cmd]');
       if (!btn) return;
       var cmd = btn.getAttribute('data-cmd');
-      saveRange();
+      // 대부분의 커맨드는 range 복원 후 실행
       if (cmd === 'createLink') {
-        var url = prompt('링크 URL', 'https://');
-        if (url) { restoreRange(); document.execCommand('createLink', false, url); }
+        var url = prompt('링크 URL (비우면 링크 해제)', 'https://');
+        if (url === null) return;
+        restoreRange();
+        if (url === '') document.execCommand('unlink');
+        else document.execCommand('createLink', false, url);
       } else if (cmd === 'open-presets') {
+        // 프리셋 모달이 스스로 restoreRange 함
         openPresetModal();
+      } else if (cmd === 'highlight-quick') {
+        applyHighlightColor(getLastHlColor());
+      } else if (cmd === 'highlight-palette') {
+        openPalette(btn);
+      } else if (cmd === 'emphasis') {
+        toggleEmphasisDot();
+      } else if (cmd === 'ruby') {
+        insertRuby();
+      } else if (cmd === 'sup' || cmd === 'sub') {
+        toggleSupSub(cmd);
+      } else if (cmd === 'removeFormat') {
+        clearInlineFormat();
       } else {
         restoreRange();
         document.execCommand(cmd, false, null);
       }
       updateBar();
     });
-    log('플로팅 툴바 설치');
+    log('플로팅 툴바 설치 (p18j)');
   }
 
   // ═══════════════════════════════════════════════════════════
