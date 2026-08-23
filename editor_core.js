@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19c';
+  var VERSION = 'v2.0-β-p19c-fix';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1073,26 +1073,31 @@
     '}',
     '.ep-popup-v2-footer .pop-btn.is-primary { background: var(--point, #FF9A76); color: #fff; border-color: var(--point, #FF9A76); }',
     '.ep-popup-v2-footer .pop-btn.is-primary:hover { background: var(--color, #0F3A3A); border-color: var(--color, #0F3A3A); color: var(--base, #F5F5F5); }',
-    /* p19b: 루비(후리가나) 강제 표시 규칙
-       ─────────────────────────────────────────
-       사용자님 F12 실측 결과: <ruby><rt>...</rt></ruby> 태그는 DOM 에
-       정상 삽입되지만 사이트 스킨 CSS 또는 Ghost 기본 스타일이 rt 를
-       숨기는 것으로 확인됨. 브라우저 기본 루비 렌더링이 되살아나도록
-       방어적으로 규칙 추가. 편집기 안 편집 영역 및 문서 본문 양쪽에
-       모두 적용됨. */
-    'ruby { ruby-position: over; ruby-align: center; }',
-    'ruby rt {',
-    '  display: revert;',
-    '  font-size: 0.55em;',
-    '  line-height: 1.1;',
-    '  color: inherit;',
-    '  font-family: inherit;',
-    '  text-align: center;',
-    '  user-select: text;',
-    '  -webkit-user-select: text;',
-    '  opacity: 0.85;',
+    /* p19c-fix: 루비 강제 표시 (display:ruby-text 로 정확히 명시) */
+    'html body ruby, html body [contenteditable] ruby {',
+    '  display: ruby !important;',
+    '  ruby-position: over !important;',
+    '  ruby-align: center !important;',
     '}',
-    'ruby rp { display: none; }',
+    'html body ruby rt, html body [contenteditable] ruby rt {',
+    '  display: ruby-text !important;',
+    '  visibility: visible !important;',
+    '  font-size: 0.55em !important;',
+    '  line-height: 1.1 !important;',
+    '  color: inherit !important;',
+    '  font-family: inherit !important;',
+    '  text-align: center !important;',
+    '  opacity: 0.85 !important;',
+    '  height: auto !important;',
+    '  width: auto !important;',
+    '  position: static !important;',
+    '  clip: auto !important;',
+    '  overflow: visible !important;',
+    '  float: none !important;',
+    '  vertical-align: baseline !important;',
+    '  white-space: nowrap !important;',
+    '}',
+    'html body ruby rp { display: none !important; }',
     /* p14a: 크롭 팝업 */
     '.ep-crop-popup {',
     '  position: fixed;',
