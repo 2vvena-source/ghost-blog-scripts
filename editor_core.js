@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19c-final';
+  var VERSION = 'v2.0-β-p19d';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -10122,6 +10122,11 @@
     } catch(err){ console.warn('[p18j] emphasis error', err); }
   }
 
+  // p19d: 루비 삽입 — <ruby><rt> 대신 <span.ddl-ruby data-rt> 방식.
+  //   이유: Ghost 의 Koenig 저장 시 <ruby><rt><rp> 태그가 sanitizer 에 의해
+  //         제거되어 블로그 렌더 시 사라지는 문제 (2026-08-23 확인).
+  //   방식: <span> 은 sanitize 허용 목록에 있어 안전. data-rt 속성도 유지됨.
+  //         CSS ::before 로 attr(data-rt) 를 위에 얹어 표시.
   function insertRuby(){
     if (!savedRange) return;
     restoreRange();
@@ -10131,7 +10136,6 @@
       return;
     }
     var baseText = sel.toString();
-    // 선택 유지
     saveRange();
     openEditorDialog('윗글씨 (루비)', [
       { key:'ruby', label:'선택한 "' + baseText + '" 위에 표시할 내용', default:'', placeholder:'한글·영문·한자·기호 등 자유롭게' }
@@ -10143,19 +10147,18 @@
       var sel2 = window.getSelection();
       if (!sel2 || sel2.rangeCount === 0) return;
       var range = sel2.getRangeAt(0);
-      var ruby = document.createElement('ruby');
-      var rt = document.createElement('rt');
-      rt.textContent = rubyText;
+      var span = document.createElement('span');
+      span.className = 'ddl-ruby';
+      span.setAttribute('data-rt', rubyText);
       try {
-        ruby.appendChild(range.extractContents());
-        ruby.appendChild(rt);
-        range.insertNode(ruby);
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
         sel2.removeAllRanges();
         var nr = document.createRange();
-        nr.selectNodeContents(ruby);
+        nr.selectNodeContents(span);
         sel2.addRange(nr);
         saveRange();
-      } catch(err){ console.warn('[p18k] ruby error', err); }
+      } catch(err){ console.warn('[p19d] ruby error', err); }
     });
   }
 
@@ -10179,7 +10182,7 @@
     // 선택 영역 안의 특수 태그 언랩용 헬퍼
     function stripSpecial(root){
       // Node List 스냅샷 (라이브면 변형 중 오동작)
-      var nodes = root.querySelectorAll('mark, .ep-emphasis, sup, sub, ruby, rt, rp');
+      var nodes = root.querySelectorAll('mark, .ep-emphasis, sup, sub, ruby, rt, rp, .ddl-ruby');
       // 언랩은 실제 문서(range 안)에서 해야 함 → root 는 참고만
     }
     // 실제 문서에서 처리: 공통 조상 안의 특수 태그를 찾아, 셀렉션과 교차하면 언랩
@@ -10189,7 +10192,7 @@
     // scope 는 너무 좁을 수 있음 → 편집 가능 조상까지 넓히기
     var editable = scope.closest && scope.closest('[contenteditable="true"], .callout-body');
     if (editable) scope = editable;
-    var candidates = scope.querySelectorAll('mark, .ep-emphasis, ruby');
+    var candidates = scope.querySelectorAll('mark, .ep-emphasis, ruby, .ddl-ruby');
     candidates.forEach(function(node){
       if (!range.intersectsNode(node)) return;
       // ruby 는 rt 도 함께 제거
@@ -11773,9 +11776,27 @@
   // 확장 가능: 향후 특수 블록이 늘어나면 SITE_GLOBAL_CSS 에만 추가.
   // ═══════════════════════════════════════════════════════════
   var SITE_GLOBAL_CSS = [
-    /* 루비 (후리가나) — 사이트 스킨이 <rt> 를 감추는 경우 방어 */
-    'ruby { display: ruby; ruby-position: over; ruby-align: center; }',
-    'ruby rt { display: ruby-text !important; font-size: 0.55em !important; line-height: 1.1; opacity: 0.85; color: inherit; font-family: inherit; text-align: center; white-space: nowrap; }',
+    /* p19d: 루비 (후리가나) — Ghost sanitizer 를 우회하는 span 방식.
+       구조: <span class="ddl-ruby" data-rt="루비">가나다</span>
+       CSS ::before 로 data-rt 값을 본문 위에 얹어 표시. */
+    '.ddl-ruby { position: relative; display: inline-block; line-height: 1.9; }',
+    '.ddl-ruby::before {',
+    '  content: attr(data-rt);',
+    '  position: absolute;',
+    '  left: 50%;',
+    '  bottom: 100%;',
+    '  transform: translateX(-50%) translateY(0.15em);',
+    '  font-size: 0.55em;',
+    '  line-height: 1;',
+    '  white-space: nowrap;',
+    '  opacity: 0.85;',
+    '  color: inherit;',
+    '  font-family: inherit;',
+    '  pointer-events: none;',
+    '}',
+    /* 기존 표준 태그도 함께 지원 (편집기 안 임시 상태 대비) */
+    'ruby { display: ruby; ruby-position: over; }',
+    'ruby rt { display: ruby-text !important; font-size: 0.55em !important; opacity: 0.85; }',
     'ruby rp { display: none; }'
   ].join('\n');
 
