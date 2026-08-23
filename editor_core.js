@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p18e';
+  var VERSION = 'v2.0-β-p18f';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1986,8 +1986,7 @@
 
   function getGroupsForTarget(target){
     if (target === 'icon' || target === 'border' || target === 'divider') {
-      // p13a: 테두리도 아이콘처럼 진한/연한 4그룹
-      // p16a: 구분선도 동일한 4그룹 시스템 사용
+      // p13a: 테두리/아이콘/구분선 — 진한/연한 4그룹
       return {
         notion: GROUPS_ICON.notion,
         site: GROUPS_ICON.site,
@@ -1995,11 +1994,25 @@
         site_soft: GROUPS_BG.site
       };
     }
-    // bg, text: 연한 배경 그룹
+    // p18f: bg 도 그라데이션·패턴에서 짙은 색이 필요 → 4그룹으로 확장
+    //       (기존 solid 모드에서도 짙은 색을 쓰고 싶어하는 요구가 있어 통일)
+    if (target === 'bg') {
+      return {
+        notion: GROUPS_ICON.notion,
+        site: GROUPS_ICON.site,
+        notion_soft: GROUPS_BG.notion,
+        site_soft: GROUPS_BG.site
+      };
+    }
+    // text 등 나머지: 연한 배경 그룹 유지
     return GROUPS_BG;
   }
   function getGroupLabels(target){
     if (target === 'icon' || target === 'border' || target === 'divider') {
+      return { notion:'노션 진한', site:'사이트 진한', notion_soft:'노션 연한', site_soft:'사이트 연한' };
+    }
+    // p18f: bg 도 4그룹 라벨
+    if (target === 'bg') {
       return { notion:'노션 진한', site:'사이트 진한', notion_soft:'노션 연한', site_soft:'사이트 연한' };
     }
     return null;
@@ -4016,12 +4029,16 @@
     function applyColorPresetByIdx(idx, target, ns){
     var box = calPopupLock || selectedCallout;
     if (!box) return;
-    // p18e: ns 우선. 저장소는 byTarget[ns], 색상 값 적용은 ns 기준으로 분기
+    // p18f: ns 없으면 target 로 fallback
     ns = ns || target;
     var settings = loadCalloutSettings();
     var targetSt = settings.byTarget[ns] || { userPresets:[], lastGroup:'notion' };
     var groups = getGroupsForTarget(target);
     var lastGroup = targetSt.lastGroup;
+    if (!groups[lastGroup] && !(targetSt.userPresets || []).some(function(p){ return (p.group || '내 프리셋') === lastGroup; })) {
+      // 저장된 lastGroup 이 유효하지 않으면 첫 번째 그룹으로 재조정
+      lastGroup = Object.keys(groups)[0] || 'notion';
+    }
     var presets = [];
     if (groups[lastGroup]) presets = groups[lastGroup].presets;
     else {
@@ -4030,70 +4047,62 @@
       });
     }
     var p = presets[idx];
-    if (!p) return;
-    // p18e: 그라데이션/테두리 색 2 라우팅
-    if (ns === 'callout-bg2') {
-      var isSoft2 = lastGroup.indexOf('_soft') >= 0;
-      var c2v = isSoft2 ? (p.bg || p.color) : (p.color || p.bg);
-      box.setAttribute('data-bg2', c2v);
-      applyCalloutBg(box);
-      return;
-    }
-    if (ns === 'callout-border2') {
-      var isSoftB2 = lastGroup.indexOf('_soft') >= 0;
-      var cb2v = isSoftB2 ? (p.bg || p.color) : (p.color || p.bg);
-      box.setAttribute('data-border-color2', cb2v);
-      applyBorderToBox(box);
-      return;
-    }
-    if (ns === 'callout-bg') {
-      // 색 1 (그라데이션 색 1 또는 단색 배경)
-      var isSoft1 = lastGroup.indexOf('_soft') >= 0;
-      var c1v = isSoft1 ? (p.bg || p.color) : (p.color || p.bg);
-      box.setAttribute('data-bg', c1v);
-      box.setAttribute('data-bg-hex', c1v);
-      box.style.backgroundColor = c1v;
+    if (!p) { console.warn('[p18f] preset not found', {ns:ns, target:target, idx:idx, lastGroup:lastGroup}); return; }
+
+    // p18f: 통일 규칙 — swatch 로 보인 색을 그대로 적용
+    //  - 연한 그룹(*_soft) 이면 p.bg (파스텔 rgba)
+    //  - 짙은 그룹(notion/site) 이면 p.color (짙은 hex)
+    //  - 사용자 그룹 이면 p.color || p.bg
+    var isSoft = lastGroup.indexOf('_soft') >= 0;
+    var isBuiltin = !!groups[lastGroup];
+    var chosen;
+    if (!isBuiltin) chosen = p.color || p.bg;
+    else if (isSoft) chosen = p.bg || p.color;
+    else chosen = p.color || p.bg;
+
+    // ns 별 세팅
+    if (ns === 'callout-bg' || (target === 'bg' && ns === 'bg')) {
+      // 그라데이션·패턴이면 c1 (data-bg-hex), solid 면 backgroundColor + data-bg
+      box.setAttribute('data-bg-hex', chosen);
+      box.setAttribute('data-bg', chosen);
+      box.style.backgroundColor = chosen;
       applyCalloutBg(box);
       maybeAutoTextColor();
-      return;
-    }
-    if (ns === 'callout-border') {
-      var isSoftBB = lastGroup.indexOf('_soft') >= 0;
-      var cbb = isSoftBB ? (p.bg || p.color) : (p.color || p.bg);
-      box.setAttribute('data-border-color', cbb);
-      box.setAttribute('data-border-hex', cbb);
+    } else if (ns === 'callout-bg2') {
+      box.setAttribute('data-bg2', chosen);
+      applyCalloutBg(box);
+    } else if (ns === 'callout-border' || (target === 'border' && ns === 'border')) {
+      box.setAttribute('data-border-color', chosen);
+      box.setAttribute('data-border-hex', chosen);
       applyBorderToBox(box);
-      return;
-    }
-    if (target === 'bg') {
-      // 배경은 bg 값 (rgba 형태)
-      // p14a: backgroundColor 만 재가 (배경 이미지 유지)
-      box.style.backgroundColor = p.bg;
-      box.setAttribute('data-bg', p.bg);
-      var rgb = parseRgb(p.bg);
-      if (rgb) box.setAttribute('data-bg-hex', 'rgb('+rgb.r+','+rgb.g+','+rgb.b+')');
-      maybeAutoTextColor();
+    } else if (ns === 'callout-border2') {
+      box.setAttribute('data-border-color2', chosen);
+      applyBorderToBox(box);
     } else if (target === 'icon') {
-      var isSoftGroup = lastGroup.indexOf('_soft') >= 0;
-      var applyColor = isSoftGroup ? p.bg : p.color;
       var iconEl = box.querySelector('.callout-icon');
       if (iconEl && iconEl.classList.contains('is-shape')) {
-        iconEl.style.setProperty('--icon-color', applyColor);
-        if (typeof updateShapeSpanStyle === "function") updateShapeSpanStyle(iconEl);
+        iconEl.style.setProperty('--icon-color', chosen);
+        if (typeof updateShapeSpanStyle === 'function') updateShapeSpanStyle(iconEl);
       }
-      box.setAttribute('data-icon-color', applyColor);
-    } else if (target === 'border') {
-      // p13a: 테두리 색상 (연한 그룹이면 bg 값)
-      var isSoft = lastGroup.indexOf('_soft') >= 0;
-      var c = isSoft ? p.bg : p.color;
-      box.setAttribute('data-border-color', c);
-      applyBorderToBox(box);
+      box.setAttribute('data-icon-color', chosen);
     } else if (target === 'text') {
-      box.style.color = p.color;
+      box.style.color = chosen;
       var bodyEl = box.querySelector('.callout-body');
-      if (bodyEl) bodyEl.style.color = p.color;
+      if (bodyEl) bodyEl.style.color = chosen;
       box.setAttribute('data-text-color', 'custom');
-      box.setAttribute('data-text-hex', p.color);
+      box.setAttribute('data-text-hex', chosen);
+    } else {
+      // fallback: 기존 bg 로직
+      box.style.backgroundColor = chosen;
+      box.setAttribute('data-bg', chosen);
+      var rgb = parseRgb(chosen);
+      if (rgb) box.setAttribute('data-bg-hex', 'rgb('+rgb.r+','+rgb.g+','+rgb.b+')');
+      maybeAutoTextColor();
+    }
+
+    // p18f: 팝업 body 재렌더로 색 픽커/미리보기 값 동기화
+    if (typeof renderCalloutPopupBody === 'function' && document.getElementById('ep-cal-popup-body')) {
+      renderCalloutPopupBody();
     }
   }
 
@@ -4153,6 +4162,9 @@
       box.style.backgroundColor = newBg;
       box.setAttribute('data-bg', newBg);
       box.setAttribute('data-bg-hex', hex);
+      // p18f: 그라데이션/패턴 모드면 재적용
+      var _bm = box.getAttribute('data-bg-mode');
+      if (_bm === 'gradient' || _bm === 'pattern') applyCalloutBg(box);
       maybeAutoTextColor();
     } else if (target === 'icon') {
       var iconEl = box.querySelector('.callout-icon');
