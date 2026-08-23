@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19h';
+  var VERSION = 'v2.0-β-p19i';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -9063,16 +9063,19 @@
     });
     var html = parts.join('\n');
 
-    // p19g: 루비를 sanitizer-proof 마커 텍스트로 변환.
-    //   <mark class="ddl-ruby" data-rt="X">Y</mark> → ⟪rt:X⟫Y⟪/rt⟫
-    //   Ghost 가 <mark>·class 를 지워도 마커는 순수 텍스트라 남음.
-    //   페이지 로드 시 injectSiteGlobalCSS() 옆에서 restoreRubyMarkers() 가
-    //   다시 <mark class="ddl-ruby"> 로 복원.
-    html = html.replace(/<mark\s[^>]*class="ddl-ruby"[^>]*data-rt="([^"]*)"[^>]*>([\s\S]*?)<\/mark>/g,
-      function(_m, rt, inner){ return '\u27EArt:' + rt + '\u27EB' + inner + '\u27EA/rt\u27EB'; });
-    // data-rt 가 class 앞에 있는 케이스 대비 (속성 순서 다양성)
-    html = html.replace(/<mark\s[^>]*data-rt="([^"]*)"[^>]*class="ddl-ruby"[^>]*>([\s\S]*?)<\/mark>/g,
-      function(_m, rt, inner){ return '\u27EArt:' + rt + '\u27EB' + inner + '\u27EA/rt\u27EB'; });
+    // p19i: 저장 전 mark.ddl-ruby 안 시각화용 <span.ddl-ruby-rt> 제거
+    html = html.replace(/(<mark\s[^>]*ddl-ruby[^>]*>)([\s\S]*?)(<\/mark>)/g, function(_m, open, inner, close){
+      return open + inner.replace(/<span[^>]*class="ddl-ruby-rt"[^>]*>[\s\S]*?<\/span>/g, '') + close;
+    });
+
+    // p19g/i: 루비 → 마커 텍스트. data-rt 에 < 있으면 rt-html, 없으면 rt.
+    function _rubyMarker(_m, rt, inner){
+      var dec = rt.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&amp;/g,'&');
+      var tag = (dec.indexOf('<') >= 0) ? 'rt-html' : 'rt';
+      return '\u27EA' + tag + ':' + dec + '\u27EB' + inner + '\u27EA/' + tag + '\u27EB';
+    }
+    html = html.replace(/<mark\s[^>]*class="ddl-ruby"[^>]*data-rt="([^"]*)"[^>]*>([\s\S]*?)<\/mark>/g, _rubyMarker);
+    html = html.replace(/<mark\s[^>]*data-rt="([^"]*)"[^>]*class="ddl-ruby"[^>]*>([\s\S]*?)<\/mark>/g, _rubyMarker);
 
     // p13e: 저장 HTML 진단 로그
     log('[SAVE-HTML] 길이:', html.length, '/ 콜아웃:', (html.match(/callout-box/g)||[]).length, '/ 구분선:', (html.match(/ddl-divider-block/g)||[]).length, '/ 버튼:', (html.match(/ddl-button-block/g)||[]).length, '/ kg-card:', (html.match(/kg-card-begin/g)||[]).length);
@@ -10138,6 +10141,88 @@
   //         제거되어 블로그 렌더 시 사라지는 문제 (2026-08-23 확인).
   //   방식: <span> 은 sanitize 허용 목록에 있어 안전. data-rt 속성도 유지됨.
   //         CSS ::before 로 attr(data-rt) 를 위에 얹어 표시.
+  // p19i: 다이얼로그에 서식 툴바 (B/I/U/글자색) 주입.
+  //   dialog input 을 contenteditable div 로 승격 → 드래그 선택 후 서식.
+  //   확인 클릭 직전 innerHTML 을 input.value 로 대체 (HTML 문자열 저장).
+  function _augmentRubyDialogWithToolbar(initialHtml){
+    var modal = document.querySelector('.ep-modal, .ep-popup');
+    if (!modal) return;
+    var input = modal.querySelector('input[type="text"]');
+    if (!input || input.__rubyAugmented) return;
+    input.__rubyAugmented = true;
+    var wrap = input.parentNode;
+
+    var editable = document.createElement('div');
+    editable.setAttribute('contenteditable', 'true');
+    editable.className = 'ep-ruby-editable';
+    editable.style.cssText = 'min-height:1.8em; padding:0.4em 0.6em; background:transparent; border:none; border-bottom:1px solid rgba(15,58,58,0.35); font-family:inherit; color:var(--color,#0F3A3A); box-sizing:border-box; outline:none; font-size:0.9em; line-height:1.5;';
+    if (initialHtml && initialHtml.indexOf('<') >= 0) editable.innerHTML = initialHtml;
+    else editable.textContent = input.value || initialHtml || '';
+    wrap.insertBefore(editable, input);
+    input.style.display = 'none';
+
+    var toolbar = document.createElement('div');
+    toolbar.style.cssText = 'display:flex; gap:4px; margin-top:6px; align-items:center; flex-wrap:wrap;';
+    toolbar.innerHTML = ''
+      + '<button type="button" data-rcmd="bold"       class="pop-btn" style="font-weight:800;" title="굵게">B</button>'
+      + '<button type="button" data-rcmd="italic"     class="pop-btn" style="font-style:italic; font-family:serif;" title="기울임">I</button>'
+      + '<button type="button" data-rcmd="underline"  class="pop-btn" style="text-decoration:underline;" title="밑줄">U</button>'
+      + '<span style="width:1px; height:1em; background:rgba(15,58,58,0.2); margin:0 4px;"></span>'
+      + '<label style="display:inline-flex; align-items:center; gap:4px; font-size:0.75em; opacity:0.7;">글자색 <input type="color" data-rcmd="color" value="#0F3A3A" style="width:2em; height:1.6em; padding:0; border:1px solid rgba(15,58,58,0.3); border-radius:3px; cursor:pointer;"></label>'
+      + '<button type="button" data-rcmd="clearFormat" class="pop-btn" title="서식 지우기" style="margin-left:auto;">✕서식</button>';
+    wrap.appendChild(toolbar);
+
+    toolbar.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    toolbar.addEventListener('click', function(e){
+      var btn = e.target.closest('[data-rcmd]');
+      if (!btn) return;
+      var cmd = btn.getAttribute('data-rcmd');
+      editable.focus();
+      if (cmd === 'bold') document.execCommand('bold', false, null);
+      else if (cmd === 'italic') document.execCommand('italic', false, null);
+      else if (cmd === 'underline') document.execCommand('underline', false, null);
+      else if (cmd === 'clearFormat') document.execCommand('removeFormat', false, null);
+    });
+    toolbar.addEventListener('input', function(e){
+      if (e.target.getAttribute && e.target.getAttribute('data-rcmd') === 'color') {
+        editable.focus();
+        document.execCommand('foreColor', false, e.target.value);
+      }
+    });
+
+    // 확인 버튼 hook (mousedown 이 dialog 콜백보다 먼저 실행됨)
+    var btns = modal.querySelectorAll('button');
+    var okBtn = null;
+    for (var i = btns.length - 1; i >= 0; i--){
+      var t = (btns[i].textContent || '').trim();
+      if (t === '확인' || t === 'OK' || btns[i].classList.contains('is-primary')) { okBtn = btns[i]; break; }
+    }
+    if (!okBtn && btns.length) okBtn = btns[btns.length - 1];
+    if (okBtn && !okBtn.__rubyHooked) {
+      okBtn.__rubyHooked = true;
+      okBtn.addEventListener('mousedown', function(){
+        input.value = editable.innerHTML || '';
+      }, true);
+    }
+    editable.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        input.value = editable.innerHTML || '';
+        if (okBtn) okBtn.click();
+      }
+    });
+
+    editable.focus();
+    try {
+      var r = document.createRange();
+      r.selectNodeContents(editable);
+      r.collapse(false);
+      var s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    } catch(_){}
+  }
+
   function insertRuby(){
     if (!savedRange) return;
     restoreRange();
@@ -10149,25 +10234,29 @@
     var baseText = sel.toString();
     saveRange();
     openEditorDialog('윗글씨 (루비)', [
-      { key:'ruby', label:'선택한 "' + baseText + '" 위에 표시할 내용', default:'', placeholder:'한글·영문·한자·기호 등 자유롭게' }
+      { key:'ruby', label:'"' + baseText + '" 위에 표시할 내용', default:'', placeholder:'서식 툴바로 굵기·색 지정 가능' }
     ], function(vals){
       if (!vals) return;
-      var rubyText = (vals.ruby || '').trim();
-      if (!rubyText) return;
+      var rubyHtml = (vals.ruby || '').trim();
+      if (!rubyHtml || rubyHtml === '<br>') return;
       restoreRange();
       var sel2 = window.getSelection();
       if (!sel2 || sel2.rangeCount === 0) return;
       var range = sel2.getRangeAt(0);
-      // p19f: <mark class="ddl-ruby" data-rt="..."> 방식.
-      //   <mark> 는 형광펜에서 이미 검증된 sanitizer 통과 태그.
-      //   data-* 속성도 형광펜(data-hl-spec) 처럼 그대로 저장·복원됨.
       var el = document.createElement('mark');
       el.className = 'ddl-ruby';
-      el.setAttribute('data-rt', rubyText);
-      el.setAttribute('title', rubyText);
-      // 배경색 제거 (mark 기본 노란 배경 방지)
+      el.setAttribute('data-rt', rubyHtml);
+      el.setAttribute('title', rubyHtml.replace(/<[^>]+>/g,''));
       el.style.background = 'transparent';
       el.style.color = 'inherit';
+      // HTML 이면 편집 중 시각화용 rt-span 삽입 (저장 시 제거됨)
+      if (rubyHtml.indexOf('<') >= 0) {
+        var _rtSpan = document.createElement('span');
+        _rtSpan.className = 'ddl-ruby-rt';
+        _rtSpan.setAttribute('contenteditable', 'false');
+        _rtSpan.innerHTML = rubyHtml;
+        el.appendChild(_rtSpan);
+      }
       try {
         el.appendChild(range.extractContents());
         range.insertNode(el);
@@ -10176,8 +10265,9 @@
         nr.selectNodeContents(el);
         sel2.addRange(nr);
         saveRange();
-      } catch(err){ console.warn('[p19f] ruby error', err); }
+      } catch(err){ console.warn('[p19i] ruby error', err); }
     });
+    setTimeout(function(){ _augmentRubyDialogWithToolbar(''); }, 30);
   }
 
   function toggleSupSub(which){
@@ -10257,24 +10347,37 @@
           parent.removeChild(mark);
         }, { okLabel:'삭제', cancelLabel:'취소' });
       } else {
-        // 수정: 현재 data-rt 값으로 다이얼로그
+        // 수정: 서식 툴바 지원
         var current = mark.getAttribute('data-rt') || '';
-        var baseText = mark.textContent || '';
+        var baseText = (mark.textContent || '').replace(/(current-plain-hack)/, '');
+        // rt-span 자체 텍스트는 baseText 에서 제거
+        var rtSpan = mark.querySelector(':scope > .ddl-ruby-rt');
+        if (rtSpan) baseText = (mark.childNodes[mark.childNodes.length-1] && mark.childNodes[mark.childNodes.length-1].textContent) || baseText;
         openEditorDialog('루비 수정', [
-          { key:'ruby', label:'"' + baseText + '" 위에 표시할 내용', default: current, placeholder:'비우고 확인 = 루비 삭제' }
+          { key:'ruby', label:'"' + baseText + '" 위에 표시할 내용', default: current.replace(/<[^>]+>/g,''), placeholder:'비우고 확인 = 루비 삭제' }
         ], function(vals){
           if (!vals) return;
           var newRt = (vals.ruby || '').trim();
-          if (!newRt) {
-            // 빈 값 = 삭제
+          if (!newRt || newRt === '<br>') {
             var parent = mark.parentNode;
             while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
             parent.removeChild(mark);
           } else {
             mark.setAttribute('data-rt', newRt);
-            mark.setAttribute('title', newRt);
+            mark.setAttribute('title', newRt.replace(/<[^>]+>/g,''));
+            // 기존 rt-span 제거 후 새 HTML 이면 재삽입
+            var oldSpan = mark.querySelector(':scope > .ddl-ruby-rt');
+            if (oldSpan) oldSpan.parentNode.removeChild(oldSpan);
+            if (newRt.indexOf('<') >= 0) {
+              var _rt = document.createElement('span');
+              _rt.className = 'ddl-ruby-rt';
+              _rt.setAttribute('contenteditable', 'false');
+              _rt.innerHTML = newRt;
+              mark.insertBefore(_rt, mark.firstChild);
+            }
           }
         });
+        setTimeout(function(){ _augmentRubyDialogWithToolbar(current); }, 30);
       }
       e.preventDefault();
       e.stopPropagation();
@@ -11872,7 +11975,8 @@
     '  font-weight: normal !important;',
     '}',
     '[contenteditable] mark.ddl-ruby { cursor: pointer !important; }',
-    'mark.ddl-ruby::before {',
+    /* rt-span 이 있으면 그것으로 표시, 없으면 ::before 로 attr(data-rt) */
+    'mark.ddl-ruby:not(:has(.ddl-ruby-rt))::before {',
     '  content: attr(data-rt) !important;',
     '  position: absolute !important;',
     '  left: 50% !important;',
@@ -11886,6 +11990,21 @@
     '  font-family: inherit !important;',
     '  pointer-events: none !important;',
     '  visibility: visible !important;',
+    '}',
+    'mark.ddl-ruby .ddl-ruby-rt {',
+    '  position: absolute !important;',
+    '  left: 50% !important;',
+    '  bottom: 100% !important;',
+    '  transform: translateX(-50%) !important;',
+    '  font-size: 0.5em !important;',
+    '  line-height: 1 !important;',
+    '  white-space: nowrap !important;',
+    '  opacity: 0.85 !important;',
+    '  color: inherit !important;',
+    '  font-family: inherit !important;',
+    '  pointer-events: none !important;',
+    '  display: block !important;',
+    '  background: transparent !important;',
     '}',
     /* 표준 <ruby> 도 지원 (편집기 안 임시 상태 대비) */
     'ruby { display: ruby; ruby-position: over; }',
@@ -11903,10 +12022,8 @@
     } catch(_){}
   }
 
-  // p19g: 저장된 루비 마커(⟪rt:X⟫Y⟪/rt⟫)를 <mark class="ddl-ruby"> 로 복원.
-  //   Ghost sanitizer 가 <mark> 를 지워도 유니코드 마커는 텍스트라 살아남음.
-  //   페이지 로드 시 이 함수가 텍스트 노드를 스캔해 원본 요소를 재구성.
-  var RUBY_MARKER_RE = /\u27EArt:([^\u27EA\u27EB]*)\u27EB([\s\S]*?)\u27EA\/rt\u27EB/g;
+  // p19g/i: 루비 마커 복원. rt (텍스트) / rt-html (HTML 서식) 두 종류.
+  var RUBY_MARKER_RE = /\u27EA(rt(?:-html)?):([^\u27EA\u27EB]*)\u27EB([\s\S]*?)\u27EA\/\1\u27EB/g;
 
   function restoreRubyMarkers(root){
     root = root || document.body;
@@ -11915,7 +12032,7 @@
     try {
       walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
         acceptNode: function(node){
-          if (!node.nodeValue || node.nodeValue.indexOf('\u27EArt:') < 0) return NodeFilter.FILTER_REJECT;
+          if (!node.nodeValue || node.nodeValue.indexOf('\u27EArt') < 0) return NodeFilter.FILTER_REJECT;
           // 편집기 UI 안 (팝업/툴바) 은 건너뜀
           var p = node.parentNode;
           while (p && p !== root) {
@@ -11931,7 +12048,7 @@
     while ((n = walker.nextNode())) targets.push(n);
     targets.forEach(function(textNode){
       var text = textNode.nodeValue;
-      if (!text || text.indexOf('\u27EArt:') < 0) return;
+      if (!text || text.indexOf('\u27EArt') < 0) return;
       var frag = document.createDocumentFragment();
       var lastIdx = 0;
       var re = new RegExp(RUBY_MARKER_RE.source, 'g');
@@ -11940,10 +12057,19 @@
         if (m.index > lastIdx) frag.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
         var mark = document.createElement('mark');
         mark.className = 'ddl-ruby';
-        mark.setAttribute('data-rt', m[1]);
+        var rtVal = m[2];
+        mark.setAttribute('data-rt', rtVal);
+        mark.setAttribute('title', rtVal.replace(/<[^>]+>/g,''));
         mark.style.background = 'transparent';
         mark.style.color = 'inherit';
-        mark.appendChild(document.createTextNode(m[2]));
+        // rt-html 이면 자식 span 으로 innerHTML 삽입 (CSS ::before 대신)
+        if (m[1] === 'rt-html' && rtVal.indexOf('<') >= 0) {
+          var rtSpan = document.createElement('span');
+          rtSpan.className = 'ddl-ruby-rt';
+          rtSpan.innerHTML = rtVal;
+          mark.appendChild(rtSpan);
+        }
+        mark.appendChild(document.createTextNode(m[3]));
         frag.appendChild(mark);
         lastIdx = re.lastIndex;
       }
@@ -11972,7 +12098,7 @@
           for (var j=0; j<mut.addedNodes.length; j++){
             var nn = mut.addedNodes[j];
             if (nn.nodeType === 1) { restoreRubyMarkers(nn); }
-            else if (nn.nodeType === 3 && nn.nodeValue && nn.nodeValue.indexOf('\u27EArt:') >= 0) {
+            else if (nn.nodeType === 3 && nn.nodeValue && nn.nodeValue.indexOf('\u27EArt') >= 0) {
               restoreRubyMarkers(nn.parentNode || document.body);
             }
           }
