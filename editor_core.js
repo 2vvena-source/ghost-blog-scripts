@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p17j';
+  var VERSION = 'v2.0-β-p18c';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2974,54 +2974,243 @@
     return html;
   }
 
+
+  // p18c: 콜아웃 그라데이션/패턴 통합 프리셋
+  function _calCompositeMakePreview(preset){
+    if (preset.mode === 'gradient') {
+      return 'background: linear-gradient(' + (preset.angle||45) + 'deg, ' + preset.bg + ' 0%, ' + preset.bg2 + ' 100%);';
+    }
+    if (preset.mode === 'pattern') {
+      var s = preset.patternSize || 10;
+      var c1 = preset.bg, c2 = preset.bg2, p = preset.pattern || 'dot';
+      if (p === 'dot') {
+        return 'background: radial-gradient(circle at ' + (s/2) + 'px ' + (s/2) + 'px, ' + c2 + ' ' + (s*0.15) + 'px, ' + c1 + ' ' + (s*0.16) + 'px); background-size: ' + s + 'px ' + s + 'px;';
+      } else if (p === 'stripe') {
+        return 'background: repeating-linear-gradient(45deg, ' + c1 + ' 0, ' + c1 + ' ' + (s/2) + 'px, ' + c2 + ' ' + (s/2) + 'px, ' + c2 + ' ' + s + 'px);';
+      } else if (p === 'check') {
+        return 'background: conic-gradient(' + c1 + ' 25%, ' + c2 + ' 25% 50%, ' + c1 + ' 50% 75%, ' + c2 + ' 75%); background-size: ' + s + 'px ' + s + 'px;';
+      } else if (p === 'zigzag') {
+        return 'background: linear-gradient(135deg, ' + c1 + ' 25%, transparent 25%) 0 0/' + s + 'px ' + s + 'px, linear-gradient(225deg, ' + c1 + ' 25%, transparent 25%) 0 0/' + s + 'px ' + s + 'px, ' + c2 + ';';
+      }
+    }
+    return 'background: ' + preset.bg + ';';
+  }
+
+  function renderCalloutCompositePresetSection(opts){
+    var s = loadCalloutSettings();
+    if (!s.byTarget['callout-composite']) {
+      s.byTarget['callout-composite'] = { userPresets:[], lastGroup:'기본' };
+    }
+    var st = s.byTarget['callout-composite'];
+    var presets = st.userPresets || [];
+    var groups = { '기본': [] };
+    presets.forEach(function(p){
+      var g = p.group || '기본';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(p);
+    });
+    var groupKeys = Object.keys(groups);
+    var lastGroup = st.lastGroup;
+    if (groupKeys.indexOf(lastGroup) < 0) lastGroup = groupKeys[0];
+
+    var html = '';
+    html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;">'
+         + '<div class="row-label" style="font-weight:600;">💾 조합 프리셋 (색1+색2+각도+모드)</div></div>';
+    html += '<div class="row"><button type="button" class="pop-btn" data-cal-composite-save="1" style="width:100%; background:rgba(255,154,118,0.15); border-color:rgba(255,154,118,0.4);">현재 조합을 프리셋으로 저장</button></div>';
+
+    if (presets.length > 0) {
+      html += '<div class="row"><div class="row-label">프리셋 그룹</div><div style="display:flex; flex-wrap:wrap; gap:0.35em;">';
+      groupKeys.forEach(function(g){
+        var cnt = (groups[g] || []).length;
+        html += '<button type="button" class="pop-btn' + (g===lastGroup?' is-active':'') + '" data-cal-composite-group="' + escapeAttr(g) + '">' + escapeHtml(g) + ' (' + cnt + ')</button>';
+      });
+      html += '</div></div>';
+
+      var curPresets = groups[lastGroup] || [];
+      if (curPresets.length > 0) {
+        html += '<div class="row"><div class="ep-preset-grid" style="grid-template-columns:repeat(auto-fill, minmax(72px, 1fr)); gap:6px;">';
+        curPresets.forEach(function(p){
+          var globalIdx = presets.indexOf(p);
+          var previewStyle = _calCompositeMakePreview(p);
+          html += '<div class="ep-preset-chip" data-cal-composite-apply="' + globalIdx + '" style="position:relative;">'
+               + '<div style="width:100%; height:28px; border-radius:4px; ' + previewStyle + ' border:1px solid rgba(15,58,58,0.15);"></div>'
+               + '<div style="font-size:0.72em; margin-top:3px; text-align:center;">' + escapeHtml(p.name || '무제') + '</div>'
+               + '<button type="button" class="ep-preset-del" data-cal-composite-del="' + globalIdx + '" title="삭제" style="position:absolute; top:-6px; right:-6px; width:18px; height:18px; border-radius:50%; background:#000; color:#fff; border:none; cursor:pointer; font-size:12px; line-height:16px; opacity:0; transition:opacity 0.15s;">×</button>'
+               + '</div>';
+        });
+        html += '</div></div>';
+      }
+    } else {
+      html += '<div class="row" style="opacity:0.55; font-size:0.82em; text-align:center; padding:0.5em;">저장된 조합 프리셋이 아직 없습니다.</div>';
+    }
+    return html;
+  }
+
+  function openCalloutCompositeSaveDialog(opts){
+    var _s = loadCalloutSettings();
+    if (!_s.byTarget['callout-composite']) _s.byTarget['callout-composite'] = { userPresets:[], lastGroup:'기본' };
+    var _grp = [];
+    (_s.byTarget['callout-composite'].userPresets || []).forEach(function(p){
+      var g = p.group || '기본';
+      if (_grp.indexOf(g) < 0) _grp.push(g);
+    });
+    if (_grp.length === 0) _grp = ['기본'];
+
+    openEditorDialog('콜아웃 조합 프리셋 저장', [
+      { key:'name',  label:'프리셋 이름', default:'내 조합', placeholder:'예: 노을 그라데이션' },
+      { key:'group', label:'그룹',       type:'group', options:_grp, default:(_s.byTarget['callout-composite'].lastGroup && _grp.indexOf(_s.byTarget['callout-composite'].lastGroup)>=0 ? _s.byTarget['callout-composite'].lastGroup : _grp[0]) }
+    ], function(vals){
+      if (!vals) return;
+      var g = (vals.group||'').trim() || '기본';
+      _saveCalloutCompositePreset(opts, (vals.name||'내 조합').trim(), g);
+    });
+  }
+
+  function _saveCalloutCompositePreset(opts, name, group){
+    var s = loadCalloutSettings();
+    if (!s.byTarget['callout-composite']) s.byTarget['callout-composite'] = { userPresets:[], lastGroup:'기본' };
+    s.byTarget['callout-composite'].userPresets.push({
+      name: name, group: group,
+      mode: opts.bgMode, bg: opts.bg, bg2: opts.bg2,
+      angle: opts.gradientAngle, pattern: opts.pattern, patternSize: opts.patternSize
+    });
+    s.byTarget['callout-composite'].lastGroup = group;
+    saveCalloutSettings(s);
+    renderCalloutPopupBody();
+  }
+
+  function _applyCalloutCompositePreset(box, globalIdx){
+    var s = loadCalloutSettings();
+    var st = s.byTarget['callout-composite'];
+    if (!st) return;
+    var p = (st.userPresets || [])[globalIdx];
+    if (!p) return;
+    box.setAttribute('data-bg-mode', p.mode || 'gradient');
+    if (p.bg) { box.setAttribute('data-bg-hex', p.bg); box.setAttribute('data-bg', p.bg); box.style.backgroundColor = p.bg; }
+    if (p.bg2) box.setAttribute('data-bg2', p.bg2);
+    if (p.angle != null) box.setAttribute('data-gradient-angle', String(p.angle));
+    if (p.pattern) box.setAttribute('data-pattern', p.pattern);
+    if (p.patternSize != null) box.setAttribute('data-pattern-size', String(p.patternSize));
+    applyCalloutBg(box);
+    renderCalloutPopupBody();
+  }
+
+  function _deleteCalloutCompositePreset(globalIdx){
+    var s = loadCalloutSettings();
+    var st = s.byTarget['callout-composite'];
+    if (!st || !st.userPresets) return;
+    st.userPresets.splice(globalIdx, 1);
+    saveCalloutSettings(s);
+    renderCalloutPopupBody();
+  }
+
   function renderBgTab(){
     var box = calPopupLock || selectedCallout;
     if (!box) return '';
-    var bg = box.getAttribute('data-bg') || box.style.background || '';
+    // p18c: bgMode 도입 — solid/gradient/pattern/image
+    // 기존 배경 이미지가 있으면 image 모드로 기본 처리
     var bgImage = box.getAttribute('data-bg-image') || '';
+    var bgMode = box.getAttribute('data-bg-mode');
+    if (!bgMode) bgMode = bgImage ? 'image' : 'solid';
+    var bg = box.getAttribute('data-bg') || box.style.background || '';
+    var bg2 = box.getAttribute('data-bg2') || '#FF9A76';
+    var gradientAngle = parseInt(box.getAttribute('data-gradient-angle') || '45', 10);
+    var pattern = box.getAttribute('data-pattern') || 'dot';
+    var patternSize = parseInt(box.getAttribute('data-pattern-size') || '10', 10);
     var radius = box.getAttribute('data-radius') || '6';
     var link = box.getAttribute('data-link') || '';
     var bgOpacity = box.getAttribute('data-bg-opacity') || '100';
-    var settings = loadCalloutSettings();
-    var groupKeys = ['notion', 'site'];
-    var userGroups = {};
-    (settings.userPresets || []).forEach(function(p){
-      var g = p.group || '내 프리셋';
-      if (!userGroups[g]) userGroups[g] = [];
-      userGroups[g].push(p);
-    });
-    Object.keys(userGroups).forEach(function(k){ if (groupKeys.indexOf(k) < 0) groupKeys.push(k); });
+    var curBgHex = toHex(box.getAttribute('data-bg-hex') || box.style.background || box.getAttribute('data-bg') || '#F5F5F5');
+    var curBg2Hex = toHex(bg2);
 
-    var curBgHex = toHex(box.style.background || box.getAttribute('data-bg') || '#F5F5F5');
-    var html = renderColorSection('bg', curBgHex);
+    var html = '';
 
-    html += '<div class="row"><div class="row-label">배경 투명도 (' + bgOpacity + '%)</div>'
-      + '<input type="range" id="pop-bg-opacity" min="0" max="100" step="5" value="' + bgOpacity + '" style="width:100%;">'
-      + '<div style="font-size:0.75em; opacity:0.55; margin-top:0.2em;">0으로 낮추면 콜아웃 배경이 완전히 사라져 페이지가 그대로 보입니다.</div>'
-      + '</div>';
+    // p18c: 배경 모드 4가지
+    html += '<div class="row"><div class="row-label">배경 모드</div><div>'
+      + '<button class="pop-btn' + (bgMode==='solid'?' is-active':'') + '" data-cal-set="bgMode" data-value="solid">단색</button>'
+      + '<button class="pop-btn' + (bgMode==='gradient'?' is-active':'') + '" data-cal-set="bgMode" data-value="gradient">그라데이션</button>'
+      + '<button class="pop-btn' + (bgMode==='pattern'?' is-active':'') + '" data-cal-set="bgMode" data-value="pattern">패턴</button>'
+      + '<button class="pop-btn' + (bgMode==='image'?' is-active':'') + '" data-cal-set="bgMode" data-value="image">이미지</button>'
+      + '</div></div>';
 
-    // p14a: 배경 이미지 UI (업로드·크롭 재조정·투명도·제거)
-    var bgImgOpacity = box.getAttribute('data-bg-image-opacity') || '100';
-    html += '<div class="row"><div class="row-label">배경 이미지</div>'
-      + '<button class="pop-btn" data-bg-action="upload-image">' + (bgImage ? '이미지 교체' : '이미지 업로드') + '</button>'
-      + (bgImage ? '<button class="pop-btn" data-bg-action="recrop-image">크롭 재조정</button>' : '')
-      + (bgImage ? '<button class="pop-btn" data-bg-action="remove-image">이미지 제거</button>' : '')
-      + '</div>';
-    if (bgImage) {
-      html += '<div class="row"><div class="row-label">이미지 투명도 (' + bgImgOpacity + '%)</div>'
-        + '<input type="range" id="pop-bg-image-opacity" min="0" max="100" step="5" value="' + bgImgOpacity + '" style="width:100%;">'
-        + '<div style="font-size:0.75em; opacity:0.55; margin-top:0.2em;">0으로 낮추면 이미지가 거의 안 보여 배경색만 남습니다.</div>'
+    // 이미지 모드가 아니면 색 1 섹션 (namespace: callout-bg)
+    if (bgMode !== 'image') {
+      html += '<div class="row"><div class="row-label">' + (bgMode==='gradient'||bgMode==='pattern'?'색 1':'배경색') + '</div>'
+        + '<div class="ep-color-row"><input type="color" data-cal-set="bg" value="' + escapeAttr(curBgHex) + '"></div></div>';
+      html += renderColorSection('bg', curBgHex, 'callout-bg');
+    }
+
+    // 그라데이션·패턴이면 색 2 섹션 (namespace: callout-bg2)
+    if (bgMode === 'gradient' || bgMode === 'pattern') {
+      html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;"><div class="row-label" style="font-weight:600;">색 2</div>'
+        + '<div class="ep-color-row"><input type="color" data-cal-set="bg2" value="' + escapeAttr(curBg2Hex) + '"></div></div>';
+      html += renderColorSection('bg', curBg2Hex, 'callout-bg2');
+    }
+
+    // 그라데이션 방향
+    if (bgMode === 'gradient') {
+      html += '<div class="row"><div class="row-label">방향 (' + gradientAngle + '°)</div>'
+        + '<input type="range" data-cal-set="gradientAngle" min="0" max="360" step="15" value="' + gradientAngle + '" style="width:100%;">'
+        + '<div style="display:flex; gap:6px; margin-top:4px; flex-wrap:wrap;">'
+        + '<button type="button" class="pop-btn" data-cal-preset-angle="0">↑</button>'
+        + '<button type="button" class="pop-btn" data-cal-preset-angle="90">→</button>'
+        + '<button type="button" class="pop-btn" data-cal-preset-angle="180">↓</button>'
+        + '<button type="button" class="pop-btn" data-cal-preset-angle="270">←</button>'
+        + '<button type="button" class="pop-btn" data-cal-preset-angle="135">↘</button>'
+        + '<button type="button" class="pop-btn" data-cal-preset-angle="45">↗</button>'
+        + '</div></div>';
+    }
+
+    // 패턴 세부
+    if (bgMode === 'pattern') {
+      html += '<div class="row"><div class="row-label">패턴</div><div>'
+        + '<button type="button" class="pop-btn' + (pattern==='dot'?' is-active':'') + '" data-cal-set="pattern" data-value="dot">도트</button>'
+        + '<button type="button" class="pop-btn' + (pattern==='stripe'?' is-active':'') + '" data-cal-set="pattern" data-value="stripe">줄무늬</button>'
+        + '<button type="button" class="pop-btn' + (pattern==='check'?' is-active':'') + '" data-cal-set="pattern" data-value="check">체크</button>'
+        + '<button type="button" class="pop-btn' + (pattern==='zigzag'?' is-active':'') + '" data-cal-set="pattern" data-value="zigzag">지그재그</button>'
+        + '</div></div>';
+      html += '<div class="row"><div class="row-label">패턴 크기 (' + patternSize + 'px)</div>'
+        + '<input type="range" data-cal-set="patternSize" min="4" max="40" step="1" value="' + patternSize + '" style="width:100%;"></div>';
+    }
+
+    // 통합 프리셋 (그라데이션·패턴에서만)
+    if (bgMode === 'gradient' || bgMode === 'pattern') {
+      html += renderCalloutCompositePresetSection({
+        bgMode: bgMode, bg: curBgHex, bg2: curBg2Hex,
+        gradientAngle: gradientAngle, pattern: pattern, patternSize: patternSize
+      });
+    }
+
+    // 단색·그라데이션·패턴이면 배경 투명도 슬라이더 (이미지가 아닐 때)
+    if (bgMode !== 'image') {
+      html += '<div class="row"><div class="row-label">배경 투명도 (' + bgOpacity + '%)</div>'
+        + '<input type="range" id="pop-bg-opacity" min="0" max="100" step="5" value="' + bgOpacity + '" style="width:100%;">'
+        + '<div style="font-size:0.75em; opacity:0.55; margin-top:0.2em;">0으로 낮추면 콜아웃 배경이 완전히 사라져 페이지가 그대로 보입니다.</div>'
         + '</div>';
     }
 
-    // p13g: 콜아웃 폭 슬라이더 (25~100%, 5% 단위)
+    // 이미지 모드일 때만 기존 이미지 UI
+    if (bgMode === 'image') {
+      var bgImgOpacity = box.getAttribute('data-bg-image-opacity') || '100';
+      html += '<div class="row"><div class="row-label">배경 이미지</div>'
+        + '<button class="pop-btn" data-bg-action="upload-image">' + (bgImage ? '이미지 교체' : '이미지 업로드') + '</button>'
+        + (bgImage ? '<button class="pop-btn" data-bg-action="recrop-image">크롭 재조정</button>' : '')
+        + (bgImage ? '<button class="pop-btn" data-bg-action="remove-image">이미지 제거</button>' : '')
+        + '</div>';
+      if (bgImage) {
+        html += '<div class="row"><div class="row-label">이미지 투명도 (' + bgImgOpacity + '%)</div>'
+          + '<input type="range" id="pop-bg-image-opacity" min="0" max="100" step="5" value="' + bgImgOpacity + '" style="width:100%;">'
+          + '<div style="font-size:0.75em; opacity:0.55; margin-top:0.2em;">0으로 낮추면 이미지가 거의 안 보여 배경색만 남습니다.</div>'
+          + '</div>';
+      }
+    }
+
+    // 폭 슬라이더
     var widthPct = box.getAttribute('data-width-pct') || '100';
     html += '<div class="row"><div class="row-label">콜아웃 폭 (' + widthPct + '%)</div>'
       + '<input type="range" id="pop-width-pct" min="25" max="100" step="5" value="' + widthPct + '" style="width:100%;">'
       + '<div style="font-size:0.75em; opacity:0.55; margin-top:0.2em;">100%: 편집기 전체 폭. 100% 미만일 때 아래 정렬 적용됨.</div>'
       + '</div>';
-
-    // p13h: 콜아웃 자체 정렬 제거 - 정렬은 블록 정렬로 별도 처리 (p14 예정)
 
     html += '<div class="row"><div class="row-label">모서리 둥글기</div>'
       + '<select id="pop-radius">'
@@ -3046,38 +3235,64 @@
     var borderStyle = box.getAttribute('data-border-style') || 'none';
     var borderWidth = box.getAttribute('data-border-width') || '1';
     var borderColor = box.getAttribute('data-border-color') || '#0F3A3A';
+    var borderColor2 = box.getAttribute('data-border-color2') || '#FF9A76';
+    var borderMode = box.getAttribute('data-border-mode') || 'solid';  // solid | gradient
+    var borderAngle = parseInt(box.getAttribute('data-border-angle') || '45', 10);
     var borderOpacity = box.getAttribute('data-border-opacity') || '100';
 
     var html = '';
     // 스타일
-    html += '<div class="row"><div class="row-label">테두리 스타일</div>'
+    html += '<div class="row"><div class="row-label">테두리 스타일</div><div>'
       + '<button class="pop-btn' + (borderStyle==='none'?' is-active':'') + '" data-border-style="none">없음</button>'
       + '<button class="pop-btn' + (borderStyle==='solid'?' is-active':'') + '" data-border-style="solid">실선</button>'
       + '<button class="pop-btn' + (borderStyle==='dashed'?' is-active':'') + '" data-border-style="dashed">점선</button>'
       + '<button class="pop-btn' + (borderStyle==='dotted'?' is-active':'') + '" data-border-style="dotted">동그란 점선</button>'
       + '<button class="pop-btn' + (borderStyle==='double'?' is-active':'') + '" data-border-style="double">실선 두 겹</button>'
-      + '</div>';
+      + '</div></div>';
 
-    // 두께 (스타일이 없음이 아닐 때만)
     if (borderStyle !== 'none') {
       html += '<div class="row"><div class="row-label">두께 (' + borderWidth + 'px)</div>'
-        + '<input type="range" id="pop-border-width" min="1" max="10" step="1" value="' + borderWidth + '" style="width:100%;">'
-        + '</div>';
+        + '<input type="range" id="pop-border-width" min="1" max="10" step="1" value="' + borderWidth + '" style="width:100%;"></div>';
 
-      // 투명도
       html += '<div class="row"><div class="row-label">투명도 (' + borderOpacity + '%)</div>'
-        + '<input type="range" id="pop-border-opacity" min="0" max="100" step="5" value="' + borderOpacity + '" style="width:100%;">'
-        + '</div>';
+        + '<input type="range" id="pop-border-opacity" min="0" max="100" step="5" value="' + borderOpacity + '" style="width:100%;"></div>';
 
-      // 색상 - 배경과 동일 시스템 (target=border)
-      html += renderColorSection('border', borderColor);
+      // p18c: 테두리 색상 모드 (단색 | 그라데이션)
+      html += '<div class="row"><div class="row-label">테두리 색상 모드</div><div>'
+        + '<button class="pop-btn' + (borderMode==='solid'?' is-active':'') + '" data-cal-set="borderMode" data-value="solid">단색</button>'
+        + '<button class="pop-btn' + (borderMode==='gradient'?' is-active':'') + '" data-cal-set="borderMode" data-value="gradient">그라데이션</button>'
+        + '</div></div>';
 
-      // p13b: 테두리 컷아웃
-      var borderCutout = box.getAttribute('data-border-cutout') === '1';
-      html += '<div class="row"><div class="row-label">컷아웃 (뒤가 뚫림)</div>'
-        + '<label style="display:flex; align-items:center; gap:0.4em; font-size:0.85em;">'
-        + '<input type="checkbox" id="pop-border-cutout"' + (borderCutout?' checked':'') + '> 테두리를 뚫어서 뒤가 보이게 (색 대신 투명)'
-        + '</label></div>';
+      // 색상 - 단색이면 하나, 그라데이션이면 색1+색2+각도
+      html += '<div class="row"><div class="row-label">' + (borderMode==='gradient'?'색 1':'테두리 색') + '</div>'
+        + '<div class="ep-color-row"><input type="color" data-cal-set="borderColor" value="' + escapeAttr(toHex(borderColor)) + '"></div></div>';
+      html += renderColorSection('border', borderColor, 'callout-border');
+
+      if (borderMode === 'gradient') {
+        html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;"><div class="row-label" style="font-weight:600;">색 2</div>'
+          + '<div class="ep-color-row"><input type="color" data-cal-set="borderColor2" value="' + escapeAttr(toHex(borderColor2)) + '"></div></div>';
+        html += renderColorSection('border', borderColor2, 'callout-border2');
+
+        html += '<div class="row"><div class="row-label">방향 (' + borderAngle + '°)</div>'
+          + '<input type="range" data-cal-set="borderAngle" min="0" max="360" step="15" value="' + borderAngle + '" style="width:100%;">'
+          + '<div style="display:flex; gap:6px; margin-top:4px; flex-wrap:wrap;">'
+          + '<button type="button" class="pop-btn" data-cal-preset-border-angle="0">↑</button>'
+          + '<button type="button" class="pop-btn" data-cal-preset-border-angle="90">→</button>'
+          + '<button type="button" class="pop-btn" data-cal-preset-border-angle="180">↓</button>'
+          + '<button type="button" class="pop-btn" data-cal-preset-border-angle="270">←</button>'
+          + '<button type="button" class="pop-btn" data-cal-preset-border-angle="135">↘</button>'
+          + '<button type="button" class="pop-btn" data-cal-preset-border-angle="45">↗</button>'
+          + '</div></div>';
+      }
+
+      // 컷아웃 (단색 모드에서만)
+      if (borderMode === 'solid') {
+        var borderCutout = box.getAttribute('data-border-cutout') === '1';
+        html += '<div class="row"><div class="row-label">컷아웃 (뒤가 뚫림)</div>'
+          + '<label style="display:flex; align-items:center; gap:0.4em; font-size:0.85em;">'
+          + '<input type="checkbox" id="pop-border-cutout"' + (borderCutout?' checked':'') + '> 테두리를 뚫어서 뒤가 보이게 (색 대신 투명)'
+          + '</label></div>';
+      }
     }
 
     return html;
@@ -3241,6 +3456,106 @@
         );
         return;
       }
+      // p18c: 콜아웃 data-cal-set 통합 처리 (bgMode / pattern / gradientAngle / borderMode / borderAngle / patternSize / borderColor / borderColor2 / bg / bg2)
+      var calValBtn = e.target.closest('[data-cal-set][data-value]');
+      if (calValBtn) {
+        var box0 = calPopupLock || selectedCallout;
+        if (!box0) return;
+        var sk = calValBtn.getAttribute('data-cal-set');
+        var v = calValBtn.getAttribute('data-value');
+        var attr = ({ bgMode:'data-bg-mode', pattern:'data-pattern', borderMode:'data-border-mode' })[sk];
+        if (attr) {
+          box0.setAttribute(attr, v);
+          if (sk === 'bgMode') applyCalloutBg(box0);
+          else if (sk === 'pattern') applyCalloutBg(box0);
+          else if (sk === 'borderMode') applyBorderToBox(box0);
+          renderCalloutPopupBody();
+        }
+        return;
+      }
+      // p18c: 각도 프리셋 (배경 그라데이션)
+      var calAngleBtn = e.target.closest('[data-cal-preset-angle]');
+      if (calAngleBtn) {
+        var box1x = calPopupLock || selectedCallout;
+        if (!box1x) return;
+        var av = parseInt(calAngleBtn.getAttribute('data-cal-preset-angle'), 10);
+        box1x.setAttribute('data-gradient-angle', String(av));
+        applyCalloutBg(box1x);
+        renderCalloutPopupBody();
+        return;
+      }
+      // p18c: 각도 프리셋 (테두리 그라데이션)
+      var calBdAngleBtn = e.target.closest('[data-cal-preset-border-angle]');
+      if (calBdAngleBtn) {
+        var boxBd = calPopupLock || selectedCallout;
+        if (!boxBd) return;
+        var bav = parseInt(calBdAngleBtn.getAttribute('data-cal-preset-border-angle'), 10);
+        boxBd.setAttribute('data-border-angle', String(bav));
+        applyBorderToBox(boxBd);
+        renderCalloutPopupBody();
+        return;
+      }
+      // p18c: 통합 프리셋 - 저장
+      var calCompSave = e.target.closest('[data-cal-composite-save]');
+      if (calCompSave) {
+        var box2 = calPopupLock || selectedCallout;
+        if (!box2) return;
+        var mode = box2.getAttribute('data-bg-mode') || 'gradient';
+        var bgHex = box2.getAttribute('data-bg-hex') || '#0F3A3A';
+        var bg2Hex = box2.getAttribute('data-bg2') || '#FF9A76';
+        var angle = parseInt(box2.getAttribute('data-gradient-angle') || '45', 10);
+        var pt = box2.getAttribute('data-pattern') || 'dot';
+        var ps = parseInt(box2.getAttribute('data-pattern-size') || '10', 10);
+        openCalloutCompositeSaveDialog({ bgMode: mode, bg: bgHex, bg2: bg2Hex, gradientAngle: angle, pattern: pt, patternSize: ps });
+        return;
+      }
+      // p18c: 통합 프리셋 - 그룹 전환
+      var calCompGrp = e.target.closest('[data-cal-composite-group]');
+      if (calCompGrp) {
+        var g3 = calCompGrp.getAttribute('data-cal-composite-group');
+        var ss3 = loadCalloutSettings();
+        if (!ss3.byTarget['callout-composite']) ss3.byTarget['callout-composite'] = { userPresets:[], lastGroup:'기본' };
+        ss3.byTarget['callout-composite'].lastGroup = g3;
+        saveCalloutSettings(ss3);
+        renderCalloutPopupBody();
+        return;
+      }
+      // p18c: 통합 프리셋 - 삭제 (apply 보다 먼저)
+      var calCompDel = e.target.closest('[data-cal-composite-del]');
+      if (calCompDel) {
+        e.stopPropagation();
+        var delI = parseInt(calCompDel.getAttribute('data-cal-composite-del'), 10);
+        var _ds3 = loadCalloutSettings();
+        var _dst3 = (_ds3.byTarget && _ds3.byTarget['callout-composite']) || { userPresets:[] };
+        var _dp3 = (_dst3.userPresets || [])[delI];
+        var _dname3 = (_dp3 && _dp3.name) ? _dp3.name : '이 프리셋';
+        openEditorConfirm(
+          '조합 프리셋 삭제',
+          '"' + _dname3 + '" 프리셋을 삭제할까요?\n이 작업은 되돌릴 수 없습니다.',
+          function(ok){ if (ok) _deleteCalloutCompositePreset(delI); },
+          { okLabel:'삭제', cancelLabel:'취소', danger:true }
+        );
+        return;
+      }
+      // p18c: 통합 프리셋 - 적용 (확인창)
+      var calCompApp = e.target.closest('[data-cal-composite-apply]');
+      if (calCompApp) {
+        var box3 = calPopupLock || selectedCallout;
+        if (!box3) return;
+        var appI = parseInt(calCompApp.getAttribute('data-cal-composite-apply'), 10);
+        var _asS = loadCalloutSettings();
+        var _asL = (_asS.byTarget && _asS.byTarget['callout-composite'] && _asS.byTarget['callout-composite'].userPresets) || [];
+        var _asP = _asL[appI];
+        var _asName = (_asP && _asP.name) ? _asP.name : '이 조합';
+        openApplyConfirm(
+          'callout-composite',
+          '"' + _asName + '" 조합을 적용할까요?\n현재 배경 설정(색1, 색2, 각도, 패턴)이 모두 덮어써집니다.',
+          function(ok){ if (ok) _applyCalloutCompositePreset(box3, appI); }
+        );
+        return;
+      }
+      // p18c: 슬라이더 / 색픽커 - data-cal-set (input 이벤트가 아닌 change/mousedown 도 통합)
+      // (실제로는 input 이벤트 리스너에서 처리 - ⑧ 참조)
       var colorP = e.target.closest('[data-color-preset]');
       if (colorP) {
         var idx = parseInt(colorP.getAttribute('data-color-preset'), 10);
@@ -3316,6 +3631,44 @@
       var box = calPopupLock || selectedCallout;
       if (!box) return;
       var t = e.target;
+
+      // p18c: data-cal-set 입력 (슬라이더/색피커) 통합 처리
+      if (t.getAttribute && t.getAttribute('data-cal-set')) {
+        var _sk = t.getAttribute('data-cal-set');
+        var _vv = t.value;
+        if (_sk === 'bg') {
+          box.setAttribute('data-bg-hex', _vv);
+          box.setAttribute('data-bg', _vv);
+          box.style.backgroundColor = _vv;
+          applyCalloutBg(box);
+        } else if (_sk === 'bg2') {
+          box.setAttribute('data-bg2', _vv);
+          applyCalloutBg(box);
+        } else if (_sk === 'gradientAngle') {
+          box.setAttribute('data-gradient-angle', String(parseInt(_vv, 10)));
+          applyCalloutBg(box);
+          var _lbl1 = t.parentNode && t.parentNode.querySelector('.row-label');
+          if (_lbl1) _lbl1.textContent = '방향 (' + _vv + '°)';
+        } else if (_sk === 'patternSize') {
+          box.setAttribute('data-pattern-size', String(parseInt(_vv, 10)));
+          applyCalloutBg(box);
+          var _lbl2 = t.parentNode && t.parentNode.querySelector('.row-label');
+          if (_lbl2) _lbl2.textContent = '패턴 크기 (' + _vv + 'px)';
+        } else if (_sk === 'borderColor') {
+          box.setAttribute('data-border-color', _vv);
+          box.setAttribute('data-border-hex', _vv);
+          applyBorderToBox(box);
+        } else if (_sk === 'borderColor2') {
+          box.setAttribute('data-border-color2', _vv);
+          applyBorderToBox(box);
+        } else if (_sk === 'borderAngle') {
+          box.setAttribute('data-border-angle', String(parseInt(_vv, 10)));
+          applyBorderToBox(box);
+          var _lbl3 = t.parentNode && t.parentNode.querySelector('.row-label');
+          if (_lbl3) _lbl3.textContent = '방향 (' + _vv + '°)';
+        }
+        return;
+      }
 
       if (t.id === 'pop-icon-emoji') {
         var iconEl = box.querySelector('.callout-icon');
@@ -3650,13 +4003,48 @@
   }
 
   function applyColorFromPicker(target, hex){
-    // p17g: 버튼 팝업 라우팅 — namespace('btn-bg', 'btn-bg2')를 받으면 버튼 옵션으로 위임
+    // p17g: 버튼 팝업 라우팅
     if (target === 'btn-bg' || target === 'btn-bg2') {
       if (typeof selectedButton === 'undefined' || !selectedButton) return;
       var bopts = readButtonOpts(selectedButton);
       if (target === 'btn-bg') bopts.bg = hex;
       else bopts.bg2 = hex;
       writeButtonOpts(selectedButton, bopts);
+      return;
+    }
+    // p18c: 콜아웃 그라데이션 색 2 라우팅
+    if (target === 'callout-bg2') {
+      var box2 = calPopupLock || selectedCallout;
+      if (!box2) return;
+      box2.setAttribute('data-bg2', hex);
+      applyCalloutBg(box2);
+      return;
+    }
+    // p18c: 콜아웃 테두리 색 2 라우팅
+    if (target === 'callout-border2') {
+      var boxB = calPopupLock || selectedCallout;
+      if (!boxB) return;
+      boxB.setAttribute('data-border-color2', hex);
+      applyBorderToBox(boxB);
+      return;
+    }
+    // p18c: 콜아웃 배경 색 1 (namespace 라우팅)
+    if (target === 'callout-bg') {
+      var box1 = calPopupLock || selectedCallout;
+      if (!box1) return;
+      box1.setAttribute('data-bg-hex', hex);
+      box1.setAttribute('data-bg', hex);
+      box1.style.backgroundColor = hex;
+      applyCalloutBg(box1);
+      return;
+    }
+    // p18c: 콜아웃 테두리 색 1 (namespace)
+    if (target === 'callout-border') {
+      var boxB1 = calPopupLock || selectedCallout;
+      if (!boxB1) return;
+      boxB1.setAttribute('data-border-color', hex);
+      boxB1.setAttribute('data-border-hex', hex);
+      applyBorderToBox(boxB1);
       return;
     }
     var box = calPopupLock || selectedCallout;
@@ -3699,22 +4087,118 @@
     applyBorderToBox(box);
   }
 
+
+  // p18c: 콜아웃 배경 적용 (bgMode 별 - solid/gradient/pattern/image)
+  function applyCalloutBg(box){
+    if (!box) return;
+    var mode = box.getAttribute('data-bg-mode');
+    var bgImage = box.getAttribute('data-bg-image') || '';
+    if (!mode) mode = bgImage ? 'image' : 'solid';
+    var op = parseInt(box.getAttribute('data-bg-opacity') || '100', 10);
+
+    // 배경 리셋
+    box.style.backgroundImage = '';
+    box.style.backgroundSize = '';
+    box.style.backgroundPosition = '';
+    box.style.backgroundRepeat = '';
+
+    if (mode === 'gradient') {
+      var c1 = box.getAttribute('data-bg-hex') || '#0F3A3A';
+      var c2 = box.getAttribute('data-bg2') || '#FF9A76';
+      var angle = parseInt(box.getAttribute('data-gradient-angle') || '45', 10);
+      // opacity 적용
+      if (op < 100) {
+        var rgb1 = parseRgb(c1), rgb2 = parseRgb(c2);
+        if (rgb1) c1 = 'rgba(' + rgb1.r + ',' + rgb1.g + ',' + rgb1.b + ',' + (op/100) + ')';
+        if (rgb2) c2 = 'rgba(' + rgb2.r + ',' + rgb2.g + ',' + rgb2.b + ',' + (op/100) + ')';
+      }
+      box.style.backgroundColor = 'transparent';
+      box.style.backgroundImage = 'linear-gradient(' + angle + 'deg, ' + c1 + ', ' + c2 + ')';
+      box.setAttribute('data-bg', 'linear-gradient(' + angle + 'deg, ' + c1 + ', ' + c2 + ')');
+      return;
+    }
+
+    if (mode === 'pattern') {
+      var c1p = box.getAttribute('data-bg-hex') || '#0F3A3A';
+      var c2p = box.getAttribute('data-bg2') || '#FF9A76';
+      var p = box.getAttribute('data-pattern') || 'dot';
+      var s = parseInt(box.getAttribute('data-pattern-size') || '10', 10);
+      var patternStyle = '';
+      if (p === 'dot') {
+        patternStyle = 'radial-gradient(circle at ' + (s/2) + 'px ' + (s/2) + 'px, ' + c2p + ' ' + (s*0.15) + 'px, ' + c1p + ' ' + (s*0.16) + 'px)';
+        box.style.backgroundSize = s + 'px ' + s + 'px';
+      } else if (p === 'stripe') {
+        patternStyle = 'repeating-linear-gradient(45deg, ' + c1p + ' 0, ' + c1p + ' ' + (s/2) + 'px, ' + c2p + ' ' + (s/2) + 'px, ' + c2p + ' ' + s + 'px)';
+      } else if (p === 'check') {
+        patternStyle = 'conic-gradient(' + c1p + ' 25%, ' + c2p + ' 25% 50%, ' + c1p + ' 50% 75%, ' + c2p + ' 75%)';
+        box.style.backgroundSize = s + 'px ' + s + 'px';
+      } else if (p === 'zigzag') {
+        patternStyle = 'linear-gradient(135deg, ' + c1p + ' 25%, transparent 25%) 0 0/' + s + 'px ' + s + 'px, '
+                     + 'linear-gradient(225deg, ' + c1p + ' 25%, transparent 25%) 0 0/' + s + 'px ' + s + 'px, '
+                     + c2p;
+      }
+      box.style.backgroundColor = 'transparent';
+      box.style.backgroundImage = patternStyle;
+      box.setAttribute('data-bg', patternStyle);
+      // opacity 는 별도 layer 필요 → 향후 확장
+      return;
+    }
+
+    if (mode === 'image' && bgImage) {
+      // 기존 이미지 로직은 유지 (data-bg-image 인라인 적용됨)
+      box.style.backgroundImage = 'url(' + bgImage + ')';
+      box.style.backgroundSize = 'cover';
+      box.style.backgroundPosition = 'center';
+      box.style.backgroundRepeat = 'no-repeat';
+      // 배경색은 유지
+      return;
+    }
+
+    // solid (기본) — 기존 backgroundColor 만 사용, 다른 layer 초기화
+    // 배경색은 이미 data-bg / applyColorFromPicker 에서 설정됨
+  }
+
   function applyBorderToBox(box){
     if (!box) return;
     var style = box.getAttribute('data-border-style') || 'none';
     if (style === 'none') {
       box.style.border = '';
+      box.style.borderImage = '';
+      box.style.borderImageSlice = '';
       return;
     }
     var width = box.getAttribute('data-border-width') || '1';
+    var borderMode = box.getAttribute('data-border-mode') || 'solid';
+    var opacity = parseInt(box.getAttribute('data-border-opacity') || '100', 10);
+
+    // p18c: 그라데이션 모드
+    if (borderMode === 'gradient') {
+      var c1 = box.getAttribute('data-border-color') || '#0F3A3A';
+      var c2 = box.getAttribute('data-border-color2') || '#FF9A76';
+      var angle = parseInt(box.getAttribute('data-border-angle') || '45', 10);
+      // opacity 적용
+      if (opacity < 100) {
+        var rgb1 = parseRgb(c1), rgb2 = parseRgb(c2);
+        if (rgb1) c1 = 'rgba(' + rgb1.r + ',' + rgb1.g + ',' + rgb1.b + ',' + (opacity/100) + ')';
+        if (rgb2) c2 = 'rgba(' + rgb2.r + ',' + rgb2.g + ',' + rgb2.b + ',' + (opacity/100) + ')';
+      }
+      // border-image 는 border-style 필수. dotted/dashed 등도 이렇게 표현됨.
+      box.style.border = width + 'px ' + style + ' transparent';
+      box.style.borderImage = 'linear-gradient(' + angle + 'deg, ' + c1 + ', ' + c2 + ') 1';
+      // border-image 는 border-radius 를 무시하므로 안내
+      // (사용자 편집기에선 border-image 로 그라데이션 표현)
+      return;
+    }
+
+    // 단색 모드 (기존 로직)
+    box.style.borderImage = '';
+    box.style.borderImageSlice = '';
     var cutout = box.getAttribute('data-border-cutout') === '1';
     var finalColor;
     if (cutout) {
-      // p13c: 컷아웃 = 페이지 배경색과 동일
       finalColor = PAGE_BG_COLOR;
     } else {
       var color = box.getAttribute('data-border-color') || '#0F3A3A';
-      var opacity = parseInt(box.getAttribute('data-border-opacity') || '100', 10);
       var rgb = parseRgb(color);
       finalColor = color;
       if (rgb && opacity < 100) {
@@ -7514,13 +7998,35 @@
     if (!box.style.borderRadius && box.getAttribute('data-radius')) {
       box.style.borderRadius = box.getAttribute('data-radius') + 'px';
     }
-    // p14a: 배경 이미지 인라인 강제 (사이트 CSS 없이도 렌더되도록)
-    var bgImg = box.getAttribute('data-bg-image');
-    if (bgImg) {
-      box.style.backgroundImage = 'url(' + bgImg + ')';
-      box.style.backgroundSize = 'cover';
-      box.style.backgroundPosition = 'center';
-      box.style.backgroundRepeat = 'no-repeat';
+    // p18c: 저장 시 배경 모드에 따라 인라인 스타일 명시 (사이트 CSS 없이도 렌더)
+    var _bgMode = box.getAttribute('data-bg-mode');
+    if (!_bgMode && box.getAttribute('data-bg-image')) _bgMode = 'image';
+    if (!_bgMode) _bgMode = 'solid';
+
+    if (_bgMode === 'image') {
+      var bgImg = box.getAttribute('data-bg-image');
+      if (bgImg) {
+        box.style.backgroundImage = 'url(' + bgImg + ')';
+        box.style.backgroundSize = 'cover';
+        box.style.backgroundPosition = 'center';
+        box.style.backgroundRepeat = 'no-repeat';
+      }
+    } else if (_bgMode === 'gradient' || _bgMode === 'pattern') {
+      // applyCalloutBg 가 이미 style.backgroundImage 를 세팅해놓음.
+      // 저장 시 그대로 보존.
+      // backgroundColor 는 transparent 유지되어 있음 (applyCalloutBg 처리)
+    }
+
+    // p18c: 테두리 그라데이션 인라인 (border-image)
+    var _bMode = box.getAttribute('data-border-mode') || 'solid';
+    var _bStyle = box.getAttribute('data-border-style') || 'none';
+    if (_bStyle !== 'none' && _bMode === 'gradient') {
+      var _bc1 = box.getAttribute('data-border-color') || '#0F3A3A';
+      var _bc2 = box.getAttribute('data-border-color2') || '#FF9A76';
+      var _ba = parseInt(box.getAttribute('data-border-angle') || '45', 10);
+      var _bw = box.getAttribute('data-border-width') || '1';
+      box.style.border = _bw + 'px ' + _bStyle + ' transparent';
+      box.style.borderImage = 'linear-gradient(' + _ba + 'deg, ' + _bc1 + ', ' + _bc2 + ') 1';
     }
     // p14b: 저장 HTML 에서 원본 이미지 base64 제거 (용량 절감 - MB 단위 절약)
     //         원본은 오직 재크롭 재조정에만 필요 → 사이트/저장은 data-bg-image 만 있으면 충분
