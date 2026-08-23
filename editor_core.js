@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19f';
+  var VERSION = 'v2.0-β-p19g';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -9062,7 +9062,18 @@
       }
     });
     var html = parts.join('\n');
-    
+
+    // p19g: 루비를 sanitizer-proof 마커 텍스트로 변환.
+    //   <mark class="ddl-ruby" data-rt="X">Y</mark> → ⟪rt:X⟫Y⟪/rt⟫
+    //   Ghost 가 <mark>·class 를 지워도 마커는 순수 텍스트라 남음.
+    //   페이지 로드 시 injectSiteGlobalCSS() 옆에서 restoreRubyMarkers() 가
+    //   다시 <mark class="ddl-ruby"> 로 복원.
+    html = html.replace(/<mark\s[^>]*class="ddl-ruby"[^>]*data-rt="([^"]*)"[^>]*>([\s\S]*?)<\/mark>/g,
+      function(_m, rt, inner){ return '\u27EArt:' + rt + '\u27EB' + inner + '\u27EA/rt\u27EB'; });
+    // data-rt 가 class 앞에 있는 케이스 대비 (속성 순서 다양성)
+    html = html.replace(/<mark\s[^>]*data-rt="([^"]*)"[^>]*class="ddl-ruby"[^>]*>([\s\S]*?)<\/mark>/g,
+      function(_m, rt, inner){ return '\u27EArt:' + rt + '\u27EB' + inner + '\u27EA/rt\u27EB'; });
+
     // p13e: 저장 HTML 진단 로그
     log('[SAVE-HTML] 길이:', html.length, '/ 콜아웃:', (html.match(/callout-box/g)||[]).length, '/ 구분선:', (html.match(/ddl-divider-block/g)||[]).length, '/ 버튼:', (html.match(/ddl-button-block/g)||[]).length, '/ kg-card:', (html.match(/kg-card-begin/g)||[]).length);
     console.log('[2vvena-editor SAVE-HTML]\n' + html);
@@ -11817,7 +11828,7 @@
 
   function injectSiteGlobalCSS(){
     try {
-      if (document.querySelector('style[data-ddl-global="ruby"]')) return; // 재삽입 방지
+      if (document.querySelector('style[data-ddl-global="ruby"]')) return;
       var s = document.createElement('style');
       s.setAttribute('data-ddl-global', 'ruby');
       s.textContent = SITE_GLOBAL_CSS;
@@ -11825,12 +11836,85 @@
     } catch(_){}
   }
 
-  // 즉시 실행 (DOM 준비 상태 불문 · document.documentElement 은 항상 존재)
-  injectSiteGlobalCSS();
-  // 안전망: DOM ready 후 재확인 (head 가 늦게 만들어지는 케이스)
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', injectSiteGlobalCSS, { once: true });
+  // p19g: 저장된 루비 마커(⟪rt:X⟫Y⟪/rt⟫)를 <mark class="ddl-ruby"> 로 복원.
+  //   Ghost sanitizer 가 <mark> 를 지워도 유니코드 마커는 텍스트라 살아남음.
+  //   페이지 로드 시 이 함수가 텍스트 노드를 스캔해 원본 요소를 재구성.
+  var RUBY_MARKER_RE = /\u27EArt:([^\u27EA\u27EB]*)\u27EB([\s\S]*?)\u27EA\/rt\u27EB/g;
+
+  function restoreRubyMarkers(root){
+    root = root || document.body;
+    if (!root) return;
+    var walker;
+    try {
+      walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+        acceptNode: function(node){
+          if (!node.nodeValue || node.nodeValue.indexOf('\u27EArt:') < 0) return NodeFilter.FILTER_REJECT;
+          // 편집기 UI 안 (팝업/툴바) 은 건너뜀
+          var p = node.parentNode;
+          while (p && p !== root) {
+            if (p.classList && (p.classList.contains('ep-popup') || p.classList.contains('ep-float-toolbar') || p.classList.contains('ep-modal'))) return NodeFilter.FILTER_REJECT;
+            p = p.parentNode;
+          }
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      });
+    } catch(_){ return; }
+    var targets = [];
+    var n;
+    while ((n = walker.nextNode())) targets.push(n);
+    targets.forEach(function(textNode){
+      var text = textNode.nodeValue;
+      if (!text || text.indexOf('\u27EArt:') < 0) return;
+      var frag = document.createDocumentFragment();
+      var lastIdx = 0;
+      var re = new RegExp(RUBY_MARKER_RE.source, 'g');
+      var m;
+      while ((m = re.exec(text)) !== null) {
+        if (m.index > lastIdx) frag.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
+        var mark = document.createElement('mark');
+        mark.className = 'ddl-ruby';
+        mark.setAttribute('data-rt', m[1]);
+        mark.style.background = 'transparent';
+        mark.style.color = 'inherit';
+        mark.appendChild(document.createTextNode(m[2]));
+        frag.appendChild(mark);
+        lastIdx = re.lastIndex;
+      }
+      if (lastIdx < text.length) frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+      textNode.parentNode.replaceChild(frag, textNode);
+    });
   }
+
+  function runGlobalHooks(){
+    injectSiteGlobalCSS();
+    try { restoreRubyMarkers(document.body); } catch(_){}
+  }
+
+  // 즉시 실행
+  runGlobalHooks();
+  // DOM ready 안전망 (body 늦게 만들어지는 케이스)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', runGlobalHooks, { once: true });
+  }
+  // 동적 콘텐트 대응: body 변경 감지해서 새로 나타난 마커도 복원
+  try {
+    var _mo = new MutationObserver(function(muts){
+      for (var i=0; i<muts.length; i++){
+        var mut = muts[i];
+        if (mut.type === 'childList' && mut.addedNodes && mut.addedNodes.length){
+          for (var j=0; j<mut.addedNodes.length; j++){
+            var nn = mut.addedNodes[j];
+            if (nn.nodeType === 1) { restoreRubyMarkers(nn); }
+            else if (nn.nodeType === 3 && nn.nodeValue && nn.nodeValue.indexOf('\u27EArt:') >= 0) {
+              restoreRubyMarkers(nn.parentNode || document.body);
+            }
+          }
+        }
+      }
+    });
+    if (document.body) _mo.observe(document.body, { childList:true, subtree:true });
+    else document.addEventListener('DOMContentLoaded', function(){ _mo.observe(document.body, { childList:true, subtree:true }); }, { once:true });
+  } catch(_){}
 
   function boot(){
     // 편집기 페이지 아니면 접근 매크로만 설치하고 종료
