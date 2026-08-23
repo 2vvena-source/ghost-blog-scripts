@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p18k';
+  var VERSION = 'v2.0-β-p19a';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -946,6 +946,133 @@
     // p17i: 그룹 선택 드롭다운
     '.ep-dialog-select { width: 100%; padding: 0.5em; border: 1px solid rgba(15,58,58,0.2); border-radius: 4px; background: #fafafa; font-family: inherit; font-size: 0.92em; cursor: pointer; }',
     '.ep-dialog-select:focus { outline: 2px solid rgba(255,154,118,0.5); outline-offset: -1px; }',
+    /* p19a: 블록 팝업 팩토리 (createBlockPopup) 전용 CSS 변수 시스템
+       ─────────────────────────────────────────────────────────────
+       사용법: 팩토리로 만든 팝업은 .ep-popup 대신 .ep-popup-v2 클래스를 씀.
+       기본값은 현재 .ep-popup 과 동일하게 맞춰 놓았으므로 겉모습 변화 없음.
+       나중에 톤 조정 필요 시 아래 :root 값만 수정하면 팩토리 팝업 전체 반영.
+       기존 콜아웃/구분선/버튼 팝업(.ep-popup) 은 영향 받지 않음. */
+    ':root {',
+    '  --ep-popup-bg:              #fff;',
+    '  --ep-popup-border:          rgba(15,58,58,0.25);',
+    '  --ep-popup-radius:          6px;',
+    '  --ep-popup-shadow:          0 10px 30px rgba(0,0,0,0.15);',
+    '  --ep-popup-width:           380px;',
+    '  --ep-popup-max-height:      80vh;',
+    '  --ep-popup-header-bg:       rgba(15,58,58,0.06);',
+    '  --ep-popup-header-font:     "Cafe24Danjunghae","Gowun Batang",serif;',
+    '  --ep-popup-header-size:     1.05em;',
+    '  --ep-popup-header-padding:  0.7em 1em;',
+    '  --ep-popup-header-border:   1px solid rgba(15,58,58,0.15);',
+    '  --ep-popup-tab-color:       rgba(15,58,58,0.5);',
+    '  --ep-popup-tab-hover:       var(--color, #0F3A3A);',
+    '  --ep-popup-tab-active:      var(--color, #0F3A3A);',
+    '  --ep-popup-tab-underline:   var(--point, #FF9A76);',
+    '  --ep-popup-tab-gap:         0;',
+    '  --ep-popup-body-padding:    0.9em 1em 1.2em;',
+    '  --ep-popup-body-font-size:  0.9em;',
+    '  --ep-popup-body-color:      var(--color, #0F3A3A);',
+    '}',
+    /* p19a: .ep-popup-v2 팩토리 전용 클래스 (기존 .ep-popup 과 병존) */
+    '.ep-popup-v2 {',
+    '  position: fixed;',
+    '  z-index: 1005;',
+    '  background: var(--ep-popup-bg);',
+    '  border: 1px solid var(--ep-popup-border);',
+    '  border-radius: var(--ep-popup-radius);',
+    '  box-shadow: var(--ep-popup-shadow);',
+    '  width: var(--ep-popup-width);',
+    '  max-height: var(--ep-popup-max-height);',
+    '  display: flex;',
+    '  flex-direction: column;',
+    '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
+    '  color: var(--ep-popup-body-color);',
+    '}',
+    '.ep-popup-v2-header {',
+    '  padding: var(--ep-popup-header-padding);',
+    '  background: var(--ep-popup-header-bg);',
+    '  border-radius: var(--ep-popup-radius) var(--ep-popup-radius) 0 0;',
+    '  cursor: move;',
+    '  user-select: none;',
+    '  display: flex;',
+    '  align-items: center;',
+    '  justify-content: space-between;',
+    '  font-family: var(--ep-popup-header-font);',
+    '  font-size: var(--ep-popup-header-size);',
+    '  border-bottom: var(--ep-popup-header-border);',
+    '}',
+    '.ep-popup-v2-close {',
+    '  background: transparent;',
+    '  border: none;',
+    '  cursor: pointer;',
+    '  font-size: 1.3em;',
+    '  color: rgba(15,58,58,0.6);',
+    '  line-height: 1;',
+    '  padding: 0 0.2em;',
+    '}',
+    '.ep-popup-v2-close:hover { color: var(--color, #0F3A3A); }',
+    '.ep-popup-v2-tabs {',
+    '  display: flex;',
+    '  gap: var(--ep-popup-tab-gap);',
+    '  border-bottom: 1px solid rgba(15,58,58,0.1);',
+    '  padding: 0 0.6em;',
+    '}',
+    '.ep-popup-v2-tab {',
+    '  flex: 1;',
+    '  padding: 0.6em 0.5em;',
+    '  background: transparent;',
+    '  border: none;',
+    '  border-bottom: 2px solid transparent;',
+    '  cursor: pointer;',
+    '  font-family: inherit;',
+    '  font-size: 0.9em;',
+    '  color: var(--ep-popup-tab-color);',
+    '}',
+    '.ep-popup-v2-tab:hover { color: var(--ep-popup-tab-hover); }',
+    '.ep-popup-v2-tab.is-active {',
+    '  color: var(--ep-popup-tab-active);',
+    '  border-bottom-color: var(--ep-popup-tab-underline);',
+    '  font-weight: 500;',
+    '}',
+    '.ep-popup-v2-body {',
+    '  padding: var(--ep-popup-body-padding);',
+    '  overflow-y: auto;',
+    '  flex: 1;',
+    '  font-size: var(--ep-popup-body-font-size);',
+    '}',
+    /* .ep-popup-v2-body 내부의 row / row-label / pop-btn / input 등은
+       기존 .ep-popup-body 규칙을 그대로 상속 받도록 별도 규칙 재작성하지 않음.
+       필요 시 팩토리 사용자가 CSS 변수로 override 가능. */
+    '.ep-popup-v2-body .row { margin-bottom: 0.9em; }',
+    '.ep-popup-v2-body .row-label {',
+    '  font-size: 0.78em;',
+    '  opacity: 0.6;',
+    '  margin-bottom: 0.35em;',
+    '  letter-spacing: 0.03em;',
+    '}',
+    '.ep-popup-v2-body button.pop-btn {',
+    '  padding: 0.4em 0.8em;',
+    '  background: transparent;',
+    '  border: 1px solid rgba(15,58,58,0.25);',
+    '  border-radius: 3px;',
+    '  cursor: pointer;',
+    '  font-family: inherit;',
+    '  font-size: 0.85em;',
+    '  color: var(--color, #0F3A3A);',
+    '  margin-right: 0.3em;',
+    '  margin-bottom: 0.3em;',
+    '}',
+    '.ep-popup-v2-body button.pop-btn:hover { border-color: var(--point, #FF9A76); color: var(--point, #FF9A76); }',
+    '.ep-popup-v2-body button.pop-btn.is-active { background: var(--color, #0F3A3A); color: var(--base, #F5F5F5); border-color: var(--color, #0F3A3A); }',
+    '.ep-popup-v2-footer {',
+    '  padding: 0.7em 1em;',
+    '  border-top: 1px solid rgba(15,58,58,0.1);',
+    '  display: flex;',
+    '  justify-content: flex-end;',
+    '  gap: 0.5em;',
+    '}',
+    '.ep-popup-v2-footer .pop-btn.is-primary { background: var(--point, #FF9A76); color: #fff; border-color: var(--point, #FF9A76); }',
+    '.ep-popup-v2-footer .pop-btn.is-primary:hover { background: var(--color, #0F3A3A); border-color: var(--color, #0F3A3A); color: var(--base, #F5F5F5); }',
     /* p14a: 크롭 팝업 */
     '.ep-crop-popup {',
     '  position: fixed;',
@@ -1271,30 +1398,7 @@
     '  max-height: 70vh;',
     '  overflow-y: auto;',
     '}',
-    // 팔레트 안 미니 버튼 그룹 (모드 · 그룹)
-    '.ep-hl-palette .hl-mode-row { display:flex; gap:0.3em; margin-bottom:0.6em; }',
-    '.ep-hl-palette .hl-mode {',
-    '  flex:1; padding:0.35em 0.4em; background:transparent;',
-    '  border:1px solid rgba(15,58,58,0.35); border-radius:2px;',
-    '  color:#0F3A3A; font-family:inherit; font-size:11px;',
-    '  cursor:pointer;',
-    '}',
-    '.ep-hl-palette .hl-mode.is-active { background:#0F3A3A; color:#fff; border-color:#0F3A3A; }',
-    '.ep-hl-palette .hl-mode:hover:not(.is-active) { color:var(--point,#FF9A76); border-color:var(--point,#FF9A76); }',
-    '.ep-hl-palette .hl-group-row { display:flex; flex-wrap:wrap; gap:0.25em; margin-bottom:0.5em; }',
-    '.ep-hl-palette .hl-group {',
-    '  padding:0.2em 0.5em; background:transparent;',
-    '  border:1px solid rgba(15,58,58,0.35); border-radius:2px;',
-    '  color:#0F3A3A; font-family:inherit; font-size:10.5px;',
-    '  cursor:pointer;',
-    '}',
-    '.ep-hl-palette .hl-group.is-active { background:#0F3A3A; color:#fff; border-color:#0F3A3A; }',
-    '.ep-hl-palette .hl-group:hover:not(.is-active) { color:var(--point,#FF9A76); border-color:var(--point,#FF9A76); }',
-    '.ep-hl-palette .hl-slider-row {',
-    '  display:grid; grid-template-columns:60px 1fr 34px; gap:0.4em;',
-    '  align-items:center; margin:0.35em 0; font-size:11px;',
-    '}',
-    '.ep-hl-palette .hl-slider-row input[type=range] { width:100%; }',
+    // p18l: 확장 UI 관련 CSS 는 다음 AI 에서 재설계 예정 (여기서는 비어 있음)
     '.ep-hl-palette.is-open { display: block; }',
     '.ep-hl-palette .hl-title {',
     '  font-family: "Cafe24Danjunghae","Gowun Batang",serif;',
@@ -6682,6 +6786,268 @@
     }
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // p19a. createBlockPopup() — 범용 블록 팝업 팩토리
+  // ═══════════════════════════════════════════════════════════
+  //
+  // 앞으로 만들 모든 특수기능 블록 UI (형광펜, 접은글, 헤더, 다단, 슬라이더,
+  // 제품 리뷰 등) 가 이 팩토리 위에서 개발되도록 하는 표준 진입점.
+  //
+  // ⚠️ 기존 콜아웃/구분선/버튼 팝업은 이 팩토리를 사용하지 않는다.
+  //    (안정 상태 유지. 언젠가 통일 재디자인 시점에 별도 라운드로 마이그레이션)
+  //
+  // 시그니처:
+  //   var popup = createBlockPopup({
+  //     title:         '형광펜',                     // 헤더 제목 (필수)
+  //     tabs:          [                              // 탭 배열 (선택)
+  //       { key: 'solid',    label: '단색',       render: function(body, ctx){...} },
+  //       { key: 'gradient', label: '그라데이션', render: function(body, ctx){...} },
+  //       { key: 'pattern',  label: '패턴',       render: function(body, ctx){...} },
+  //     ],
+  //     initialTab:    'solid',                      // 초기 활성 탭 key (선택)
+  //     width:         '440px',                      // 창 너비 (선택, 기본 CSS 변수)
+  //     shellVariant:  'tabs',                       // 향후 'sidebar' 등 확장 여지 (선택)
+  //     footer:        [                              // 하단 버튼들 (선택)
+  //       { label: '취소',  onClick: function(popup){ popup.close(); } },
+  //       { label: '적용',  primary: true, onClick: function(popup){ ... } },
+  //     ],
+  //     onOpen:        function(popup){ },           // 열린 직후 (선택)
+  //     onClose:       function(popup){ },           // 닫히기 전 (선택)
+  //     storageKey:    'inline_hl_last_spec',        // 상태 저장 힌트 (선택, 참고용)
+  //     draggable:     true,                          // 헤더 드래그로 이동 (선택, 기본 true)
+  //   });
+  //
+  //   popup 반환 객체:
+  //     .el          → 최상위 DOM 요소
+  //     .body        → 현재 활성 탭의 body 요소 (탭 전환 시 갱신)
+  //     .setTab(key) → 탭 전환
+  //     .close()     → 닫기
+  //     .show(x, y)  → 화면 좌표 (fixed) 지정하여 열기. 생략 시 화면 중앙.
+  //
+  // 탭 render 콜백에 전달되는 인자:
+  //   body : HTMLElement (그 탭 전용 body div. 그리는 대상)
+  //   ctx  : { popup, tabKey } (팩토리 컨트롤 접근용)
+  //
+  // ═══════════════════════════════════════════════════════════
+  function createBlockPopup(opts){
+    opts = opts || {};
+    var title        = opts.title || '';
+    var tabs         = Array.isArray(opts.tabs) ? opts.tabs : [];
+    var initialTab   = opts.initialTab || (tabs[0] && tabs[0].key) || null;
+    var width        = opts.width || null;
+    var shellVariant = opts.shellVariant || 'tabs';
+    var footer       = Array.isArray(opts.footer) ? opts.footer : [];
+    var onOpen       = typeof opts.onOpen === 'function' ? opts.onOpen : null;
+    var onClose      = typeof opts.onClose === 'function' ? opts.onClose : null;
+    var draggable    = opts.draggable !== false;
+
+    // ── DOM 생성 ─────────────────────────────────────────
+    var root = document.createElement('div');
+    root.className = 'ep-popup-v2';
+    root.setAttribute('data-shell-variant', shellVariant);
+    if (width) root.style.width = width;
+
+    // 헤더
+    var header = document.createElement('div');
+    header.className = 'ep-popup-v2-header';
+    var titleEl = document.createElement('span');
+    titleEl.className = 'ep-popup-v2-title';
+    titleEl.textContent = title;
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'ep-popup-v2-close';
+    closeBtn.type = 'button';
+    closeBtn.setAttribute('aria-label', '닫기');
+    closeBtn.textContent = '×';
+    header.appendChild(titleEl);
+    header.appendChild(closeBtn);
+    root.appendChild(header);
+
+    // 탭 스트립 (탭이 2개 이상일 때만 표시)
+    var tabStripEl = null;
+    var tabButtons = {};       // key → button
+    var tabBodies  = {};       // key → body div
+    if (shellVariant === 'tabs' && tabs.length >= 2){
+      tabStripEl = document.createElement('div');
+      tabStripEl.className = 'ep-popup-v2-tabs';
+      tabs.forEach(function(t){
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'ep-popup-v2-tab';
+        b.textContent = t.label || t.key;
+        b.setAttribute('data-tab-key', t.key);
+        tabStripEl.appendChild(b);
+        tabButtons[t.key] = b;
+      });
+      root.appendChild(tabStripEl);
+    }
+
+    // 바디 컨테이너 (탭이 여러 개면 각 탭마다 body 생성해 두고 표시만 전환)
+    var bodyWrap = document.createElement('div');
+    bodyWrap.className = 'ep-popup-v2-body-wrap';
+    bodyWrap.style.display = 'flex';
+    bodyWrap.style.flex = '1';
+    bodyWrap.style.minHeight = '0';
+    root.appendChild(bodyWrap);
+
+    if (tabs.length === 0){
+      // 탭 없는 케이스: 단일 body
+      var body = document.createElement('div');
+      body.className = 'ep-popup-v2-body';
+      bodyWrap.appendChild(body);
+      tabBodies['__single'] = body;
+    } else {
+      tabs.forEach(function(t){
+        var b = document.createElement('div');
+        b.className = 'ep-popup-v2-body';
+        b.setAttribute('data-tab-body', t.key);
+        b.style.display = 'none';
+        bodyWrap.appendChild(b);
+        tabBodies[t.key] = b;
+      });
+    }
+
+    // 푸터 (버튼이 하나 이상일 때만)
+    var footerEl = null;
+    if (footer.length > 0){
+      footerEl = document.createElement('div');
+      footerEl.className = 'ep-popup-v2-footer';
+      root.appendChild(footerEl);
+    }
+
+    // ── 상태 ─────────────────────────────────────────────
+    var currentTabKey = null;
+    var rendered = {}; // key → true (이미 render 콜백 호출한 탭 표시)
+
+    // 팩토리 컨트롤 객체 (탭 콜백에 전달됨)
+    var api = {
+      el: root,
+      body: null,               // setTab 에서 갱신
+      close: closePopup,
+      show: showPopup,
+      setTab: setTab,
+      getBody: function(key){ return tabBodies[key] || null; },
+    };
+
+    // ── 탭 전환 ──────────────────────────────────────────
+    function setTab(key){
+      if (tabs.length === 0){
+        api.body = tabBodies['__single'];
+        // 단일 body 는 첫 진입 시 한 번만 render (탭 없으므로 render 콜백 없음)
+        return;
+      }
+      var target = tabs.filter(function(t){ return t.key === key; })[0];
+      if (!target) return;
+
+      // 모든 탭 비활성
+      Object.keys(tabBodies).forEach(function(k){
+        tabBodies[k].style.display = 'none';
+      });
+      Object.keys(tabButtons).forEach(function(k){
+        tabButtons[k].classList.remove('is-active');
+      });
+
+      // 활성화
+      tabBodies[key].style.display = '';
+      if (tabButtons[key]) tabButtons[key].classList.add('is-active');
+      currentTabKey = key;
+      api.body = tabBodies[key];
+
+      // lazy render: 이 탭 처음 열릴 때만 render 콜백 호출
+      if (!rendered[key] && typeof target.render === 'function'){
+        try {
+          target.render(tabBodies[key], { popup: api, tabKey: key });
+          rendered[key] = true;
+        } catch(err){
+          console.warn('[p19a createBlockPopup] tab render error', key, err);
+        }
+      }
+    }
+
+    // ── 표시 / 닫기 ─────────────────────────────────────
+    function showPopup(x, y){
+      if (root.parentNode) return; // 이미 열림
+      document.body.appendChild(root);
+      // 위치: 명시 값 없으면 화면 중앙
+      var w = root.offsetWidth  || 380;
+      var h = root.offsetHeight || 300;
+      if (typeof x !== 'number' || typeof y !== 'number'){
+        x = Math.max(20, (window.innerWidth  - w) / 2);
+        y = Math.max(20, (window.innerHeight - h) / 2);
+      }
+      root.style.left = x + 'px';
+      root.style.top  = y + 'px';
+
+      // 초기 탭 활성화
+      if (tabs.length > 0){
+        setTab(initialTab || tabs[0].key);
+      } else {
+        api.body = tabBodies['__single'];
+      }
+
+      if (onOpen) { try { onOpen(api); } catch(err){ console.warn(err); } }
+    }
+    function closePopup(){
+      if (!root.parentNode) return;
+      if (onClose) { try { onClose(api); } catch(err){ console.warn(err); } }
+      root.parentNode.removeChild(root);
+    }
+
+    // ── 이벤트: 닫기 / 탭 클릭 / 드래그 ───────────────────
+    closeBtn.addEventListener('click', closePopup);
+
+    if (tabStripEl){
+      tabStripEl.addEventListener('click', function(e){
+        var btn = e.target.closest('.ep-popup-v2-tab');
+        if (!btn) return;
+        var k = btn.getAttribute('data-tab-key');
+        if (k) setTab(k);
+      });
+    }
+
+    if (draggable){
+      var dragState = null;
+      header.addEventListener('mousedown', function(e){
+        // 닫기 버튼 클릭은 드래그 시작 X
+        if (e.target.closest('.ep-popup-v2-close')) return;
+        var rect = root.getBoundingClientRect();
+        dragState = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+        e.preventDefault();
+      });
+      document.addEventListener('mousemove', function(e){
+        if (!dragState) return;
+        var x = e.clientX - dragState.dx;
+        var y = e.clientY - dragState.dy;
+        // 화면 밖으로 벗어나지 않게 클램프
+        var w = root.offsetWidth  || 380;
+        var h = root.offsetHeight || 300;
+        x = Math.max(0, Math.min(window.innerWidth  - 40, x));
+        y = Math.max(0, Math.min(window.innerHeight - 40, y));
+        root.style.left = x + 'px';
+        root.style.top  = y + 'px';
+      });
+      document.addEventListener('mouseup', function(){ dragState = null; });
+    }
+
+    // ── 푸터 버튼 ────────────────────────────────────────
+    if (footerEl){
+      footer.forEach(function(fb){
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'pop-btn' + (fb.primary ? ' is-primary' : '');
+        b.textContent = fb.label || '';
+        if (typeof fb.onClick === 'function'){
+          b.addEventListener('click', function(){ fb.onClick(api); });
+        }
+        footerEl.appendChild(b);
+      });
+    }
+
+    return api;
+  }
+
+  // 팩토리를 편집기 네임스페이스에 노출 (외부 스크립트/디버그용)
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.createBlockPopup = createBlockPopup; } catch(_){}
+
   function renderDividerPopupBody(tab){
     if (!divPopupEl) { try{log('[divider-popup] render abort: no popup');}catch(_){} return; }
     if (!selectedDivider) { try{log('[divider-popup] render abort: no selectedDivider');}catch(_){} return; }
@@ -9787,97 +10153,23 @@
     palette.className = 'ep-hl-palette';
     document.body.appendChild(palette);
 
-    // p18k: 확장 팔레트 — 상단 모드 탭 + 색1/색2 + 투명도 + 미리보기 + 프리셋 저장
+    // p18l: 심플 팔레트 (기본 색 + 없음 + 사용자 색). 상세 옵션은 다음 AI에서 재설계 예정.
+    //       spec 기반 시스템(단색/그라데이션/패턴)은 내부에는 살아있으나 UI 는 노출 X.
     function renderPalette(){
-      var spec = getLastHlSpec();
       var user = loadHlUserPresets();
-
       var html = '<div class="hl-title">형광펜</div>';
-      // 모드
-      html += '<div class="hl-mode-row">'
-        + '<button type="button" class="hl-mode ' + (spec.mode==='solid'?'is-active':'') + '" data-hl-mode="solid">단색</button>'
-        + '<button type="button" class="hl-mode ' + (spec.mode==='gradient'?'is-active':'') + '" data-hl-mode="gradient">그라데이션</button>'
-        + '<button type="button" class="hl-mode ' + (spec.mode==='pattern'?'is-active':'') + '" data-hl-mode="pattern">패턴</button>'
-        + '</div>';
-
-      // 기본 그룹 색상 스와치
-      html += '<div class="hl-group-label">기본 색</div>';
       html += '<div class="hl-grid">';
       html += '<div class="hl-sw is-none" data-hl-color="c1" data-hl-value="none" title="형광펜 해제"></div>';
       HL_PALETTE_BASIC.forEach(function(o){
-        html += '<div class="hl-sw" data-hl-color="c1" data-hl-value="' + o.c + '" title="' + o.name + ' (색 1)" style="background:' + o.c + '"></div>';
+        html += '<div class="hl-sw" data-hl-color="c1" data-hl-value="' + o.c + '" title="' + o.name + '" style="background:' + o.c + '"></div>';
       });
       html += '</div>';
 
-      // 그라데이션·패턴이면 색 2 선택 UI
-      if (spec.mode === 'gradient' || spec.mode === 'pattern') {
-        html += '<div class="hl-group-label">색 1 · 색 2 지정</div>';
-        html += '<div class="hl-slider-row">'
-          + '<span>색 1</span>'
-          + '<input type="color" data-hl-c1 value="' + toHex(spec.c1 || '#FFF176') + '" style="width:100%; height:22px; padding:0; border:1px solid rgba(15,58,58,0.35);">'
-          + '<span></span>'
-          + '</div>';
-        html += '<div class="hl-slider-row">'
-          + '<span>투명도 1</span>'
-          + '<input type="range" data-hl-a1 min="0" max="100" step="5" value="' + (spec.a1||100) + '">'
-          + '<span data-hl-a1-lbl>' + (spec.a1||100) + '%</span>'
-          + '</div>';
-        html += '<div class="hl-slider-row">'
-          + '<span>색 2</span>'
-          + '<input type="color" data-hl-c2 value="' + toHex(spec.c2 || '#F8BBD0') + '" style="width:100%; height:22px; padding:0; border:1px solid rgba(15,58,58,0.35);">'
-          + '<span></span>'
-          + '</div>';
-        html += '<div class="hl-slider-row">'
-          + '<span>투명도 2</span>'
-          + '<input type="range" data-hl-a2 min="0" max="100" step="5" value="' + (spec.a2||100) + '">'
-          + '<span data-hl-a2-lbl>' + (spec.a2||100) + '%</span>'
-          + '</div>';
-        if (spec.mode === 'gradient') {
-          html += '<div class="hl-slider-row">'
-            + '<span>각도</span>'
-            + '<input type="range" data-hl-angle min="0" max="360" step="15" value="' + (spec.angle||45) + '">'
-            + '<span data-hl-angle-lbl>' + (spec.angle||45) + '°</span>'
-            + '</div>';
-        }
-        if (spec.mode === 'pattern') {
-          html += '<div class="hl-group-label">패턴</div>';
-          html += '<div class="hl-group-row">'
-            + '<button type="button" class="hl-group ' + (spec.pattern==='dot'?'is-active':'') + '" data-hl-pattern="dot">도트</button>'
-            + '<button type="button" class="hl-group ' + (spec.pattern==='stripe'?'is-active':'') + '" data-hl-pattern="stripe">줄무늬</button>'
-            + '<button type="button" class="hl-group ' + (spec.pattern==='check'?'is-active':'') + '" data-hl-pattern="check">체크</button>'
-            + '</div>';
-          html += '<div class="hl-slider-row">'
-            + '<span>크기</span>'
-            + '<input type="range" data-hl-size min="4" max="40" step="1" value="' + (spec.size||10) + '">'
-            + '<span data-hl-size-lbl>' + (spec.size||10) + 'px</span>'
-            + '</div>';
-        }
-      } else {
-        // 단색 모드에서도 투명도 슬라이더 노출
-        html += '<div class="hl-slider-row">'
-          + '<span>투명도</span>'
-          + '<input type="range" data-hl-a1 min="0" max="100" step="5" value="' + (spec.a1||100) + '">'
-          + '<span data-hl-a1-lbl>' + (spec.a1||100) + '%</span>'
-          + '</div>';
-      }
-
-      // 미리보기
-      html += '<div class="hl-group-label">미리보기</div>';
-      html += '<div style="padding:0.5em 0.7em; border:1px dashed rgba(15,58,58,0.3); border-radius:2px; text-align:center;">'
-        + '<mark style="background:' + specToBackground(spec) + '; color:inherit; padding:0.15em 0.4em; border-radius:2px;">형광펜 예시 Aa 가나 123</mark>'
-        + '</div>';
-
-      // 적용 버튼
-      html += '<div class="hl-mode-row" style="margin-top:0.6em;">'
-        + '<button type="button" class="hl-mode is-active" data-hl-apply style="background:var(--point,#FF9A76); border-color:var(--point,#FF9A76);">이 형광펜 적용</button>'
-        + '</div>';
-
-      // 사용자 프리셋
       if (user.length) {
-        html += '<div class="hl-group-label">내 프리셋</div>';
+        html += '<div class="hl-group-label">내 색</div>';
         html += '<div class="hl-grid">';
         user.forEach(function(o, i){
-          var bg = o.spec ? specToBackground(o.spec) : ('#' === (o.c||'').charAt(0) ? o.c : (o.c || '#ccc'));
+          var bg = o.spec ? specToBackground(o.spec) : (o.c || '#ccc');
           html += '<div class="hl-sw" data-hl-user="' + i + '" title="' + (o.name || '') + '" style="background:' + bg + '">'
             + '<button type="button" class="hl-del" data-hl-del="' + i + '" title="삭제">×</button>'
             + '</div>';
@@ -9885,9 +10177,15 @@
         html += '</div>';
       }
 
-      // 현재 조합 저장
+      // 색 저장 (심플): 픽커 + 저장
       html += '<div class="hl-add">'
-        + '<button type="button" data-hl-save-spec>💾 현재 형광펜 저장</button>'
+        + '<input type="color" data-hl-picker value="' + getLastHlColor() + '">'
+        + '<button type="button" data-hl-save-spec>현재 색 저장</button>'
+        + '</div>';
+
+      // 개발 예정 안내 (사이트 톤 얇은 실선)
+      html += '<div style="margin-top:0.6em; padding-top:0.5em; border-top:1px dashed rgba(15,58,58,0.25); font-size:10.5px; opacity:0.55; line-height:1.4;">'
+        + '그라데이션·패턴·투명도 상세 설정은 다음 업데이트에서 콜아웃과 동일한 방식으로 추가됩니다.'
         + '</div>';
 
       palette.innerHTML = html;
@@ -9920,11 +10218,9 @@
     }
 
     palette.addEventListener('mousedown', function(e){ e.preventDefault(); });
-    // p18k: 통합 이벤트 처리 (모드 / 색1·2 / 투명도 / 패턴 / 사용자 프리셋)
+    // p18l: 심플 이벤트 (기본 색 즉시 적용 · 사용자 색 · 현재 색 저장)
     palette.addEventListener('click', function(e){
-      var spec = getLastHlSpec();
-
-      // 사용자 프리셋 삭제
+      // 사용자 색 삭제
       var del = e.target.closest('[data-hl-del]');
       if (del) {
         e.stopPropagation();
@@ -9935,45 +10231,20 @@
         renderPalette();
         return;
       }
-      // 모드 전환
-      var modeBtn = e.target.closest('[data-hl-mode]');
-      if (modeBtn) {
-        spec.mode = modeBtn.getAttribute('data-hl-mode');
-        setLastHlSpec(spec);
-        renderPalette();
-        return;
-      }
-      // 색 1 스와치 (기본 색 그리드)
+      // 기본 색 스와치 (없음 포함) — 즉시 적용
       var swC1 = e.target.closest('[data-hl-color="c1"]');
       if (swC1) {
         var v = swC1.getAttribute('data-hl-value');
         if (v === 'none') {
           applyHighlightColor('');
-          palette.classList.remove('is-open');
-          updateBar();
-          return;
-        }
-        spec.c1 = v;
-        setLastHlSpec(spec);
-        // 단색 모드면 즉시 적용 후 닫기
-        if (spec.mode === 'solid') {
-          applyHighlightColor(spec);
-          palette.classList.remove('is-open');
-          updateBar();
         } else {
-          renderPalette();
+          applyHighlightColor({ mode:'solid', c1:v, a1:100 });
         }
+        palette.classList.remove('is-open');
+        updateBar();
         return;
       }
-      // 패턴 종류
-      var patBtn = e.target.closest('[data-hl-pattern]');
-      if (patBtn) {
-        spec.pattern = patBtn.getAttribute('data-hl-pattern');
-        setLastHlSpec(spec);
-        renderPalette();
-        return;
-      }
-      // 사용자 프리셋 적용
+      // 사용자 색 적용
       var userBtn = e.target.closest('[data-hl-user]');
       if (userBtn) {
         var ui = parseInt(userBtn.getAttribute('data-hl-user'), 10);
@@ -9981,82 +10252,30 @@
         var uP = uL[ui];
         if (uP) {
           var uS = uP.spec || { mode:'solid', c1:uP.c || '#FFF176', a1:100 };
-          setLastHlSpec(uS);
           applyHighlightColor(uS);
           palette.classList.remove('is-open');
           updateBar();
         }
         return;
       }
-      // 현재 조합 저장
-      var saveSpec = e.target.closest('[data-hl-save-spec]');
-      if (saveSpec) {
+      // 현재 색 저장
+      var saveBtn = e.target.closest('[data-hl-save-spec]');
+      if (saveBtn) {
+        var pk = palette.querySelector('[data-hl-picker]');
+        var c = pk ? pk.value : getLastHlColor();
         var sList = loadHlUserPresets();
-        // openEditorDialog 로 이름·그룹 받음
-        openEditorDialog('형광펜 저장', [
-          { key:'name', label:'이름', default:'내 형광펜', placeholder:'예: 파스텔 노랑' }
-        ], function(vals){
-          if (!vals) return;
-          var nm = (vals.name || '').trim() || '내 형광펜';
-          sList.push({ name:nm, spec:JSON.parse(JSON.stringify(spec)) });
-          saveHlUserPresets(sList);
-          renderPalette();
-        });
-        return;
-      }
-      // 적용 버튼
-      var applyBtn = e.target.closest('[data-hl-apply]');
-      if (applyBtn) {
-        applyHighlightColor(spec);
-        palette.classList.remove('is-open');
-        updateBar();
+        sList.push({ name:'', spec:{ mode:'solid', c1:c, a1:100 } });
+        saveHlUserPresets(sList);
+        setLastHlColor(c);
+        renderPalette();
         return;
       }
     });
-    // 슬라이더/픽커 실시간
     palette.addEventListener('input', function(e){
-      var spec = getLastHlSpec();
-      var t = e.target;
-      if (t.hasAttribute && t.hasAttribute('data-hl-c1')) {
-        spec.c1 = t.value; setLastHlSpec(spec);
-        renderPalettePreviewOnly();
-        return;
-      }
-      if (t.hasAttribute && t.hasAttribute('data-hl-c2')) {
-        spec.c2 = t.value; setLastHlSpec(spec);
-        renderPalettePreviewOnly();
-        return;
-      }
-      if (t.hasAttribute && t.hasAttribute('data-hl-a1')) {
-        spec.a1 = parseInt(t.value,10); setLastHlSpec(spec);
-        var lbl = palette.querySelector('[data-hl-a1-lbl]'); if (lbl) lbl.textContent = spec.a1 + '%';
-        renderPalettePreviewOnly();
-        return;
-      }
-      if (t.hasAttribute && t.hasAttribute('data-hl-a2')) {
-        spec.a2 = parseInt(t.value,10); setLastHlSpec(spec);
-        var lbl2 = palette.querySelector('[data-hl-a2-lbl]'); if (lbl2) lbl2.textContent = spec.a2 + '%';
-        renderPalettePreviewOnly();
-        return;
-      }
-      if (t.hasAttribute && t.hasAttribute('data-hl-angle')) {
-        spec.angle = parseInt(t.value,10); setLastHlSpec(spec);
-        var lblA = palette.querySelector('[data-hl-angle-lbl]'); if (lblA) lblA.textContent = spec.angle + '°';
-        renderPalettePreviewOnly();
-        return;
-      }
-      if (t.hasAttribute && t.hasAttribute('data-hl-size')) {
-        spec.size = parseInt(t.value,10); setLastHlSpec(spec);
-        var lblS = palette.querySelector('[data-hl-size-lbl]'); if (lblS) lblS.textContent = spec.size + 'px';
-        renderPalettePreviewOnly();
-        return;
+      if (e.target.hasAttribute && e.target.hasAttribute('data-hl-picker')) {
+        setLastHlColor(e.target.value);
       }
     });
-    function renderPalettePreviewOnly(){
-      var spec = getLastHlSpec();
-      var previewMark = palette.querySelector('mark');
-      if (previewMark) previewMark.style.background = specToBackground(spec);
-    }
 
     function updateBar(){
       var sel = window.getSelection();
