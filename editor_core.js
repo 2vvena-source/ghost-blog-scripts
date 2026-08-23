@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19c-fix';
+  var VERSION = 'v2.0-β-p19c-final';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -11759,6 +11759,41 @@
       document.body.style.userSelect = '';
     });
     log('이미지 리사이저 설치');
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // p19c-final: 사이트 전역 CSS 삽입 (모든 페이지에서 실행)
+  // ───────────────────────────────────────────────────────────
+  // 편집기에서 만든 <ruby> 등 특수 요소가 사이트 스킨과 무관하게
+  // 정상 표시되도록 하는 방어 규칙. Site Footer 저장이 실패하거나
+  // 스킨 CSS 가 이기는 경우에도 반드시 동작하도록 스크립트가 직접
+  // <head> 에 삽입. 성능 영향 0 (초 1회, 5개 규칙만).
+  //
+  // 재삽입 방지: data-ddl-global 마커로 이중 삽입 차단.
+  // 확장 가능: 향후 특수 블록이 늘어나면 SITE_GLOBAL_CSS 에만 추가.
+  // ═══════════════════════════════════════════════════════════
+  var SITE_GLOBAL_CSS = [
+    /* 루비 (후리가나) — 사이트 스킨이 <rt> 를 감추는 경우 방어 */
+    'ruby { display: ruby; ruby-position: over; ruby-align: center; }',
+    'ruby rt { display: ruby-text !important; font-size: 0.55em !important; line-height: 1.1; opacity: 0.85; color: inherit; font-family: inherit; text-align: center; white-space: nowrap; }',
+    'ruby rp { display: none; }'
+  ].join('\n');
+
+  function injectSiteGlobalCSS(){
+    try {
+      if (document.querySelector('style[data-ddl-global="ruby"]')) return; // 재삽입 방지
+      var s = document.createElement('style');
+      s.setAttribute('data-ddl-global', 'ruby');
+      s.textContent = SITE_GLOBAL_CSS;
+      (document.head || document.documentElement).appendChild(s);
+    } catch(_){}
+  }
+
+  // 즉시 실행 (DOM 준비 상태 불문 · document.documentElement 은 항상 존재)
+  injectSiteGlobalCSS();
+  // 안전망: DOM ready 후 재확인 (head 가 늦게 만들어지는 케이스)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectSiteGlobalCSS, { once: true });
   }
 
   function boot(){
