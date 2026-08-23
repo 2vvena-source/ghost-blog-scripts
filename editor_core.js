@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19j-fix2';
+  var VERSION = 'v2.0-β-p19j-fix3';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -9063,10 +9063,19 @@
     });
     var html = parts.join('\n');
 
-    // p19i: 저장 전 mark.ddl-ruby 안 시각화용 <span.ddl-ruby-rt> 제거.
-    // data-has-rt 속성도 저장물에서 제거 (복원 시 다시 세팅됨).
+    // p19i/j: 저장 전 mark.ddl-ruby 안 시각화용 <span.ddl-ruby-rt> 제거.
+    // data-has-rt 속성 제거. p19j-fix3: 색 관련 태그도 data-rt 안에서 제거 (사용자 지시: 색은 원본 상속).
     html = html.replace(/(<mark\s[^>]*ddl-ruby[^>]*>)([\s\S]*?)(<\/mark>)/g, function(_m, open, inner, close){
       var cleanOpen = open.replace(/\s*data-has-rt="[^"]*"/g, '');
+      // data-rt="..." 안 <font color> 나 style="color:" 제거
+      cleanOpen = cleanOpen.replace(/data-rt="([^"]*)"/g, function(_a, val){
+        var stripped = val
+          .replace(/&lt;font\b[^&]*?&gt;/g, '')
+          .replace(/&lt;\/font&gt;/g, '')
+          .replace(/\s*color\s*:\s*[^;&"]+;?/gi, '')
+          .replace(/\s*style="\s*"/g, '');
+        return 'data-rt="' + stripped + '"';
+      });
       return cleanOpen + inner.replace(/<span[^>]*class="ddl-ruby-rt"[^>]*>[\s\S]*?<\/span>/g, '') + close;
     });
 
@@ -10184,8 +10193,6 @@
       + '<button type="button" data-rcmd="bold"       class="pop-btn" style="font-weight:800;" title="굵게">B</button>'
       + '<button type="button" data-rcmd="italic"     class="pop-btn" style="font-style:italic; font-family:serif;" title="기울임">I</button>'
       + '<button type="button" data-rcmd="underline"  class="pop-btn" style="text-decoration:underline;" title="밑줄">U</button>'
-      + '<span style="width:1px; height:1em; background:rgba(15,58,58,0.2); margin:0 4px;"></span>'
-      + '<label style="display:inline-flex; align-items:center; gap:4px; font-size:0.75em; opacity:0.7;">글자색 <input type="color" data-rcmd="color" value="#0F3A3A" style="width:2em; height:1.6em; padding:0; border:1px solid rgba(15,58,58,0.3); border-radius:3px; cursor:pointer;"></label>'
       + '<button type="button" data-rcmd="clearFormat" class="pop-btn" title="서식 지우기" style="margin-left:auto;">✕서식</button>';
     wrap.appendChild(toolbar);
 
@@ -10262,6 +10269,9 @@
       var range = sel2.getRangeAt(0);
       var el = document.createElement('mark');
       el.className = 'ddl-ruby';
+      // p19j-fix3: 색 관련 태그 제거 (사용자 지시: 색은 본문 상속)
+      rubyHtml = rubyHtml.replace(/<font\b[^>]*>/gi, '').replace(/<\/font>/gi, '')
+                          .replace(/\s*color\s*:\s*[^;"]+;?/gi, '');
       el.setAttribute('data-rt', rubyHtml);
       el.setAttribute('title', rubyHtml.replace(/<[^>]+>/g,''));
       el.style.background = 'transparent';
@@ -12028,8 +12038,8 @@
     '  display: block !important;',
     '  background: transparent !important;',
     '}',
-    /* rt 안 자식 요소는 자체 color 유지 (font color, span style color 등) */
-    'mark.ddl-ruby .ddl-ruby-rt * { color: revert !important; }',
+    /* rt-span 자식 요소는 부모 색 상속 (원본 글자와 같은 색) */
+    'mark.ddl-ruby .ddl-ruby-rt, mark.ddl-ruby .ddl-ruby-rt * { color: inherit !important; }',
     /* 표준 <ruby> 도 지원 (편집기 안 임시 상태 대비) */
     'ruby { display: ruby; ruby-position: over; }',
     'ruby rt { display: ruby-text !important; font-size: 0.5em !important; opacity: 0.85 !important; }',
