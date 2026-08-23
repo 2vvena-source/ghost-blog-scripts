@@ -1,10 +1,10 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p18a
+ * 2vvena Editor Core - v2.0-β-p18b
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
  *   - window.__DDL_EDITOR_LOADED 중복 로드 방지
- *   - 관리자 페이지(/ghost/*)에서만 실행
+ *   - /editor/ 페이지에서만 실행 (원본 isEditorPage() 로직 그대로)
  */
 (function(){
   'use strict';
@@ -15,12 +15,9 @@
   }
   window.__DDL_EDITOR_LOADED = true;
 
-  // 관리자 페이지 이외에서는 실행 안 함 (블로그 방문 시 5초 지연 방지)
-  var _p = window.location.pathname || '';
-  if (_p.indexOf('/ghost') !== 0 && _p !== '/ghost') {
-    // 편집기는 오직 관리자 페이지에서만 필요
-    return;
-  }
+  // 실제 페이지 필터링은 원본 스크립트의 isEditorPage() 함수가 담당.
+  // 편집기는 /editor/ 페이지에서만 실제 활성화됨.
+  // 블로그 다른 페이지에서는 조기 return되어 부하 없음.
 
   // ─── 이하 편집기 본체 (기존 IIFE 내부 코드 그대로) ────────────────
 'use strict';
