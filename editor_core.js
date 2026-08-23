@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19d-fix';
+  var VERSION = 'v2.0-β-p19e';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -10147,18 +10147,24 @@
       var sel2 = window.getSelection();
       if (!sel2 || sel2.rangeCount === 0) return;
       var range = sel2.getRangeAt(0);
-      var span = document.createElement('span');
-      span.className = 'ddl-ruby';
-      span.setAttribute('data-rt', rubyText);
+      // p19e: <a> 태그 사용 (Ghost sanitizer 가 링크는 절대 안 지움)
+      // href 는 안 넣음 (실제 링크 아님). style 로 링크처럼 안 보이게 처리.
+      var el = document.createElement('a');
+      el.className = 'ddl-ruby';
+      el.setAttribute('data-rt', rubyText);
+      el.setAttribute('title', rubyText); // sanitizer 대비 이중 저장
+      el.style.color = 'inherit';
+      el.style.textDecoration = 'none';
+      el.style.pointerEvents = 'none';
       try {
-        span.appendChild(range.extractContents());
-        range.insertNode(span);
+        el.appendChild(range.extractContents());
+        range.insertNode(el);
         sel2.removeAllRanges();
         var nr = document.createRange();
-        nr.selectNodeContents(span);
+        nr.selectNodeContents(el);
         sel2.addRange(nr);
         saveRange();
-      } catch(err){ console.warn('[p19d] ruby error', err); }
+      } catch(err){ console.warn('[p19e] ruby error', err); }
     });
   }
 
@@ -10182,7 +10188,7 @@
     // 선택 영역 안의 특수 태그 언랩용 헬퍼
     function stripSpecial(root){
       // Node List 스냅샷 (라이브면 변형 중 오동작)
-      var nodes = root.querySelectorAll('mark, .ep-emphasis, sup, sub, ruby, rt, rp, .ddl-ruby');
+      var nodes = root.querySelectorAll('mark, .ep-emphasis, sup, sub, ruby, rt, rp, .ddl-ruby, a.ddl-ruby');
       // 언랩은 실제 문서(range 안)에서 해야 함 → root 는 참고만
     }
     // 실제 문서에서 처리: 공통 조상 안의 특수 태그를 찾아, 셀렉션과 교차하면 언랩
@@ -10192,7 +10198,7 @@
     // scope 는 너무 좁을 수 있음 → 편집 가능 조상까지 넓히기
     var editable = scope.closest && scope.closest('[contenteditable="true"], .callout-body');
     if (editable) scope = editable;
-    var candidates = scope.querySelectorAll('mark, .ep-emphasis, ruby, .ddl-ruby');
+    var candidates = scope.querySelectorAll('mark, .ep-emphasis, ruby, .ddl-ruby, a.ddl-ruby');
     candidates.forEach(function(node){
       if (!range.intersectsNode(node)) return;
       // ruby 는 rt 도 함께 제거
@@ -11776,15 +11782,18 @@
   // 확장 가능: 향후 특수 블록이 늘어나면 SITE_GLOBAL_CSS 에만 추가.
   // ═══════════════════════════════════════════════════════════
   var SITE_GLOBAL_CSS = [
-    /* p19d-fix: 루비 (후리가나) — 간격 축소 + !important 로 스킨 이김 */
-    '.ddl-ruby {',
+    /* p19e: 루비 — <a class="ddl-ruby" data-rt="...">
+       Ghost sanitizer 가 <a> 태그와 class·data-속성은 절대 건드리지 않음.
+       스타일은 원래 <ruby> 렌더링과 최대한 동일하게. */
+    'a.ddl-ruby, .ddl-ruby {',
     '  position: relative !important;',
-    '  display: inline-block !important;',
-    '  line-height: 1.45 !important;',
-    '  margin-top: 0.5em !important;',
-    '  vertical-align: baseline !important;',
+    '  display: inline !important;',
+    '  color: inherit !important;',
+    '  text-decoration: none !important;',
+    '  pointer-events: none !important;',
+    '  cursor: text !important;',
     '}',
-    '.ddl-ruby::before {',
+    'a.ddl-ruby::before, .ddl-ruby::before {',
     '  content: attr(data-rt) !important;',
     '  position: absolute !important;',
     '  left: 50% !important;',
@@ -11793,17 +11802,17 @@
     '  font-size: 0.5em !important;',
     '  line-height: 1 !important;',
     '  white-space: nowrap !important;',
-    '  opacity: 0.9 !important;',
+    '  opacity: 0.85 !important;',
     '  color: inherit !important;',
     '  font-family: inherit !important;',
     '  pointer-events: none !important;',
-    '  margin-bottom: -0.15em !important;',
-    '  display: block !important;',
     '  visibility: visible !important;',
+    '  margin-bottom: 0 !important;',
+    '  padding: 0 0.15em !important;',
     '}',
-    /* 기존 표준 태그 지원 (편집기 안 임시 상태) */
+    /* 표준 <ruby> 도 지원 (편집기 안 임시 상태) */
     'ruby { display: ruby; ruby-position: over; }',
-    'ruby rt { display: ruby-text !important; font-size: 0.5em !important; opacity: 0.9 !important; }',
+    'ruby rt { display: ruby-text !important; font-size: 0.5em !important; opacity: 0.85 !important; }',
     'ruby rp { display: none; }'
   ].join('\n');
 
