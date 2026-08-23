@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19d';
+  var VERSION = 'v2.0-β-p19d-fix';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -11776,27 +11776,34 @@
   // 확장 가능: 향후 특수 블록이 늘어나면 SITE_GLOBAL_CSS 에만 추가.
   // ═══════════════════════════════════════════════════════════
   var SITE_GLOBAL_CSS = [
-    /* p19d: 루비 (후리가나) — Ghost sanitizer 를 우회하는 span 방식.
-       구조: <span class="ddl-ruby" data-rt="루비">가나다</span>
-       CSS ::before 로 data-rt 값을 본문 위에 얹어 표시. */
-    '.ddl-ruby { position: relative; display: inline-block; line-height: 1.9; }',
-    '.ddl-ruby::before {',
-    '  content: attr(data-rt);',
-    '  position: absolute;',
-    '  left: 50%;',
-    '  bottom: 100%;',
-    '  transform: translateX(-50%) translateY(0.15em);',
-    '  font-size: 0.55em;',
-    '  line-height: 1;',
-    '  white-space: nowrap;',
-    '  opacity: 0.85;',
-    '  color: inherit;',
-    '  font-family: inherit;',
-    '  pointer-events: none;',
+    /* p19d-fix: 루비 (후리가나) — 간격 축소 + !important 로 스킨 이김 */
+    '.ddl-ruby {',
+    '  position: relative !important;',
+    '  display: inline-block !important;',
+    '  line-height: 1.45 !important;',
+    '  margin-top: 0.5em !important;',
+    '  vertical-align: baseline !important;',
     '}',
-    /* 기존 표준 태그도 함께 지원 (편집기 안 임시 상태 대비) */
+    '.ddl-ruby::before {',
+    '  content: attr(data-rt) !important;',
+    '  position: absolute !important;',
+    '  left: 50% !important;',
+    '  bottom: 100% !important;',
+    '  transform: translateX(-50%) !important;',
+    '  font-size: 0.5em !important;',
+    '  line-height: 1 !important;',
+    '  white-space: nowrap !important;',
+    '  opacity: 0.9 !important;',
+    '  color: inherit !important;',
+    '  font-family: inherit !important;',
+    '  pointer-events: none !important;',
+    '  margin-bottom: -0.15em !important;',
+    '  display: block !important;',
+    '  visibility: visible !important;',
+    '}',
+    /* 기존 표준 태그 지원 (편집기 안 임시 상태) */
     'ruby { display: ruby; ruby-position: over; }',
-    'ruby rt { display: ruby-text !important; font-size: 0.55em !important; opacity: 0.85; }',
+    'ruby rt { display: ruby-text !important; font-size: 0.5em !important; opacity: 0.9 !important; }',
     'ruby rp { display: none; }'
   ].join('\n');
 
