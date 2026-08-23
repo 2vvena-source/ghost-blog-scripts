@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19j-fix';
+  var VERSION = 'v2.0-β-p19j-fix2';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -12023,12 +12023,13 @@
     '  line-height: 1 !important;',
     '  white-space: nowrap !important;',
     '  opacity: 0.85 !important;',
-    '  color: inherit !important;',
     '  font-family: inherit !important;',
     '  pointer-events: none !important;',
     '  display: block !important;',
     '  background: transparent !important;',
     '}',
+    /* rt 안 자식 요소는 자체 color 유지 (font color, span style color 등) */
+    'mark.ddl-ruby .ddl-ruby-rt * { color: revert !important; }',
     /* 표준 <ruby> 도 지원 (편집기 안 임시 상태 대비) */
     'ruby { display: ruby; ruby-position: over; }',
     'ruby rt { display: ruby-text !important; font-size: 0.5em !important; opacity: 0.85 !important; }',
@@ -12180,6 +12181,11 @@
       // β 기능
       setupFloatingToolbar();
       setupRubyEditHandler(); // p19h
+      // p19j-fix2: 우리 편집기에서도 마커 복원 (편집 캔버스 안 스캔)
+      try { restoreRubyMarkers(contentEl); } catch(_){}
+      // 편집 시작 후 3초까지 다시 한 번 (편집기 콘텐츠 지연 로드 대비)
+      setTimeout(function(){ try { restoreRubyMarkers(contentEl); } catch(_){} }, 500);
+      setTimeout(function(){ try { restoreRubyMarkers(contentEl); } catch(_){} }, 2000);
       // p14c: 블록 정렬·폭 시스템
       setupBlockToolbar();
       setupBlockPanelListeners();
