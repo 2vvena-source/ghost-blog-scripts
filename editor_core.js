@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p18f';
+  var VERSION = 'v2.0-β-p18g';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -3167,15 +3167,25 @@
 
     // 이미지 모드가 아니면 색 1 섹션 (namespace: callout-bg)
     if (bgMode !== 'image') {
+      var _a1 = parseInt(box.getAttribute('data-bg-alpha1') || '100', 10);
       html += '<div class="row"><div class="row-label">' + (bgMode==='gradient'||bgMode==='pattern'?'색 1':'배경색') + '</div>'
-        + '<div class="ep-color-row"><input type="color" data-cal-set="bg" value="' + escapeAttr(curBgHex) + '"></div></div>';
+        + '<div class="ep-color-row" style="display:flex; align-items:center; gap:8px;">'
+        + '<input type="color" data-cal-set="bg" value="' + escapeAttr(curBgHex) + '">'
+        + '<span style="font-size:0.75em; opacity:0.7; white-space:nowrap;">투명도 <span data-alpha-lbl="1">' + _a1 + '</span>%</span>'
+        + '<input type="range" data-cal-alpha="1" min="0" max="100" step="5" value="' + _a1 + '" style="flex:1; min-width:80px;">'
+        + '</div></div>';
       html += renderColorSection('bg', curBgHex, 'callout-bg');
     }
 
     // 그라데이션·패턴이면 색 2 섹션 (namespace: callout-bg2)
     if (bgMode === 'gradient' || bgMode === 'pattern') {
+      var _a2 = parseInt(box.getAttribute('data-bg-alpha2') || '100', 10);
       html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;"><div class="row-label" style="font-weight:600;">색 2</div>'
-        + '<div class="ep-color-row"><input type="color" data-cal-set="bg2" value="' + escapeAttr(curBg2Hex) + '"></div></div>';
+        + '<div class="ep-color-row" style="display:flex; align-items:center; gap:8px;">'
+        + '<input type="color" data-cal-set="bg2" value="' + escapeAttr(curBg2Hex) + '">'
+        + '<span style="font-size:0.75em; opacity:0.7; white-space:nowrap;">투명도 <span data-alpha-lbl="2">' + _a2 + '</span>%</span>'
+        + '<input type="range" data-cal-alpha="2" min="0" max="100" step="5" value="' + _a2 + '" style="flex:1; min-width:80px;">'
+        + '</div></div>';
       html += renderColorSection('bg', curBg2Hex, 'callout-bg2');
     }
 
@@ -3262,14 +3272,20 @@
 
   // p13a: 테두리 탭
   function renderBorderTab(){
+    // p18g: 테두리 그라데이션 제거 — 단색만 지원
     var box = calPopupLock || selectedCallout;
     if (!box) return '';
+    // 마이그레이션: 이전 세션에서 남은 data-border-mode='gradient' 잔재를 강제로 solid 로
+    if (box.getAttribute('data-border-mode') === 'gradient') {
+      box.setAttribute('data-border-mode', 'solid');
+      // 그라데이션 잔재 스타일 제거 후 다시 그리기
+      box.style.borderImage = '';
+      box.style.borderImageSlice = '';
+      if (typeof applyBorderToBox === 'function') applyBorderToBox(box);
+    }
     var borderStyle = box.getAttribute('data-border-style') || 'none';
     var borderWidth = box.getAttribute('data-border-width') || '1';
     var borderColor = box.getAttribute('data-border-color') || '#0F3A3A';
-    var borderColor2 = box.getAttribute('data-border-color2') || '#FF9A76';
-    var borderMode = box.getAttribute('data-border-mode') || 'solid';  // solid | gradient
-    var borderAngle = parseInt(box.getAttribute('data-border-angle') || '45', 10);
     var borderOpacity = box.getAttribute('data-border-opacity') || '100';
 
     var html = '';
@@ -3289,42 +3305,17 @@
       html += '<div class="row"><div class="row-label">투명도 (' + borderOpacity + '%)</div>'
         + '<input type="range" id="pop-border-opacity" min="0" max="100" step="5" value="' + borderOpacity + '" style="width:100%;"></div>';
 
-      // p18c: 테두리 색상 모드 (단색 | 그라데이션)
-      html += '<div class="row"><div class="row-label">테두리 색상 모드</div><div>'
-        + '<button class="pop-btn' + (borderMode==='solid'?' is-active':'') + '" data-cal-set="borderMode" data-value="solid">단색</button>'
-        + '<button class="pop-btn' + (borderMode==='gradient'?' is-active':'') + '" data-cal-set="borderMode" data-value="gradient">그라데이션</button>'
-        + '</div></div>';
-
-      // 색상 - 단색이면 하나, 그라데이션이면 색1+색2+각도
-      html += '<div class="row"><div class="row-label">' + (borderMode==='gradient'?'색 1':'테두리 색') + '</div>'
+      // 색상 (단색)
+      html += '<div class="row"><div class="row-label">테두리 색</div>'
         + '<div class="ep-color-row"><input type="color" data-cal-set="borderColor" value="' + escapeAttr(toHex(borderColor)) + '"></div></div>';
       html += renderColorSection('border', borderColor, 'callout-border');
 
-      if (borderMode === 'gradient') {
-        html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;"><div class="row-label" style="font-weight:600;">색 2</div>'
-          + '<div class="ep-color-row"><input type="color" data-cal-set="borderColor2" value="' + escapeAttr(toHex(borderColor2)) + '"></div></div>';
-        html += renderColorSection('border', borderColor2, 'callout-border2');
-
-        html += '<div class="row"><div class="row-label">방향 (' + borderAngle + '°)</div>'
-          + '<input type="range" data-cal-set="borderAngle" min="0" max="360" step="15" value="' + borderAngle + '" style="width:100%;">'
-          + '<div style="display:flex; gap:6px; margin-top:4px; flex-wrap:wrap;">'
-          + '<button type="button" class="pop-btn" data-cal-preset-border-angle="0">↑</button>'
-          + '<button type="button" class="pop-btn" data-cal-preset-border-angle="90">→</button>'
-          + '<button type="button" class="pop-btn" data-cal-preset-border-angle="180">↓</button>'
-          + '<button type="button" class="pop-btn" data-cal-preset-border-angle="270">←</button>'
-          + '<button type="button" class="pop-btn" data-cal-preset-border-angle="135">↘</button>'
-          + '<button type="button" class="pop-btn" data-cal-preset-border-angle="45">↗</button>'
-          + '</div></div>';
-      }
-
-      // 컷아웃 (단색 모드에서만)
-      if (borderMode === 'solid') {
-        var borderCutout = box.getAttribute('data-border-cutout') === '1';
-        html += '<div class="row"><div class="row-label">컷아웃 (뒤가 뚫림)</div>'
-          + '<label style="display:flex; align-items:center; gap:0.4em; font-size:0.85em;">'
-          + '<input type="checkbox" id="pop-border-cutout"' + (borderCutout?' checked':'') + '> 테두리를 뚫어서 뒤가 보이게 (색 대신 투명)'
-          + '</label></div>';
-      }
+      // 컷아웃
+      var borderCutout = box.getAttribute('data-border-cutout') === '1';
+      html += '<div class="row"><div class="row-label">컷아웃 (뒤가 뚫림)</div>'
+        + '<label style="display:flex; align-items:center; gap:0.4em; font-size:0.85em;">'
+        + '<input type="checkbox" id="pop-border-cutout"' + (borderCutout?' checked':'') + '> 테두리를 뚫어서 뒤가 보이게 (색 대신 투명)'
+        + '</label></div>';
     }
 
     return html;
@@ -3821,26 +3812,43 @@
       if (t.id === 'pop-bg-opacity') {
         var op = parseInt(t.value, 10);
         box.setAttribute('data-bg-opacity', String(op));
-        // p14a: backgroundColor 만 변경 (배경 이미지는 별도 유지)
-        if (op === 0) {
-          box.style.backgroundColor = 'transparent';
-          box.setAttribute('data-bg', 'transparent');
+        // p18g: 모드별 처리 — solid 는 backgroundColor 만, gradient/pattern 은 applyCalloutBg 재호출
+        var _bm = box.getAttribute('data-bg-mode') || 'solid';
+        if (_bm === 'gradient' || _bm === 'pattern') {
+          if (typeof applyCalloutBg === 'function') applyCalloutBg(box);
         } else {
-          var hex = box.getAttribute('data-bg-hex');
-          var rgb = null;
-          if (hex) rgb = parseRgb(hex);
-          else rgb = parseRgb(box.getAttribute('data-bg') || box.style.backgroundColor || '#F5F5F5');
-          if (!rgb) return;
-          var newBg = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + (op/100) + ')';
-          box.style.backgroundColor = newBg;
-          box.setAttribute('data-bg', newBg);
+          if (op === 0) {
+            box.style.backgroundColor = 'transparent';
+            box.setAttribute('data-bg', 'transparent');
+          } else {
+            var hex = box.getAttribute('data-bg-hex');
+            var rgb = null;
+            if (hex) rgb = parseRgb(hex);
+            else rgb = parseRgb(box.getAttribute('data-bg') || box.style.backgroundColor || '#F5F5F5');
+            if (!rgb) return;
+            var newBg = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + (op/100) + ')';
+            box.style.backgroundColor = newBg;
+            box.setAttribute('data-bg', newBg);
+          }
         }
         var lbl = t.parentNode.querySelector('.row-label');
         if (lbl) lbl.textContent = '배경 투명도 (' + op + '%)';
         maybeAutoTextColor();
         return;
       }
-      if (t.id === 'pop-link') {
+      // p18g: 색 1 / 색 2 개별 투명도 슬라이더
+      if (t.getAttribute && t.getAttribute('data-cal-alpha')) {
+        var which = t.getAttribute('data-cal-alpha');
+        var av = parseInt(t.value, 10);
+        var attr = (which === '2') ? 'data-bg-alpha2' : 'data-bg-alpha1';
+        box.setAttribute(attr, String(av));
+        // 라벨 즉시 갱신
+        var lblA = t.parentNode.querySelector('[data-alpha-lbl="' + which + '"]');
+        if (lblA) lblA.textContent = av;
+        if (typeof applyCalloutBg === 'function') applyCalloutBg(box);
+        return;
+      }
+            if (t.id === 'pop-link') {
         box.setAttribute('data-link', t.value);
         return;
       }
@@ -4213,12 +4221,14 @@
       var c1 = box.getAttribute('data-bg-hex') || '#0F3A3A';
       var c2 = box.getAttribute('data-bg2') || '#FF9A76';
       var angle = parseInt(box.getAttribute('data-gradient-angle') || '45', 10);
-      // opacity 적용
-      if (op < 100) {
-        var rgb1 = parseRgb(c1), rgb2 = parseRgb(c2);
-        if (rgb1) c1 = 'rgba(' + rgb1.r + ',' + rgb1.g + ',' + rgb1.b + ',' + (op/100) + ')';
-        if (rgb2) c2 = 'rgba(' + rgb2.r + ',' + rgb2.g + ',' + rgb2.b + ',' + (op/100) + ')';
-      }
+      // p18g: 색 1 / 색 2 개별 알파 + 전체 배경 투명도 op 를 곱해서 최종 알파 계산
+      var a1 = parseInt(box.getAttribute('data-bg-alpha1') || '100', 10);
+      var a2 = parseInt(box.getAttribute('data-bg-alpha2') || '100', 10);
+      var f1 = (a1/100) * (op/100);
+      var f2 = (a2/100) * (op/100);
+      var rgb1 = parseRgb(c1), rgb2 = parseRgb(c2);
+      if (rgb1) c1 = 'rgba(' + rgb1.r + ',' + rgb1.g + ',' + rgb1.b + ',' + f1 + ')';
+      if (rgb2) c2 = 'rgba(' + rgb2.r + ',' + rgb2.g + ',' + rgb2.b + ',' + f2 + ')';
       box.style.backgroundColor = 'transparent';
       box.style.backgroundImage = 'linear-gradient(' + angle + 'deg, ' + c1 + ', ' + c2 + ')';
       box.setAttribute('data-bg', 'linear-gradient(' + angle + 'deg, ' + c1 + ', ' + c2 + ')');
@@ -4228,6 +4238,14 @@
     if (mode === 'pattern') {
       var c1p = box.getAttribute('data-bg-hex') || '#0F3A3A';
       var c2p = box.getAttribute('data-bg2') || '#FF9A76';
+      // p18g: 패턴도 색 1/2 개별 알파 + 전체 배경 투명도 반영
+      var _pa1 = parseInt(box.getAttribute('data-bg-alpha1') || '100', 10);
+      var _pa2 = parseInt(box.getAttribute('data-bg-alpha2') || '100', 10);
+      var _pf1 = (_pa1/100) * (op/100);
+      var _pf2 = (_pa2/100) * (op/100);
+      var _prgb1 = parseRgb(c1p), _prgb2 = parseRgb(c2p);
+      if (_prgb1) c1p = 'rgba(' + _prgb1.r + ',' + _prgb1.g + ',' + _prgb1.b + ',' + _pf1 + ')';
+      if (_prgb2) c2p = 'rgba(' + _prgb2.r + ',' + _prgb2.g + ',' + _prgb2.b + ',' + _pf2 + ')';
       var p = box.getAttribute('data-pattern') || 'dot';
       var s = parseInt(box.getAttribute('data-pattern-size') || '10', 10);
       var patternStyle = '';
@@ -4261,8 +4279,19 @@
       return;
     }
 
-    // solid (기본) — 기존 backgroundColor 만 사용, 다른 layer 초기화
-    // 배경색은 이미 data-bg / applyColorFromPicker 에서 설정됨
+    // solid (기본) — data-bg-hex 와 data-bg-opacity 로 backgroundColor 재조립
+    // p18g: solid 모드에서도 배경 투명도 슬라이더가 동작하도록 통일
+    var _solidHex = box.getAttribute('data-bg-hex');
+    if (_solidHex) {
+      if (op === 0) {
+        box.style.backgroundColor = 'transparent';
+      } else {
+        var _sRgb = parseRgb(_solidHex);
+        if (_sRgb) {
+          box.style.backgroundColor = 'rgba(' + _sRgb.r + ',' + _sRgb.g + ',' + _sRgb.b + ',' + (op/100) + ')';
+        }
+      }
+    }
   }
 
   function applyBorderToBox(box){
@@ -4275,29 +4304,9 @@
       return;
     }
     var width = box.getAttribute('data-border-width') || '1';
-    var borderMode = box.getAttribute('data-border-mode') || 'solid';
     var opacity = parseInt(box.getAttribute('data-border-opacity') || '100', 10);
 
-    // p18c: 그라데이션 모드
-    if (borderMode === 'gradient') {
-      var c1 = box.getAttribute('data-border-color') || '#0F3A3A';
-      var c2 = box.getAttribute('data-border-color2') || '#FF9A76';
-      var angle = parseInt(box.getAttribute('data-border-angle') || '45', 10);
-      // opacity 적용
-      if (opacity < 100) {
-        var rgb1 = parseRgb(c1), rgb2 = parseRgb(c2);
-        if (rgb1) c1 = 'rgba(' + rgb1.r + ',' + rgb1.g + ',' + rgb1.b + ',' + (opacity/100) + ')';
-        if (rgb2) c2 = 'rgba(' + rgb2.r + ',' + rgb2.g + ',' + rgb2.b + ',' + (opacity/100) + ')';
-      }
-      // border-image 는 border-style 필수. dotted/dashed 등도 이렇게 표현됨.
-      box.style.border = width + 'px ' + style + ' transparent';
-      box.style.borderImage = 'linear-gradient(' + angle + 'deg, ' + c1 + ', ' + c2 + ') 1';
-      // border-image 는 border-radius 를 무시하므로 안내
-      // (사용자 편집기에선 border-image 로 그라데이션 표현)
-      return;
-    }
-
-    // 단색 모드 (기존 로직)
+    // p18g: 테두리는 단색 전용 (그라데이션 제거)
     box.style.borderImage = '';
     box.style.borderImageSlice = '';
     var cutout = box.getAttribute('data-border-cutout') === '1';
