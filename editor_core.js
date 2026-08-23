@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p19l
+ * 2vvena Editor Core - v2.0-β-p19m
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19l';
+  var VERSION = 'v2.0-β-p19m';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -189,6 +189,18 @@
     '}',
 
     // ─── 본문 컨테이너 ───
+    // p19m: 편집 페이지 폭 강제 방어 (Ghost 업데이트 / Code Injection 소실 대비)
+    // 이 규칙은 편집 컨텍스트(is-body / is-editing)에만 적용되어 포스트 뎍기 놀이엔 영향 없음.
+    'body section.gh-content.gh-canvas.is-body,',
+    'body section.gh-content.gh-canvas.is-editing {',
+    '  max-width: 1600px !important;',
+    '  width: 100% !important;',
+    '  margin-left: auto !important;',
+    '  margin-right: auto !important;',
+    '  padding-left: 24px !important;',
+    '  padding-right: 24px !important;',
+    '  box-sizing: border-box !important;',
+    '}',
     'section.gh-content.is-editing {',
     '  min-height: 40vh;',
     '  padding: 0.5em 0 !important;',
@@ -1560,6 +1572,76 @@
     '.ep-modern-toolbar.tail-right::before  { display: block; right: -6px; top: 24px; transform: rotate(135deg); }',
     '.ep-modern-toolbar.tail-top::before    { display: block; top: -6px;   left: 24px; transform: rotate(45deg);  }',
     '.ep-modern-toolbar.tail-bottom::before { display: block; bottom:-6px; left: 24px; transform: rotate(-135deg);}',
+    // p19m: 미니 팝오버 (정렬 3종, H▸ stub 드롭다운 공통 스타일)
+    '.ep-mini-popover {',
+    '  position: fixed; z-index: 9994;',
+    '  background: #fff;',
+    '  border: 1px solid rgba(15,58,58,0.25);',
+    '  border-radius: 6px;',
+    '  box-shadow: 0 8px 20px rgba(0,0,0,0.08);',
+    '  padding: 6px;',
+    '  display: inline-flex; align-items: center; gap: 4px;',
+    '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
+    '  animation: mtb-in 120ms ease-out;',
+    '}',
+    '.ep-mini-popover button {',
+    '  background: transparent; border: 1px solid transparent;',
+    '  border-radius: 4px; padding: 6px 8px; cursor: pointer;',
+    '  color: var(--color, #0F3A3A);',
+    '  display: inline-flex; align-items: center; justify-content: center;',
+    '  transition: background 120ms ease, border-color 120ms ease;',
+    '}',
+    '.ep-mini-popover button:hover {',
+    '  background: rgba(15,58,58,0.05); border-color: rgba(15,58,58,0.15);',
+    '}',
+    '.ep-mini-popover button svg * { stroke: var(--color, #0F3A3A); }',
+    '.ep-mini-popover button:hover svg * { stroke: var(--point, #FF9A76); }',
+    // p19m: H▸ 드롭다운 stub 전용
+    '.ep-heading-popover {',
+    '  display: block !important; min-width: 220px;',
+    '  padding: 10px 14px 12px;',
+    '}',
+    '.ep-heading-popover .eh-title {',
+    '  font-family: "Cafe24Danjunghae","Gowun Batang",serif;',
+    '  font-size: 13px; opacity: 0.7; margin-bottom: 6px;',
+    '  padding-bottom: 6px; border-bottom: 1px solid rgba(15,58,58,0.1);',
+    '}',
+    '.ep-heading-popover .eh-empty {',
+    '  font-size: 12px; color: rgba(15,58,58,0.6); line-height: 1.6;',
+    '  padding: 10px 4px 12px;',
+    '}',
+    '.ep-heading-popover .eh-open-settings {',
+    '  width: 100%; padding: 8px 10px; background: transparent;',
+    '  border: 1px solid rgba(15,58,58,0.2); border-radius: 4px;',
+    '  color: var(--color, #0F3A3A); font-family: inherit; font-size: 12px;',
+    '  cursor: pointer; transition: border-color 120ms ease, color 120ms ease;',
+    '}',
+    '.ep-heading-popover .eh-open-settings:hover {',
+    '  border-color: var(--point, #FF9A76); color: var(--point, #FF9A76);',
+    '}',
+    // p19m: 설정창 허브 (프리셋 관리 링크 카드)
+    '.ddl-set-hub {',
+    '  display: grid; gap: 8px; margin-top: 4px;',
+    '}',
+    '.ddl-set-card {',
+    '  display: flex; align-items: center; justify-content: space-between;',
+    '  padding: 10px 12px; background: transparent;',
+    '  border: 1px solid rgba(15,58,58,0.15); border-radius: 8px;',
+    '  cursor: pointer; text-align: left;',
+    '  color: var(--color, #0F3A3A); font-family: inherit; font-size: 13px;',
+    '  transition: border-color 120ms ease, background 120ms ease;',
+    '}',
+    '.ddl-set-card:hover { border-color: rgba(15,58,58,0.35); background: rgba(15,58,58,0.02); }',
+    '.ddl-set-card .ddl-set-card-label { display: flex; flex-direction: column; gap: 2px; }',
+    '.ddl-set-card .ddl-set-card-title { font-weight: 500; }',
+    '.ddl-set-card .ddl-set-card-desc  { font-size: 11px; opacity: 0.6; }',
+    '.ddl-set-card .ddl-set-card-arrow { opacity: 0.4; font-size: 16px; }',
+    // 투명 스크롤 (설정창 물리 영역 안)
+    '.ddl-scroll-invisible {',
+    '  scrollbar-width: none;',
+    '  -ms-overflow-style: none;',
+    '}',
+    '.ddl-scroll-invisible::-webkit-scrollbar { width: 0; height: 0; display: none; }',
     // p18k: 형광펜 팔레트 팝오버 (확장 — 그라데이션/패턴/투명도/그룹 지원)
     '.ep-hl-palette {',
     '  position: absolute;',
@@ -7440,6 +7522,11 @@
     var svgLink   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>';
     var svgList   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg>';
     var svgLineH  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/><polyline points="18,4 20,6 18,8"/><polyline points="18,16 20,18 18,20"/></svg>';
+    // p19m: 새 3종
+    var svgFontUp   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><text x="3" y="17" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="14" fill="#0F3A3A" stroke="none">A</text><path d="M17 6v8"/><polyline points="14,9 17,6 20,9"/></svg>';
+    var svgFontDown = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><text x="3" y="17" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="14" fill="#0F3A3A" stroke="none">A</text><path d="M17 6v8"/><polyline points="14,11 17,14 20,11"/></svg>';
+    var svgCode     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,7 4,12 9,17"/><polyline points="15,7 20,12 15,17"/></svg>';
+    var svgHeadingT = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><path d="M6 4v16M14 4v16M6 12h8"/><text x="18" y="20" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="9" fill="#0F3A3A" stroke="none">▸</text></svg>';
 
     bar.innerHTML =
       // 미니 헤더
@@ -7463,6 +7550,15 @@
         '<button type="button" data-cmd="underline"   title="밑줄"      style="text-decoration:underline;">U</button>' +
         '<button type="button" data-cmd="size-cycle"  title="글자 크기 순환" style="font-family:serif;font-size:11px;letter-spacing:-0.5px;">AA</button>' +
         '<button type="button" data-cmd="line-height" title="줄간격">'    + svgLineH  + '</button>' +
+      '</div>' +
+      '<div class="ep-modern-toolbar-sep"></div>' +
+      // p19m: 3행 (툴바 동일성 유지)
+      '<div class="ep-modern-toolbar-icons">' +
+        '<button type="button" data-cmd="font-size-down" title="글자 크기 준임 (-2px)">' + svgFontDown + '</button>' +
+        '<button type="button" data-cmd="font-size-up"   title="글자 크기 키움 (+2px)">' + svgFontUp   + '</button>' +
+        '<button type="button" data-cmd="inline-code"    title="인라인 코드">'                + svgCode     + '</button>' +
+        '<button type="button" data-cmd="heading-expand" title="헤더 (H1-H6)">'                     + svgHeadingT + '</button>' +
+        '<button type="button" data-cmd="open-presets"   title="인라인 서식 프리셋" style="font-size:14px;">⭐</button>' +
       '</div>' +
       '<div class="ep-modern-toolbar-sep"></div>' +
       // Typeface
@@ -7509,6 +7605,24 @@
         try { if (typeof openDdlSettings === 'function') openDdlSettings(); } catch(err){}
         return;
       }
+      // p19m: 새 3종 공유 명령 (클래식 툴바와 동일한 핸들러 호출)
+      if (cmd === 'font-size-up' || cmd === 'font-size-down'){
+        try { adjustFontSize(cmd === 'font-size-up' ? 2 : -2); } catch(err){ console.warn(err); }
+        return;
+      }
+      if (cmd === 'inline-code'){
+        try { applyInlineCode(); } catch(err){ console.warn(err); }
+        return;
+      }
+      if (cmd === 'heading-expand'){
+        e.preventDefault(); e.stopPropagation();
+        try { openHeadingPopoverStub(btn); } catch(err){ console.warn(err); }
+        return;
+      }
+      if (cmd === 'open-presets'){
+        try { openPresetModal(); } catch(err){ console.warn(err); }
+        return;
+      }
       // Size 버튼 활성 토글
       var sizeBtn = e.target.closest('.mtb-size-btn');
       if (sizeBtn){
@@ -7533,8 +7647,28 @@
       if (cmd && /^(bold|italic|underline|justifyLeft|justifyCenter|justifyRight|createLink|removeFormat)$/.test(cmd)){
         try {
           if (cmd === 'createLink'){
-            var url = prompt('링크 주소를 입력하세요:');
-            if (url) document.execCommand('createLink', false, url);
+            // p19m: prompt → 표준 명벅 다이얼로그로 교체 (톤 통일)
+            // 선택 상태 보존을 위해 range 저장
+            var _sel = window.getSelection();
+            var _range = (_sel && _sel.rangeCount > 0) ? _sel.getRangeAt(0).cloneRange() : null;
+            window.__DDL_EDITOR.openEditDialog({
+              title: '링크',
+              width: '380px',
+              fields: [
+                { key: 'url', label: '링크 주소 (비우면 해제)', type: 'text', initial: 'https://' },
+              ],
+              onSave: function(vals){
+                var u = (vals.url || '').trim();
+                try {
+                  if (_range) {
+                    var s = window.getSelection();
+                    s.removeAllRanges(); s.addRange(_range);
+                  }
+                  if (!u || u === 'https://') document.execCommand('unlink', false, null);
+                  else document.execCommand('createLink', false, u);
+                } catch(_){}
+              }
+            });
           } else {
             document.execCommand(cmd, false, null);
           }
@@ -7657,11 +7791,36 @@
       // 유저가 다른 곳을 클릭 → 잠시 후 selectionchange 로직이 닫을 것이므로 별도 조치 불요.
     });
 
-    // ESC → 모던 툴바 닫기
+    // p19m: ESC → 전역 해제
+    //   사용자님 요청: "ESC 누르면 선택하고 있던 텍스트/혹은 블록 같은거 다 꺼지게"
     document.addEventListener('keydown', function(e){
-      if (e.key === 'Escape' && _modernToolbarEl && _modernToolbarEl.classList.contains('is-open')){
+      if (e.key !== 'Escape') return;
+      // 1) 모던 툴바 닫기
+      if (_modernToolbarEl && _modernToolbarEl.classList.contains('is-open')){
         closeModernToolbar();
       }
+      // 2) 클래식 툴바 닫기
+      document.querySelectorAll('.ep-float-toolbar.is-open').forEach(function(b){ b.classList.remove('is-open'); });
+      // 3) 형광펜 팔레트 / 미니 팝오버 닫기
+      document.querySelectorAll('.ep-hl-palette.is-open').forEach(function(p){ p.classList.remove('is-open'); });
+      document.querySelectorAll('.ep-mini-popover, #ep-align-popover, #ep-heading-popover').forEach(function(p){ if (p.parentNode) p.parentNode.removeChild(p); });
+      // 4) 텍스트 선택 해제
+      try {
+        var sel = window.getSelection();
+        if (sel && sel.rangeCount > 0){ sel.removeAllRanges(); }
+      } catch(_){}
+      // 5) 블록 선택 해제 (자체 멀티-셀렉션 상태 있으면)
+      try {
+        document.querySelectorAll('.editor-block.is-multi-selected, .editor-block.is-selected').forEach(function(b){
+          b.classList.remove('is-multi-selected');
+          b.classList.remove('is-selected');
+        });
+      } catch(_){}
+      // 6) 포커스 있는 contenteditable에서 blur
+      try {
+        var a = document.activeElement;
+        if (a && a.blur && a.hasAttribute && a.hasAttribute('contenteditable')) a.blur();
+      } catch(_){}
     });
   }
   try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.setupToolbarSelectionRouter = setupToolbarSelectionRouter; } catch(_){}
@@ -10784,23 +10943,10 @@
       + '<button type="button" data-rcmd="clearFormat" class="pop-btn" title="서식 지우기" style="margin-left:auto;">✕서식</button>';
     wrap.appendChild(toolbar);
 
-    tool
-    // p19k: 확장 버튼 stub (헤딩/정렬/목록) — 다음 배포 예고
-    bar.addEventListener('click', function(e){
-      var b = e.target.closest && e.target.closest('button[data-cmd]');
-      if (!b) return;
-      var cmd = b.getAttribute('data-cmd');
-      if (cmd === 'heading-expand' || cmd === 'align-expand' || cmd === 'list-expand'){
-        e.preventDefault(); e.stopPropagation();
-        // 임시: 안내 팝오버
-        var msg = { 'heading-expand':'헤딩(H1-H6)', 'align-expand':'정렬', 'list-expand':'목록' }[cmd];
-        var t = document.createElement('div');
-        t.textContent = msg + ' — 다음 배포에서 지원 예정';
-        t.style.cssText = 'position:fixed;left:50%;top:20%;transform:translate(-50%,0);background:#0F3A3A;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:99999;box-shadow:0 6px 20px rgba(0,0,0,0.2);';
-        document.body.appendChild(t);
-        setTimeout(function(){ t.style.transition='opacity 0.3s'; t.style.opacity='0'; setTimeout(function(){t.remove();}, 300); }, 1500);
-      }
-    }, true);
+    // p19m: 이전 tool 파편 + p19k 토스트 stub 을 무력화.
+    //   새 라우터가 heading-expand / align-expand / list-expand 를 실제 실행하도록,
+    //   여기서 토스트를 띄우면 이중 반응함.
+    if (false){ /* p19k 토스트 비활성 (사이드 이효트 방지) */ }
         bar.addEventListener('mousedown', function(e){ e.preventDefault(); });
     toolbar.addEventListener('click', function(e){
       var btn = e.target.closest('[data-rcmd]');
@@ -11021,7 +11167,219 @@
   }
 
   
-  // p19k: 설정 창 (stub) - 앞으로 모든 편집기 설정 이곳으로 통합
+  // ═══════════════════════════════════════════════════════════
+  // p19m. 새 서식 유틸: 글자 크기 ±2px / 인라인 코드 / 정렬 팝오버 / H▸ 드롭다운 stub
+  // ═══════════════════════════════════════════════════════════
+
+  // 공용: 사이트 톤 토스트 (간단 안내용)
+  function _showStubToast(msg){
+    var t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;left:50%;top:24px;transform:translateX(-50%);'
+      + 'background:#0F3A3A;color:#F5F5F5;padding:10px 18px;border-radius:6px;'
+      + 'font-size:13px;z-index:99999;box-shadow:0 6px 20px rgba(0,0,0,0.15);'
+      + 'font-family:"Pretendard Variable","Pretendard",sans-serif;'
+      + 'opacity:0;transition:opacity 0.2s ease;';
+    document.body.appendChild(t);
+    requestAnimationFrame(function(){ t.style.opacity = '1'; });
+    setTimeout(function(){
+      t.style.opacity = '0';
+      setTimeout(function(){ if (t.parentNode) t.parentNode.removeChild(t); }, 250);
+    }, 1600);
+  }
+
+  // 글자 크기 ±2px (span 방식, 8~72px 클램프)
+  function adjustFontSize(delta){
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    var range = sel.getRangeAt(0);
+
+    // 현재 글자 크기 추정 (선택 시작 지점의 computed 값)
+    var startNode = range.startContainer;
+    var startEl = startNode.nodeType === 1 ? startNode : startNode.parentElement;
+    if (!startEl) return;
+    var cs = getComputedStyle(startEl);
+    var curPx = parseFloat(cs.fontSize) || 16;
+    var newPx = curPx + delta;
+    if (newPx < 8)  newPx = 8;
+    if (newPx > 72) newPx = 72;
+
+    // 이미 선택 상위가 span[style*="font-size"] 면 그 span의 값만 갱신
+    var wrapper = startEl.closest && startEl.closest('span[data-ddl-fsize]');
+    if (wrapper && range.startContainer === range.endContainer && wrapper.contains(range.startContainer) && wrapper.contains(range.endContainer)) {
+      wrapper.style.fontSize = newPx + 'px';
+      wrapper.setAttribute('data-ddl-fsize', newPx);
+      return;
+    }
+
+    // 새 span으로 감싸기
+    var span = document.createElement('span');
+    span.setAttribute('data-ddl-fsize', String(newPx));
+    span.style.fontSize = newPx + 'px';
+    try {
+      range.surroundContents(span);
+    } catch(e){
+      // 경계 거치면 extract+wrap
+      var frag = range.extractContents();
+      span.appendChild(frag);
+      range.insertNode(span);
+    }
+    // 선택 상태 유지
+    try {
+      var newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+    } catch(_){}
+  }
+
+  // 인라인 코드 기본 스타일 (사용자님 다음 라운드에서 편집 가능해질 예정)
+  function _getInlineCodeStyle(){
+    var def = {
+      background: 'rgba(15,58,58,0.08)',
+      color:      'var(--color, #0F3A3A)',
+      fontFamily: '"JetBrains Mono","Menlo","Consolas",monospace',
+      fontSize:   '0.9em',
+      padding:    '0.1em 0.35em',
+      borderRadius: '3px',
+      border:     '1px solid rgba(15,58,58,0.1)',
+    };
+    try {
+      var raw = localStorage.getItem('ddl.codeStyle');
+      if (raw){ var o = JSON.parse(raw); Object.keys(o||{}).forEach(function(k){ def[k] = o[k]; }); }
+    } catch(_){}
+    return def;
+  }
+
+  function applyInlineCode(){
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    var range = sel.getRangeAt(0);
+
+    // 이미 code 안 이면 해제
+    var startNode = range.startContainer;
+    var startEl = startNode.nodeType === 1 ? startNode : startNode.parentElement;
+    var existingCode = startEl && startEl.closest && startEl.closest('code');
+    if (existingCode && existingCode.contains(range.endContainer)) {
+      // code 해제: 내용을 부모로 올리고 code 삭제
+      var parent = existingCode.parentNode;
+      while (existingCode.firstChild) parent.insertBefore(existingCode.firstChild, existingCode);
+      parent.removeChild(existingCode);
+      return;
+    }
+
+    var style = _getInlineCodeStyle();
+    var css = '';
+    Object.keys(style).forEach(function(k){
+      var v = style[k];
+      // camelCase → kebab-case
+      var prop = k.replace(/[A-Z]/g, function(m){ return '-' + m.toLowerCase(); });
+      css += prop + ':' + v + ';';
+    });
+
+    var code = document.createElement('code');
+    code.setAttribute('data-ddl-code', '1');
+    code.setAttribute('style', css);
+    try {
+      range.surroundContents(code);
+    } catch(e){
+      var frag = range.extractContents();
+      code.appendChild(frag);
+      range.insertNode(code);
+    }
+    try {
+      var nr = document.createRange();
+      nr.selectNodeContents(code);
+      sel.removeAllRanges();
+      sel.addRange(nr);
+    } catch(_){}
+  }
+
+  // 정렬 팝오버 (왼/가운데/오른)
+  function openAlignPopover(anchorBtn){
+    // 기존 팝오버 있으면 제거
+    var old = document.getElementById('ep-align-popover');
+    if (old) { old.remove(); return; }
+
+    var pop = document.createElement('div');
+    pop.id = 'ep-align-popover';
+    pop.className = 'ep-mini-popover';
+    pop.innerHTML =
+      '<button type="button" data-align="justifyLeft"   title="왼쪽 정렬">'   + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg>' + '</button>' +
+      '<button type="button" data-align="justifyCenter" title="가운데 정렬">' + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="5" y1="18" x2="19" y2="18"/></svg>' + '</button>' +
+      '<button type="button" data-align="justifyRight"  title="오른쪽 정렬">' + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="6" y1="18" x2="20" y2="18"/></svg>' + '</button>';
+    document.body.appendChild(pop);
+
+    // 위치: anchor 아래
+    var r = anchorBtn.getBoundingClientRect();
+    pop.style.top  = (r.bottom + 6) + 'px';
+    pop.style.left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left)) + 'px';
+
+    pop.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    pop.addEventListener('click', function(e){
+      var b = e.target.closest('button[data-align]');
+      if (!b) return;
+      var cmd = b.getAttribute('data-align');
+      try { if (typeof restoreRange === 'function') restoreRange(); } catch(_){}
+      try { document.execCommand(cmd, false, null); } catch(_){}
+      pop.remove();
+    });
+    // 밖 클릭 → 닫기
+    setTimeout(function(){
+      var closer = function(ev){
+        if (pop.contains(ev.target) || anchorBtn.contains(ev.target)) return;
+        pop.remove();
+        document.removeEventListener('mousedown', closer, true);
+      };
+      document.addEventListener('mousedown', closer, true);
+    }, 0);
+  }
+
+  // H▸ 드롭다운 (껍데기) — 헤더 프리셋 시스템 다음 라운드에 실체화
+  function openHeadingPopoverStub(anchorBtn){
+    var old = document.getElementById('ep-heading-popover');
+    if (old) { old.remove(); return; }
+
+    var pop = document.createElement('div');
+    pop.id = 'ep-heading-popover';
+    pop.className = 'ep-mini-popover ep-heading-popover';
+    pop.innerHTML =
+      '<div class="eh-title">헤더 스타일</div>' +
+      '<div class="eh-empty">설정 → 프리셋 관리에서<br>헤더 프리셋을 먼저 만들어주세요</div>' +
+      '<button type="button" class="eh-open-settings">설정 열기 →</button>';
+    document.body.appendChild(pop);
+
+    var r = anchorBtn.getBoundingClientRect();
+    pop.style.top  = (r.bottom + 6) + 'px';
+    pop.style.left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left)) + 'px';
+
+    pop.querySelector('.eh-open-settings').addEventListener('click', function(){
+      pop.remove();
+      try { openDdlSettings(); } catch(_){}
+    });
+    setTimeout(function(){
+      var closer = function(ev){
+        if (pop.contains(ev.target) || anchorBtn.contains(ev.target)) return;
+        pop.remove();
+        document.removeEventListener('mousedown', closer, true);
+      };
+      document.addEventListener('mousedown', closer, true);
+    }, 0);
+  }
+
+  try {
+    window.__DDL_EDITOR = window.__DDL_EDITOR || {};
+    window.__DDL_EDITOR.adjustFontSize      = adjustFontSize;
+    window.__DDL_EDITOR.applyInlineCode     = applyInlineCode;
+    window.__DDL_EDITOR.openAlignPopover    = openAlignPopover;
+    window.__DDL_EDITOR.showStubToast       = _showStubToast;
+  } catch(_){}
+
+  // p19k: 설정 창 - 프리셋 관리 허브 (p19m 재구성)
+  // p19m: 설정창 — 프리셋 관리 허브 구조
+  //   툴바 스타일 선택 + 프리셋 관리 카드 4개 (헤더 / 인라인 서식 / 형광펜 / 코드 스타일) + 단축키 카드
+  //   프리셋 카드는 대부분 "다음 라운드" 안내. 인라인 서식만 이미 구현되어 있으므로 openPresetModal 바로 연결.
+  //   내부 스크롤은 보이지 않도록 만듦 (.ddl-scroll-invisible)
   function openDdlSettings(){
     var old = document.getElementById('ddl-settings-modal');
     if (old) { old.remove(); return; }
@@ -11029,41 +11387,85 @@
     mask.id = 'ddl-settings-modal';
     mask.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(15,58,58,0.28);display:flex;align-items:center;justify-content:center;';
     var box = document.createElement('div');
-    box.style.cssText = 'width:min(520px,92vw);max-height:80vh;overflow:auto;background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,0.24);font-family:inherit;color:#0F3A3A;';
+    box.className = 'ddl-scroll-invisible';
+    box.style.cssText = 'width:min(520px,92vw);max-height:82vh;overflow-y:auto;background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,0.24);font-family:inherit;color:#0F3A3A;';
     var toolbarStyle = 'classic';
     try { toolbarStyle = localStorage.getItem('ddl.toolbarStyle') || 'classic'; } catch(e){}
+
+    function _card(id, title, desc, action){
+      return '<button type="button" class="ddl-set-card" data-hub="' + id + '">'
+           +   '<span class="ddl-set-card-label">'
+           +     '<span class="ddl-set-card-title">' + title + '</span>'
+           +     '<span class="ddl-set-card-desc">'  + desc  + '</span>'
+           +   '</span>'
+           +   '<span class="ddl-set-card-arrow">' + (action || '›') + '</span>'
+           + '</button>';
+    }
+
     box.innerHTML =
+      // 헤더
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">' +
-        '<div style="font-size:16px;font-weight:700;">편집기 설정</div>' +
-        '<button id="dset-close" style="border:none;background:transparent;font-size:20px;cursor:pointer;color:#0F3A3A;">×</button>' +
+        '<div style="font-size:16px;font-weight:700;font-family:Cafe24Danjunghae,Gowun Batang,serif;">편집기 설정</div>' +
+        '<button id="dset-close" style="border:none;background:transparent;font-size:22px;cursor:pointer;color:#0F3A3A;line-height:1;">×</button>' +
       '</div>' +
-      '<div style="border-top:1px solid rgba(15,58,58,0.1);padding-top:14px;">' +
-        '<div style="font-size:13px;font-weight:600;margin-bottom:8px;">플로팅 툴바 스타일</div>' +
+      // 1. 툴바 스타일
+      '<div style="padding-top:6px;">' +
+        '<div style="font-size:12px;opacity:0.6;margin-bottom:6px;letter-spacing:0.03em;">툴바 스타일</div>' +
         '<div style="display:flex;gap:8px;">' +
-          '<button data-ts="classic" class="dset-tsbtn" style="flex:1;padding:8px 10px;border:1px solid ' + (toolbarStyle==='classic'?'#0F3A3A':'rgba(15,58,58,0.2)') + ';border-radius:8px;background:' + (toolbarStyle==='classic'?'#f0f5f5':'#fff') + ';cursor:pointer;color:#0F3A3A;">클래식 (현재)</button>' +
-          '<button data-ts="modern" class="dset-tsbtn" style="flex:1;padding:8px 10px;border:1px solid ' + (toolbarStyle==='modern'?'#0F3A3A':'rgba(15,58,58,0.2)') + ';border-radius:8px;background:' + (toolbarStyle==='modern'?'#f0f5f5':'#fff') + ';cursor:pointer;color:#0F3A3A;">모던 (버튼+확장)</button>' +
+          '<button data-ts="classic" class="dset-tsbtn" style="flex:1;padding:9px 10px;border:1px solid ' + (toolbarStyle==='classic'?'#0F3A3A':'rgba(15,58,58,0.2)') + ';border-radius:6px;background:' + (toolbarStyle==='classic'?'rgba(15,58,58,0.06)':'#fff') + ';cursor:pointer;color:#0F3A3A;font-family:inherit;font-size:13px;">클래식</button>' +
+          '<button data-ts="modern"  class="dset-tsbtn" style="flex:1;padding:9px 10px;border:1px solid ' + (toolbarStyle==='modern'?'#0F3A3A':'rgba(15,58,58,0.2)') + ';border-radius:6px;background:' + (toolbarStyle==='modern'?'rgba(15,58,58,0.06)':'#fff') + ';cursor:pointer;color:#0F3A3A;font-family:inherit;font-size:13px;">모던</button>' +
         '</div>' +
-        '<div style="font-size:11px;color:#6a7a7a;margin-top:6px;">모던 스타일은 다음 배포에서 정식 지원됩니다. 현재는 자리만 확보되어 있습니다.</div>' +
       '</div>' +
-      '<div style="border-top:1px solid rgba(15,58,58,0.1);padding-top:14px;margin-top:14px;color:#6a7a7a;font-size:12px;">' +
-        '<div style="margin-bottom:4px;">■ 앞으로 여기 추가될 항목</div>' +
-        '<ul style="margin:4px 0 0 18px;padding:0;line-height:1.7;">' +
-          '<li>블록 헤더 (H1-H6) 스타일 프리셋</li>' +
-          '<li>목록 스타일 기본값</li>' +
-          '<li>형광펜 기본 모드 (마커 / 끝흐림 / 페인트)</li>' +
-          '<li>단축키 설정</li>' +
-        '</ul>' +
+      // 2. 프리셋 관리
+      '<div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(15,58,58,0.1);">' +
+        '<div style="font-size:12px;opacity:0.6;margin-bottom:8px;letter-spacing:0.03em;">프리셋 관리</div>' +
+        '<div class="ddl-set-hub">' +
+          _card('header',     '헤더 스타일',        'H1–H6 / 기본(P) / 사용자 그룹 — 툴바 H▸ 연동')  +
+          _card('inline',     '인라인 서식 프리셋', '툴바 ⭐서식 버튼 — 색/배경/굵기 조합', '열기 ›')  +
+          _card('highlight',  '형광펜',              '마커 / 끝흐림 / 페인트 3종 + 색 그룹')  +
+          _card('code',       '인라인 코드 스타일', '툴바 <> 버튼이 적용하는 스타일 세트') +
+        '</div>' +
+      '</div>' +
+      // 3. 기타
+      '<div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(15,58,58,0.1);">' +
+        '<div style="font-size:12px;opacity:0.6;margin-bottom:8px;letter-spacing:0.03em;">기타</div>' +
+        '<div class="ddl-set-hub">' +
+          _card('shortcut',   '단축키',              '편집기 전용 키보드 단축키 설정') +
+          _card('list',       '목록 기본값',        '순서 없는 / 수 있는 / 체크리스트 기본 스타일') +
+        '</div>' +
+      '</div>' +
+      // 4. 버전
+      '<div style="margin-top:20px;padding-top:12px;border-top:1px solid rgba(15,58,58,0.06);font-size:11px;color:rgba(15,58,58,0.4);text-align:center;">' +
+        'v2.0-β-p19m' +
       '</div>';
+
     mask.appendChild(box);
     document.body.appendChild(mask);
     mask.addEventListener('click', function(e){ if (e.target === mask) mask.remove(); });
     box.querySelector('#dset-close').addEventListener('click', function(){ mask.remove(); });
+
+    // 툴바 스타일 토글
     box.querySelectorAll('.dset-tsbtn').forEach(function(btn){
       btn.addEventListener('click', function(){
         var v = btn.getAttribute('data-ts');
         try { localStorage.setItem('ddl.toolbarStyle', v); } catch(e){}
         mask.remove();
         setTimeout(openDdlSettings, 10);
+      });
+    });
+
+    // 허브 카드 라우팅
+    box.querySelectorAll('.ddl-set-card').forEach(function(c){
+      c.addEventListener('click', function(){
+        var hub = c.getAttribute('data-hub');
+        if (hub === 'inline') {
+          mask.remove();
+          setTimeout(function(){ try { openPresetModal(); } catch(_){} }, 10);
+          return;
+        }
+        // 나머지는 아직 구현 안 됨 — 토스트만
+        var name = { header:'헤더 스타일', highlight:'형광펜', code:'인라인 코드 스타일', shortcut:'단축키', list:'목록 기본값' }[hub] || hub;
+        _showStubToast(name + ' — 다음 배포에서 지원됩니다');
       });
     });
   }
@@ -11081,6 +11483,11 @@
     var _svg_hl = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h6"/><path d="M8 14l6-6 4 4-6 6H8v-4z"/><path d="M14 8l3-3 3 3-3 3"/></svg>';
     // 서식 프리셋: 별표 사이트 톤
     var _svg_star = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linejoin="round"><polygon points="12,3 14.5,9 21,9.5 16,14 17.5,20.5 12,17 6.5,20.5 8,14 3,9.5 9.5,9"/></svg>';
+    // p19m: 새 아이콘 3종 (크기↑ / 크기↓ / 코드)
+    // 사이트 톤: 엉은 실선 1.6px, stroke #0F3A3A
+    var _svg_font_up   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><text x="3" y="17" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="14" fill="#0F3A3A" stroke="none">A</text><path d="M17 6v8"/><polyline points="14,9 17,6 20,9"/></svg>';
+    var _svg_font_down = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><text x="3" y="17" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="14" fill="#0F3A3A" stroke="none">A</text><path d="M17 6v8"/><polyline points="14,11 17,14 20,11"/></svg>';
+    var _svg_code      = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,7 4,12 9,17"/><polyline points="15,7 20,12 15,17"/></svg>';
     bar.innerHTML =
       '<button data-cmd="bold" title="볼드" style="font-weight:800;">B</button>' +
       '<button data-cmd="italic" title="이탤릭" style="font-style:italic; font-family:serif;">I</button>' +
@@ -11098,7 +11505,14 @@
       '<button data-cmd="createLink" title="링크">' + _svg_link + '</button>' +
       '<button data-cmd="removeFormat" title="서식 지우기">' + _svg_clear + '</button>' +
       '<span class="ftb-sep"></span>' +
-      '<button data-cmd="heading-expand" title="헤딩 (H1-H6)" style="font-weight:700;">H<span style="font-size:0.7em;">▸</span></button>' + '<button data-cmd="align-expand" title="정렬"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg></button>' + '<button data-cmd="list-expand" title="목록"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg></button>' + '<span class="ftb-sep"></span>' + '<button data-cmd="open-presets" title="인라인 서식 프리셋" style="display:inline-flex; align-items:center; gap:0.25em;">' + _svg_star + '<span>서식</span></button>' +
+      '<button data-cmd="heading-expand" title="헤딩 (H1-H6)" style="font-weight:700;">H<span style="font-size:0.7em;">▸</span></button>' + '<button data-cmd="align-expand" title="정렬"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg></button>' + '<button data-cmd="list-expand" title="목록"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg></button>' + '<span class="ftb-sep"></span>' +
+      // p19m: 글자 크기 ±2px 단계 조절
+      '<button data-cmd="font-size-down" title="글자 크기 준임 (-2px)">' + _svg_font_down + '</button>' +
+      '<button data-cmd="font-size-up"   title="글자 크기 키움 (+2px)">' + _svg_font_up   + '</button>' +
+      // p19m: 인라인 코드 버튼
+      '<button data-cmd="inline-code" title="인라인 코드">' + _svg_code + '</button>' +
+      '<span class="ftb-sep"></span>' +
+      '<button data-cmd="open-presets" title="인라인 서식 프리셋" style="display:inline-flex; align-items:center; gap:0.25em;">' + _svg_star + '<span>서식</span></button>' +
       // p19l: 툴바 안 ⚙ 톱니 (오른쪽 끝)
       '<span class="ftb-sep"></span>' +
       '<button data-cmd="open-settings" class="ftb-gear" title="편집기 설정">' + _gearSvg(14) + '</button>';
@@ -11315,13 +11729,33 @@
         toggleSupSub(cmd);
       } else if (cmd === 'removeFormat') {
         clearInlineFormat();
+      } else if (cmd === 'font-size-up' || cmd === 'font-size-down') {
+        // p19m: 글자 크기 ±2px
+        restoreRange();
+        adjustFontSize(cmd === 'font-size-up' ? 2 : -2);
+      } else if (cmd === 'inline-code') {
+        // p19m: 인라인 코드 기본 스타일 적용
+        restoreRange();
+        applyInlineCode();
+      } else if (cmd === 'align-expand') {
+        // p19m: 정렬 3종 팝오버
+        e.preventDefault(); e.stopPropagation();
+        openAlignPopover(btn);
+      } else if (cmd === 'heading-expand') {
+        // p19m: H▸ 드롭다운 (껍데기 - 설정 안내)
+        e.preventDefault(); e.stopPropagation();
+        openHeadingPopoverStub(btn);
+      } else if (cmd === 'list-expand') {
+        // p19m: 목록 stub 유지 (다음 라운드)
+        e.preventDefault(); e.stopPropagation();
+        _showStubToast('목록(불릿/번호) — 다음 배포에서 지원됩니다');
       } else {
         restoreRange();
         document.execCommand(cmd, false, null);
       }
       updateBar();
     });
-    log('플로팅 툴바 설치 (p18j)');
+    log('플로팅 툴바 설치 (p19m)');
   }
 
   // ═══════════════════════════════════════════════════════════
