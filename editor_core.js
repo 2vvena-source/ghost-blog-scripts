@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19g';
+  var VERSION = 'v2.0-β-p19h';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -10235,6 +10235,52 @@
     document.execCommand('unlink');
   }
 
+  // p19h: 루비 수정/삭제 핸들러
+  //   편집기 캔버스 안 <mark class="ddl-ruby"> 클릭 시 미니 액션 팝오버.
+  //   좌측 절반 = 수정, 우측 절반 = 삭제 (hover CSS 로 사용자에게 안내).
+  function setupRubyEditHandler(){
+    if (!contentEl) return;
+    if (contentEl.__rubyEditBound) return;
+    contentEl.__rubyEditBound = true;
+    contentEl.addEventListener('click', function(e){
+      var mark = e.target.closest && e.target.closest('mark.ddl-ruby');
+      if (!mark) return;
+      // 클릭 위치로 수정/삭제 결정 (좌 절반 = 수정, 우 절반 = 삭제)
+      var rect = mark.getBoundingClientRect();
+      var isRight = (e.clientX - rect.left) > rect.width / 2;
+      if (isRight) {
+        // 삭제: mark 언랩 (내용만 남김)
+        openEditorConfirm('루비 삭제', '이 루비 표시를 없앨까요? (본문 글자는 유지)', function(ok){
+          if (!ok) return;
+          var parent = mark.parentNode;
+          while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+          parent.removeChild(mark);
+        }, { okLabel:'삭제', cancelLabel:'취소' });
+      } else {
+        // 수정: 현재 data-rt 값으로 다이얼로그
+        var current = mark.getAttribute('data-rt') || '';
+        var baseText = mark.textContent || '';
+        openEditorDialog('루비 수정', [
+          { key:'ruby', label:'"' + baseText + '" 위에 표시할 내용', default: current, placeholder:'비우고 확인 = 루비 삭제' }
+        ], function(vals){
+          if (!vals) return;
+          var newRt = (vals.ruby || '').trim();
+          if (!newRt) {
+            // 빈 값 = 삭제
+            var parent = mark.parentNode;
+            while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+            parent.removeChild(mark);
+          } else {
+            mark.setAttribute('data-rt', newRt);
+            mark.setAttribute('title', newRt);
+          }
+        });
+      }
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  }
+
   function setupFloatingToolbar(){
     var bar = document.createElement('div');
     bar.className = 'ep-float-toolbar';
@@ -11802,9 +11848,30 @@
     '  background-color: transparent !important;',
     '  color: inherit !important;',
     '  position: relative !important;',
-    '  display: inline !important;',
+    '  display: inline-block !important;',
     '  padding: 0 !important;',
+    '  vertical-align: baseline !important;',
+    '  line-height: inherit !important;',
     '}',
+    /* 편집기 안에서만 편집 도구 (hover 시 나타남) */
+    '[contenteditable] mark.ddl-ruby:hover::after {',
+    '  content: "✎ 수정  |  ✕ 삭제";',
+    '  position: absolute !important;',
+    '  top: -1.6em !important;',
+    '  left: 50% !important;',
+    '  transform: translateX(-50%) !important;',
+    '  background: #0F3A3A !important;',
+    '  color: #fff !important;',
+    '  font-size: 0.7em !important;',
+    '  padding: 2px 8px !important;',
+    '  border-radius: 3px !important;',
+    '  white-space: nowrap !important;',
+    '  z-index: 100 !important;',
+    '  pointer-events: none !important;',
+    '  font-family: "Pretendard Variable","Pretendard",sans-serif !important;',
+    '  font-weight: normal !important;',
+    '}',
+    '[contenteditable] mark.ddl-ruby { cursor: pointer !important; }',
     'mark.ddl-ruby::before {',
     '  content: attr(data-rt) !important;',
     '  position: absolute !important;',
@@ -11936,6 +12003,7 @@
 
       // β 기능
       setupFloatingToolbar();
+      setupRubyEditHandler(); // p19h
       // p14c: 블록 정렬·폭 시스템
       setupBlockToolbar();
       setupBlockPanelListeners();
