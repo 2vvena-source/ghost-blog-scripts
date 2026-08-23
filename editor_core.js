@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19i';
+  var VERSION = 'v2.0-β-p19i-fix';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -10145,7 +10145,7 @@
   //   dialog input 을 contenteditable div 로 승격 → 드래그 선택 후 서식.
   //   확인 클릭 직전 innerHTML 을 input.value 로 대체 (HTML 문자열 저장).
   function _augmentRubyDialogWithToolbar(initialHtml){
-    var modal = document.querySelector('.ep-modal, .ep-popup');
+    var modal = document.querySelector('.ep-dialog, .ep-modal, .ep-popup');
     if (!modal) return;
     var input = modal.querySelector('input[type="text"]');
     if (!input || input.__rubyAugmented) return;
@@ -12153,7 +12153,7 @@
       }
     });
   }
- 
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
   } else {
