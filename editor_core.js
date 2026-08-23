@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19a';
+  var VERSION = 'v2.0-β-p19b';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1073,6 +1073,26 @@
     '}',
     '.ep-popup-v2-footer .pop-btn.is-primary { background: var(--point, #FF9A76); color: #fff; border-color: var(--point, #FF9A76); }',
     '.ep-popup-v2-footer .pop-btn.is-primary:hover { background: var(--color, #0F3A3A); border-color: var(--color, #0F3A3A); color: var(--base, #F5F5F5); }',
+    /* p19b: 루비(후리가나) 강제 표시 규칙
+       ─────────────────────────────────────────
+       사용자님 F12 실측 결과: <ruby><rt>...</rt></ruby> 태그는 DOM 에
+       정상 삽입되지만 사이트 스킨 CSS 또는 Ghost 기본 스타일이 rt 를
+       숨기는 것으로 확인됨. 브라우저 기본 루비 렌더링이 되살아나도록
+       방어적으로 규칙 추가. 편집기 안 편집 영역 및 문서 본문 양쪽에
+       모두 적용됨. */
+    'ruby { ruby-position: over; ruby-align: center; }',
+    'ruby rt {',
+    '  display: revert;',
+    '  font-size: 0.55em;',
+    '  line-height: 1.1;',
+    '  color: inherit;',
+    '  font-family: inherit;',
+    '  text-align: center;',
+    '  user-select: text;',
+    '  -webkit-user-select: text;',
+    '  opacity: 0.85;',
+    '}',
+    'ruby rp { display: none; }',
     /* p14a: 크롭 팝업 */
     '.ep-crop-popup {',
     '  position: fixed;',
@@ -4354,20 +4374,46 @@
     else if (isSoft) chosen = p.bg || p.color;
     else chosen = p.color || p.bg;
 
+    // p19b: 프리셋 원본 알파 존중 (rgba(...,0.05) 같은 값이 슬라이더 100% 로
+    //       오버라이드되는 버그 해결). 프리셋에 명시 opacity 필드가 있으면 우선.
+    function _extractAlpha(colorStr){
+      if (!colorStr) return null;
+      var m = String(colorStr).match(/rgba?\([^)]*,\s*([0-9.]+)\s*\)/);
+      if (m) return Math.round(parseFloat(m[1]) * 100);
+      return null;
+    }
+    var _presetAlphaBg     = (typeof p.bgOpacity     === 'number') ? p.bgOpacity     : _extractAlpha(p.bg);
+    var _presetAlphaBorder = (typeof p.borderOpacity === 'number') ? p.borderOpacity : _extractAlpha(p.bg || p.color);
+    var _presetAlphaIcon   = (typeof p.iconOpacity   === 'number') ? p.iconOpacity   : _extractAlpha(p.color || p.bg);
+    var _presetAlphaText   = (typeof p.textOpacity   === 'number') ? p.textOpacity   : _extractAlpha(p.color || p.bg);
+
     // ns 별 세팅
     if (ns === 'callout-bg' || (target === 'bg' && ns === 'bg')) {
       // 그라데이션·패턴이면 c1 (data-bg-hex), solid 면 backgroundColor + data-bg
       box.setAttribute('data-bg-hex', chosen);
       box.setAttribute('data-bg', chosen);
       box.style.backgroundColor = chosen;
+      // p19b: 프리셋에 알파 정보가 있으면 슬라이더 값도 그것으로 세팅
+      if (_presetAlphaBg !== null && !isNaN(_presetAlphaBg)) {
+        box.setAttribute('data-bg-opacity', String(_presetAlphaBg));
+        box.setAttribute('data-bg-alpha1', String(_presetAlphaBg));
+      }
       applyCalloutBg(box);
       maybeAutoTextColor();
     } else if (ns === 'callout-bg2') {
       box.setAttribute('data-bg2', chosen);
+      // p19b: 색2 알파
+      if (_presetAlphaBg !== null && !isNaN(_presetAlphaBg)) {
+        box.setAttribute('data-bg-alpha2', String(_presetAlphaBg));
+      }
       applyCalloutBg(box);
     } else if (ns === 'callout-border' || (target === 'border' && ns === 'border')) {
       box.setAttribute('data-border-color', chosen);
       box.setAttribute('data-border-hex', chosen);
+      // p19b: 테두리 알파 존중
+      if (_presetAlphaBorder !== null && !isNaN(_presetAlphaBorder)) {
+        box.setAttribute('data-border-opacity', String(_presetAlphaBorder));
+      }
       applyBorderToBox(box);
     } else if (ns === 'callout-border2') {
       box.setAttribute('data-border-color2', chosen);
@@ -4868,7 +4914,28 @@
         saveBg = chosenColor; saveCol = chosenColor;
       }
       if (!s2.byTarget[ns]) s2.byTarget[ns] = { userPresets:[], lastGroup:'notion' };
-      s2.byTarget[ns].userPresets.push({ name: nm, group: g, bg: saveBg, color: saveCol });
+      // p19b: 알파(투명도)도 함께 저장 → 나중에 프리셋 클릭 시 슬라이더 복원됨.
+      //       각 ns 에 해당하는 슬라이더 값을 우선 저장하고, 없으면 색 문자열에서 추출.
+      var _saveAlpha = null;
+      try {
+        if (ns === 'callout-bg')       _saveAlpha = parseInt(box.getAttribute('data-bg-opacity') || '100', 10);
+        else if (ns === 'callout-bg2') _saveAlpha = parseInt(box.getAttribute('data-bg-alpha2') || '100', 10);
+        else if (ns === 'callout-border' || ns === 'callout-border2')
+          _saveAlpha = parseInt(box.getAttribute('data-border-opacity') || '100', 10);
+        else if (target === 'icon')
+          _saveAlpha = parseInt(box.getAttribute('data-icon-opacity') || '100', 10);
+        else if (target === 'text')
+          _saveAlpha = parseInt(box.getAttribute('data-text-opacity') || '100', 10);
+      } catch(_){ _saveAlpha = null; }
+      var _presetEntry = { name: nm, group: g, bg: saveBg, color: saveCol };
+      if (_saveAlpha !== null && !isNaN(_saveAlpha)) {
+        // ns 별 필드명 통일 (applyColorPresetByIdx 에서 읽음)
+        if (ns === 'callout-bg' || ns === 'callout-bg2') _presetEntry.bgOpacity = _saveAlpha;
+        else if (ns === 'callout-border' || ns === 'callout-border2') _presetEntry.borderOpacity = _saveAlpha;
+        else if (target === 'icon') _presetEntry.iconOpacity = _saveAlpha;
+        else if (target === 'text') _presetEntry.textOpacity = _saveAlpha;
+      }
+      s2.byTarget[ns].userPresets.push(_presetEntry);
       s2.byTarget[ns].lastGroup = g;
       saveCalloutSettings(s2);
       renderCalloutPopupBody();
