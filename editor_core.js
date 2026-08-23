@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19b';
+  var VERSION = 'v2.0-β-p19b-fix';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -4382,10 +4382,17 @@
       if (m) return Math.round(parseFloat(m[1]) * 100);
       return null;
     }
-    var _presetAlphaBg     = (typeof p.bgOpacity     === 'number') ? p.bgOpacity     : _extractAlpha(p.bg);
-    var _presetAlphaBorder = (typeof p.borderOpacity === 'number') ? p.borderOpacity : _extractAlpha(p.bg || p.color);
-    var _presetAlphaIcon   = (typeof p.iconOpacity   === 'number') ? p.iconOpacity   : _extractAlpha(p.color || p.bg);
-    var _presetAlphaText   = (typeof p.textOpacity   === 'number') ? p.textOpacity   : _extractAlpha(p.color || p.bg);
+    // p19b-fix: typeof 검사 대신 안전한 숫자 파싱 (문자열로 저장돼도 인식)
+    function _readAlpha(v, fallbackStr){
+      if (v === undefined || v === null || v === '') return _extractAlpha(fallbackStr);
+      var n = (typeof v === 'number') ? v : parseInt(v, 10);
+      if (isNaN(n)) return _extractAlpha(fallbackStr);
+      return Math.max(0, Math.min(100, n));
+    }
+    var _presetAlphaBg     = _readAlpha(p.bgOpacity,     p.bg);
+    var _presetAlphaBorder = _readAlpha(p.borderOpacity, p.bg || p.color);
+    var _presetAlphaIcon   = _readAlpha(p.iconOpacity,   p.color || p.bg);
+    var _presetAlphaText   = _readAlpha(p.textOpacity,   p.color || p.bg);
 
     // ns 별 세팅
     if (ns === 'callout-bg' || (target === 'bg' && ns === 'bg')) {
@@ -4916,19 +4923,23 @@
       if (!s2.byTarget[ns]) s2.byTarget[ns] = { userPresets:[], lastGroup:'notion' };
       // p19b: 알파(투명도)도 함께 저장 → 나중에 프리셋 클릭 시 슬라이더 복원됨.
       //       각 ns 에 해당하는 슬라이더 값을 우선 저장하고, 없으면 색 문자열에서 추출.
-      var _saveAlpha = null;
+      var _saveAlpha = 100;
       try {
-        if (ns === 'callout-bg')       _saveAlpha = parseInt(box.getAttribute('data-bg-opacity') || '100', 10);
-        else if (ns === 'callout-bg2') _saveAlpha = parseInt(box.getAttribute('data-bg-alpha2') || '100', 10);
+        var _attr;
+        if (ns === 'callout-bg')       _attr = box.getAttribute('data-bg-opacity');
+        else if (ns === 'callout-bg2') _attr = box.getAttribute('data-bg-alpha2');
         else if (ns === 'callout-border' || ns === 'callout-border2')
-          _saveAlpha = parseInt(box.getAttribute('data-border-opacity') || '100', 10);
+          _attr = box.getAttribute('data-border-opacity');
         else if (target === 'icon')
-          _saveAlpha = parseInt(box.getAttribute('data-icon-opacity') || '100', 10);
+          _attr = box.getAttribute('data-icon-opacity');
         else if (target === 'text')
-          _saveAlpha = parseInt(box.getAttribute('data-text-opacity') || '100', 10);
-      } catch(_){ _saveAlpha = null; }
+          _attr = box.getAttribute('data-text-opacity');
+        var _n = parseInt(_attr || '100', 10);
+        if (!isNaN(_n)) _saveAlpha = Math.max(0, Math.min(100, _n));
+      } catch(_){ _saveAlpha = 100; }
       var _presetEntry = { name: nm, group: g, bg: saveBg, color: saveCol };
-      if (_saveAlpha !== null && !isNaN(_saveAlpha)) {
+      // p19b-fix: 알파는 항상 저장 (기본 100 이라도)
+      if (true) {
         // ns 별 필드명 통일 (applyColorPresetByIdx 에서 읽음)
         if (ns === 'callout-bg' || ns === 'callout-bg2') _presetEntry.bgOpacity = _saveAlpha;
         else if (ns === 'callout-border' || ns === 'callout-border2') _presetEntry.borderOpacity = _saveAlpha;
