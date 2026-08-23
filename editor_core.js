@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19b-fix2';
+  var VERSION = 'v2.0-β-p19c';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -3363,10 +3363,21 @@
   function _saveCalloutCompositePreset(opts, name, group){
     var s = loadCalloutSettings();
     if (!s.byTarget['callout-composite']) s.byTarget['callout-composite'] = { userPresets:[], lastGroup:'기본' };
+    // p19c: box 에서 알파 3종 (bgOpacity, alpha1, alpha2) 직접 읽어 저장
+    var box = calPopupLock || selectedCallout;
+    var _bgOp = 100, _a1 = 100, _a2 = 100;
+    if (box) {
+      try {
+        _bgOp = parseInt(box.getAttribute('data-bg-opacity') || '100', 10) || 100;
+        _a1   = parseInt(box.getAttribute('data-bg-alpha1')  || '100', 10) || 100;
+        _a2   = parseInt(box.getAttribute('data-bg-alpha2')  || '100', 10) || 100;
+      } catch(_){}
+    }
     s.byTarget['callout-composite'].userPresets.push({
       name: name, group: group,
       mode: opts.bgMode, bg: opts.bg, bg2: opts.bg2,
-      angle: opts.gradientAngle, pattern: opts.pattern, patternSize: opts.patternSize
+      angle: opts.gradientAngle, pattern: opts.pattern, patternSize: opts.patternSize,
+      bgOpacity: _bgOp, alpha1: _a1, alpha2: _a2
     });
     s.byTarget['callout-composite'].lastGroup = group;
     saveCalloutSettings(s);
@@ -3385,6 +3396,10 @@
     if (p.angle != null) box.setAttribute('data-gradient-angle', String(p.angle));
     if (p.pattern) box.setAttribute('data-pattern', p.pattern);
     if (p.patternSize != null) box.setAttribute('data-pattern-size', String(p.patternSize));
+    // p19c: 알파 3종 복원 (기존 프리셋에 없으면 기본값 유지)
+    if (p.bgOpacity != null) box.setAttribute('data-bg-opacity', String(p.bgOpacity));
+    if (p.alpha1   != null) box.setAttribute('data-bg-alpha1',  String(p.alpha1));
+    if (p.alpha2   != null) box.setAttribute('data-bg-alpha2',  String(p.alpha2));
     applyCalloutBg(box);
     renderCalloutPopupBody();
   }
@@ -4389,7 +4404,6 @@
       if (isNaN(n)) return _extractAlpha(fallbackStr);
       return Math.max(0, Math.min(100, n));
     }
-    try { console.log('[p19b-fix2 APPLY]', {ns:ns, target:target, p:p, isBuiltin:isBuiltin, chosen:chosen}); } catch(_){}
     var _presetAlphaBg     = _readAlpha(p.bgOpacity,     p.bg);
     var _presetAlphaBorder = _readAlpha(p.borderOpacity, p.bg || p.color);
     var _presetAlphaIcon   = _readAlpha(p.iconOpacity,   p.color || p.bg);
@@ -4947,7 +4961,6 @@
         else if (target === 'icon') _presetEntry.iconOpacity = _saveAlpha;
         else if (target === 'text') _presetEntry.textOpacity = _saveAlpha;
       }
-      try { console.log('[p19b-fix2 SAVE]', {ns:ns, _saveAlpha:_saveAlpha, _presetEntry:_presetEntry}); } catch(_){}
       s2.byTarget[ns].userPresets.push(_presetEntry);
       s2.byTarget[ns].lastGroup = g;
       saveCalloutSettings(s2);
