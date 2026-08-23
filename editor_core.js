@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p19m
+ * 2vvena Editor Core - v2.0-β-p19n
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19m';
+  var VERSION = 'v2.0-β-p19n';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -189,17 +189,30 @@
     '}',
 
     // ─── 본문 컨테이너 ───
-    // p19m: 편집 페이지 폭 강제 방어 (Ghost 업데이트 / Code Injection 소실 대비)
-    // 이 규칙은 편집 컨텍스트(is-body / is-editing)에만 적용되어 포스트 뎍기 놀이엔 영향 없음.
-    'body section.gh-content.gh-canvas.is-body,',
-    'body section.gh-content.gh-canvas.is-editing {',
+    // p19n: 편집 페이지 폭 강제 방어 (p19m 에서는 미약함 → 부모로까지 확장)
+    //   이 규칙은 온리 편집 페이지(body 에 has-editor 클래스 또는 경로가 /editor/)에만 적용되도록
+    //   URL 기반으로 제한. 포스트 뎍기는 영향 없음.
+    'body.ddl-editor-active .gh-canvas,',
+    'body.ddl-editor-active section.gh-content,',
+    'body.ddl-editor-active section.gh-content.gh-canvas,',
+    'body.ddl-editor-active section.gh-content.gh-canvas.is-body,',
+    'body.ddl-editor-active section.gh-content.gh-canvas.is-editing,',
+    'body.ddl-editor-active .gh-canvas > * {',
     '  max-width: 1600px !important;',
     '  width: 100% !important;',
+    '  box-sizing: border-box !important;',
+    '}',
+    'body.ddl-editor-active .gh-canvas,',
+    'body.ddl-editor-active section.gh-content.gh-canvas {',
     '  margin-left: auto !important;',
     '  margin-right: auto !important;',
     '  padding-left: 24px !important;',
     '  padding-right: 24px !important;',
-    '  box-sizing: border-box !important;',
+    '}',
+    // 부모 grid template 거있 해제 (Source 테마가 종종 쓰는 3-column grid → 편집에서는 오히려 방해)
+    'body.ddl-editor-active .gh-canvas {',
+    '  grid-template-columns: none !important;',
+    '  display: block !important;',
     '}',
     'section.gh-content.is-editing {',
     '  min-height: 40vh;',
@@ -1463,10 +1476,15 @@
     '  box-shadow: 0 8px 24px rgba(0,0,0,0.08);',
     '  padding: 10px 12px 12px;',
     '  width: 280px;',
+    '  max-height: 70vh;',                        /* p19n: 길어지면 스크롤 */
+    '  overflow-y: auto;',                        /* p19n */
+    '  scrollbar-width: none;',                   /* p19n: Firefox 스크롤바 숨김 */
+    '  -ms-overflow-style: none;',                /* p19n: IE/Edge */
     '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
     '  font-size: 13px;',
     '  line-height: 1.4;',
     '}',
+    '.ep-modern-toolbar::-webkit-scrollbar { width: 0; height: 0; display: none; }',  /* p19n: WebKit 숨김 */
     '.ep-modern-toolbar.is-open { display: block; animation: mtb-in 120ms ease-out; }',
     '@keyframes mtb-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }',
     // 미니 헤더 (좌 제목 + 우 ⚙)
@@ -7432,6 +7450,17 @@
     var values = {};
     fields.forEach(function(f){ values[f.key] = (f.initial != null ? f.initial : ''); });
 
+    // p19n: input DOM 를 직접 부품으로 관리 → values 샐플링 안정화 (input event 놓침 방지)
+    var inputMap = {}; // key → input element
+
+    function _readAll(){
+      // 저장 버튼 클릭 시점에 실제 input.value 를 직접 읽음 (input event 놓침 관계 없이)
+      Object.keys(inputMap).forEach(function(k){
+        if (inputMap[k]) values[k] = inputMap[k].value;
+      });
+      return values;
+    }
+
     var p = createBlockPopup({
       title: opts.title || '편집',
       width: opts.width || '400px',
@@ -7439,7 +7468,8 @@
       footer: [
         { label: opts.cancelLabel || '취소', onClick: function(pp){ pp.close(); if (typeof opts.onCancel === 'function') opts.onCancel(); } },
         { label: opts.saveLabel || '저장', primary: true, onClick: function(pp){
-            if (typeof opts.onSave === 'function') opts.onSave(values);
+            var v = _readAll();
+            if (typeof opts.onSave === 'function') opts.onSave(v);
             pp.close();
           } },
       ],
@@ -7447,7 +7477,7 @@
         var body = pp.body || pp.getBody('__single');
         if (!body) return;
         body.innerHTML = '';
-        fields.forEach(function(f){
+        fields.forEach(function(f, idx){
           var row = document.createElement('div');
           row.className = 'row';
           var lbl = document.createElement('div');
@@ -7471,8 +7501,27 @@
           input.addEventListener('focus', function(){ input.style.borderColor = 'var(--point, #FF9A76)'; input.style.background = '#fff'; });
           input.addEventListener('blur',  function(){ input.style.borderColor = 'rgba(15,58,58,0.25)'; input.style.background = '#fafafa'; });
           input.addEventListener('input', function(){ values[f.key] = input.value; });
+          // p19n: Enter 키 = 저장 (textarea 제외)
+          if (f.type !== 'textarea') {
+            input.addEventListener('keydown', function(ev){
+              if (ev.key === 'Enter'){
+                ev.preventDefault();
+                var v = _readAll();
+                if (typeof opts.onSave === 'function') opts.onSave(v);
+                p.close();
+              }
+            });
+          }
+          inputMap[f.key] = input;
           row.appendChild(input);
           body.appendChild(row);
+
+          // p19n: 첫 번째 input 자동 포커스 + 전체 선택
+          if (idx === 0){
+            setTimeout(function(){
+              try { input.focus(); input.select && input.select(); } catch(_){}
+            }, 30);
+          }
         });
       }
     });
@@ -7647,10 +7696,18 @@
       if (cmd && /^(bold|italic|underline|justifyLeft|justifyCenter|justifyRight|createLink|removeFormat)$/.test(cmd)){
         try {
           if (cmd === 'createLink'){
-            // p19m: prompt → 표준 명벅 다이얼로그로 교체 (톤 통일)
-            // 선택 상태 보존을 위해 range 저장
+            // p19n: 링크 저장 안정화 — 선택 텍스트의 범위(range)을 anchor/offset 으로 저장해 복원
             var _sel = window.getSelection();
-            var _range = (_sel && _sel.rangeCount > 0) ? _sel.getRangeAt(0).cloneRange() : null;
+            var _savedRange = null;
+            if (_sel && _sel.rangeCount > 0){
+              var r = _sel.getRangeAt(0);
+              _savedRange = {
+                startContainer: r.startContainer,
+                startOffset:    r.startOffset,
+                endContainer:   r.endContainer,
+                endOffset:      r.endOffset,
+              };
+            }
             window.__DDL_EDITOR.openEditDialog({
               title: '링크',
               width: '380px',
@@ -7660,13 +7717,27 @@
               onSave: function(vals){
                 var u = (vals.url || '').trim();
                 try {
-                  if (_range) {
-                    var s = window.getSelection();
-                    s.removeAllRanges(); s.addRange(_range);
+                  // 선택 복원
+                  if (_savedRange){
+                    var nr = document.createRange();
+                    try {
+                      nr.setStart(_savedRange.startContainer, _savedRange.startOffset);
+                      nr.setEnd(_savedRange.endContainer,   _savedRange.endOffset);
+                      var s2 = window.getSelection();
+                      s2.removeAllRanges();
+                      s2.addRange(nr);
+                    } catch(err){ console.warn('[p19n] range restore failed', err); }
                   }
-                  if (!u || u === 'https://') document.execCommand('unlink', false, null);
+                  // 포커스 복광 (execCommand 는 포커스된 contentEditable 안에서만 작동)
+                  try {
+                    var host = _savedRange && _savedRange.startContainer;
+                    var ce = host && (host.nodeType === 1 ? host : host.parentElement);
+                    ce = ce && ce.closest && ce.closest('[contenteditable="true"]');
+                    if (ce) ce.focus();
+                  } catch(_){}
+                  if (!u || u === 'https://' || u === '') document.execCommand('unlink', false, null);
                   else document.execCommand('createLink', false, u);
-                } catch(_){}
+                } catch(err2){ console.warn('[p19n] createLink failed', err2); }
               }
             });
           } else {
@@ -13283,6 +13354,8 @@
     }
 
     log('편집기 페이지 감지. 초기화 시작.');
+    // p19n: body 에 편집기 활성 클래스 부착 (폭 방어 CSS 적용 대상 제한)
+    try { document.body.classList.add('ddl-editor-active'); } catch(_){}
     injectCSS();
     createPanel();
 
