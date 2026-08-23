@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19b-fix';
+  var VERSION = 'v2.0-β-p19b-fix2';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -4389,6 +4389,7 @@
       if (isNaN(n)) return _extractAlpha(fallbackStr);
       return Math.max(0, Math.min(100, n));
     }
+    try { console.log('[p19b-fix2 APPLY]', {ns:ns, target:target, p:p, isBuiltin:isBuiltin, chosen:chosen}); } catch(_){}
     var _presetAlphaBg     = _readAlpha(p.bgOpacity,     p.bg);
     var _presetAlphaBorder = _readAlpha(p.borderOpacity, p.bg || p.color);
     var _presetAlphaIcon   = _readAlpha(p.iconOpacity,   p.color || p.bg);
@@ -4946,6 +4947,7 @@
         else if (target === 'icon') _presetEntry.iconOpacity = _saveAlpha;
         else if (target === 'text') _presetEntry.textOpacity = _saveAlpha;
       }
+      try { console.log('[p19b-fix2 SAVE]', {ns:ns, _saveAlpha:_saveAlpha, _presetEntry:_presetEntry}); } catch(_){}
       s2.byTarget[ns].userPresets.push(_presetEntry);
       s2.byTarget[ns].lastGroup = g;
       saveCalloutSettings(s2);
