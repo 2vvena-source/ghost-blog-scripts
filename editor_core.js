@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p18c';
+  var VERSION = 'v2.0-β-p18d';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2036,6 +2036,15 @@
   function saveCalloutSettings(s){ GM_setValue('callout_settings', JSON.stringify(s)); }
 
   // p12.3: target별 그룹/프리셋 사용
+  // p18d: 그룹 삭제 버튼 hover 스타일 (한 번만 삽입)
+  (function(){
+    if (document.getElementById('ep-p18d-style')) return;
+    var st = document.createElement('style');
+    st.id = 'ep-p18d-style';
+    st.textContent = '.ep-color-group-wrap:hover .ep-group-del{opacity:1 !important;}'
+      + '.ep-color-group-wrap .ep-group-del:hover{background:#d32f2f !important;}';
+    (document.head || document.documentElement).appendChild(st);
+  })();
   function renderColorSection(target, currentColor, namespace){
     // p17g: namespace 파라미터 도입 — 팝업 안에 같은 target을 여러 번 렌더할 때
     // 각 섹션을 서로 다른 이름(namespace)으로 격리한다. 예: 'btn-bg', 'btn-bg2'
@@ -2068,7 +2077,17 @@
     html += '<div class="row"><div class="row-label">색상 그룹</div><div style="display:flex; flex-wrap:wrap; gap:0.35em;">';
     groupKeys.forEach(function(k){
       var label = labels && labels[k] ? labels[k] : (groups[k] ? groups[k].label : k);
-      html += '<button class="pop-btn' + (k===lastGroup?' is-active':'') + '" data-color-group="' + escapeAttr(k) + '" data-color-target="' + target + '" data-color-ns="' + escapeAttr(ns) + '">' + escapeHtml(label) + '</button>';
+      // p18d: 사용자 그룹인지(built-in 아님) 판정 → × 그룹 삭제 버튼 노출
+      var isUserG = !groups[k];
+      if (isUserG) {
+        // wrapper 로 감싸서 hover 시 × 노출
+        html += '<span class="ep-color-group-wrap" style="position:relative; display:inline-block;">'
+          + '<button class="pop-btn' + (k===lastGroup?' is-active':'') + '" data-color-group="' + escapeAttr(k) + '" data-color-target="' + target + '" data-color-ns="' + escapeAttr(ns) + '">' + escapeHtml(label) + '</button>'
+          + '<button type="button" class="ep-group-del" data-color-group-del="' + escapeAttr(k) + '" data-color-target="' + target + '" data-color-ns="' + escapeAttr(ns) + '" title="그룹 전체 삭제" style="position:absolute; top:-6px; right:-6px; width:16px; height:16px; border-radius:50%; background:#b00020; color:#fff; border:none; cursor:pointer; font-size:11px; line-height:14px; padding:0; opacity:0; transition:opacity 0.15s;">×</button>'
+          + '</span>';
+      } else {
+        html += '<button class="pop-btn' + (k===lastGroup?' is-active':'') + '" data-color-group="' + escapeAttr(k) + '" data-color-target="' + target + '" data-color-ns="' + escapeAttr(ns) + '">' + escapeHtml(label) + '</button>';
+      }
     });
     html += '</div></div>';
 
@@ -3398,6 +3417,41 @@
         body.querySelectorAll('[data-icon-size]').forEach(function(b){
           b.classList.toggle('is-active', b === sizeBtn);
         });
+        return;
+      }
+      // p18d: 색상 그룹 전체 삭제 (콜아웃 팝업 · 모든 target)
+      var colorGroupDel = e.target.closest('[data-color-group-del]');
+      if (colorGroupDel) {
+        e.stopPropagation();
+        var gdKey = colorGroupDel.getAttribute('data-color-group-del');
+        var gdTarget = colorGroupDel.getAttribute('data-color-target');
+        var gdNs = colorGroupDel.getAttribute('data-color-ns') || gdTarget;
+        openEditorConfirm(
+          '그룹 전체 삭제',
+          '"' + gdKey + '" 그룹의 모든 프리셋을 삭제할까요?\n이 작업은 되돌릴 수 없습니다.',
+          function(ok){
+            if (!ok) return;
+            var sD = loadCalloutSettings();
+            // bg target 은 최상위 userPresets 를 함께 쓸 수 있어 둘 다 정리
+            if (gdTarget === 'bg') {
+              sD.userPresets = (sD.userPresets || []).filter(function(p){
+                return (p.group || '내 프리셋') !== gdKey;
+              });
+            }
+            if (sD.byTarget && sD.byTarget[gdNs]) {
+              sD.byTarget[gdNs].userPresets = (sD.byTarget[gdNs].userPresets || []).filter(function(p){
+                return (p.group || '내 프리셋') !== gdKey;
+              });
+              // 삭제된 그룹이 lastGroup 이었다면 기본으로 되돌림
+              if (sD.byTarget[gdNs].lastGroup === gdKey) sD.byTarget[gdNs].lastGroup = 'notion';
+            }
+            saveCalloutSettings(sD);
+            if (typeof renderCalloutPopupBody === 'function' && document.getElementById('ep-cal-popup-body')) {
+              renderCalloutPopupBody();
+            }
+          },
+          { okLabel:'그룹 삭제', cancelLabel:'취소', danger:true }
+        );
         return;
       }
       // p12.3: target별 그룹 저장
@@ -6712,6 +6766,30 @@
         }, { okLabel:'삭제', danger:true });
         return;
       }
+      // p18d: 구분선 색상 그룹 전체 삭제
+      var divGroupDel = t.closest('[data-color-group-del][data-color-target="divider"]');
+      if (divGroupDel && selectedDivider) {
+        e.stopPropagation();
+        var dgKey = divGroupDel.getAttribute('data-color-group-del');
+        openEditorConfirm(
+          '그룹 전체 삭제',
+          '"' + dgKey + '" 그룹의 모든 프리셋을 삭제할까요?\n이 작업은 되돌릴 수 없습니다.',
+          function(ok){
+            if (!ok) return;
+            var sD = loadCalloutSettings();
+            if (sD.byTarget && sD.byTarget.divider) {
+              sD.byTarget.divider.userPresets = (sD.byTarget.divider.userPresets || []).filter(function(p){
+                return (p.group || '내 프리셋') !== dgKey;
+              });
+              if (sD.byTarget.divider.lastGroup === dgKey) sD.byTarget.divider.lastGroup = 'notion';
+            }
+            saveCalloutSettings(sD);
+            renderDividerPopupBody('color');
+          },
+          { okLabel:'그룹 삭제', cancelLabel:'취소', danger:true }
+        );
+        return;
+      }
       // 색상 그룹 (renderColorSection 이 만든 것)
       var cg = t.closest('[data-color-group][data-color-target="divider"]');
       if (cg && selectedDivider) {
@@ -7652,6 +7730,31 @@
           });
         });
         fi.click();
+        return;
+      }
+      // p18d: 버튼 색상 그룹 전체 삭제 (btn-bg / btn-bg2)
+      var btnGroupDel = t.closest('[data-color-group-del][data-color-ns="btn-bg"], [data-color-group-del][data-color-ns="btn-bg2"]');
+      if (btnGroupDel && selectedButton) {
+        e.stopPropagation();
+        var bgdNs = btnGroupDel.getAttribute('data-color-ns');
+        var bgdKey = btnGroupDel.getAttribute('data-color-group-del');
+        openEditorConfirm(
+          '그룹 전체 삭제',
+          '"' + bgdKey + '" 그룹의 모든 프리셋을 삭제할까요?\n이 작업은 되돌릴 수 없습니다.',
+          function(ok){
+            if (!ok) return;
+            var sD = loadCalloutSettings();
+            if (sD.byTarget && sD.byTarget[bgdNs]) {
+              sD.byTarget[bgdNs].userPresets = (sD.byTarget[bgdNs].userPresets || []).filter(function(p){
+                return (p.group || '내 프리셋') !== bgdKey;
+              });
+              if (sD.byTarget[bgdNs].lastGroup === bgdKey) sD.byTarget[bgdNs].lastGroup = 'notion';
+            }
+            saveCalloutSettings(sD);
+            renderButtonPopupBody('bg');
+          },
+          { okLabel:'그룹 삭제', cancelLabel:'취소', danger:true }
+        );
         return;
       }
       // p17g: 버튼 색상 그룹/프리셋을 namespace(ns) 기반으로 통합 처리
