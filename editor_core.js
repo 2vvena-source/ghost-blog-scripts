@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p18j';
+  var VERSION = 'v2.0-β-p18k';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1204,66 +1204,97 @@
     '}',
 
     // ─── β: 플로팅 툴바 ───
-    // p18j: 사이트 톤으로 재작성 — 흰 배경 + 얇은 실선 + #0F3A3A 텍스트
+    // p18k: 사이트 톤 — 흰 배경 + 얇은 실선 + 진한 딥그린 텍스트
     '.ep-float-toolbar {',
     '  position: absolute;',
     '  z-index: 9990;',
     '  display: none;',
     '  background: #ffffff;',
-    '  color: var(--color, #0F3A3A);',
-    '  border: 1px solid rgba(15, 58, 58, 0.35);',
+    '  color: #0F3A3A;',
+    '  border: 1px solid #0F3A3A;',
     '  border-radius: 2px;',
-    '  padding: 0.25em 0.35em;',
+    '  padding: 0.3em 0.4em;',
     '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
-    '  font-size: 0.9em;',
-    '  gap: 0.05em;',
+    '  font-size: 0.95em;',
+    '  gap: 0.1em;',
     '  align-items: center;',
     '  white-space: nowrap;',
-    '  transition: transform 0.15s ease;',
     '}',
     '.ep-float-toolbar.is-open { display: inline-flex; }',
     '.ep-float-toolbar button {',
     '  background: transparent;',
-    '  color: var(--color, #0F3A3A);',
+    '  color: #0F3A3A;',
     '  border: none;',
-    '  padding: 0.25em 0.5em;',
+    '  padding: 0.3em 0.55em;',
     '  cursor: pointer;',
     '  font-family: inherit;',
     '  font-size: inherit;',
-    '  min-width: 1.6em;',
+    '  font-weight: 500;',
+    '  min-width: 1.7em;',
     '  line-height: 1;',
     '  transition: color 0.12s ease, transform 0.12s ease;',
     '}',
+    '.ep-float-toolbar button svg { display:inline-block; vertical-align:middle; }',
+    '.ep-float-toolbar button svg * { stroke: #0F3A3A; }',
     '.ep-float-toolbar button:hover {',
     '  color: var(--point, #FF9A76);',
     '  text-decoration: underline double var(--point, #FF9A76);',
     '  text-underline-offset: 3px;',
     '  transform: translateY(-1px);',
     '}',
+    '.ep-float-toolbar button:hover svg * { stroke: var(--point, #FF9A76); }',
     '.ep-float-toolbar button.is-active {',
     '  color: var(--point, #FF9A76);',
     '  text-decoration: underline double var(--point, #FF9A76);',
     '  text-underline-offset: 3px;',
     '}',
+    '.ep-float-toolbar button.is-active svg * { stroke: var(--point, #FF9A76); }',
     '.ep-float-toolbar .ftb-sep {',
     '  width: 1px; height: 1em;',
     '  background: rgba(15, 58, 58, 0.25);',
     '  margin: 0 0.15em;',
     '}',
-    // 형광펜 팔레트 팝오버
+    // p18k: 형광펜 팔레트 팝오버 (확장 — 그라데이션/패턴/투명도/그룹 지원)
     '.ep-hl-palette {',
     '  position: absolute;',
     '  z-index: 9995;',
     '  display: none;',
     '  background: #ffffff;',
-    '  border: 1px solid rgba(15, 58, 58, 0.35);',
+    '  border: 1px solid #0F3A3A;',
     '  border-radius: 2px;',
-    '  padding: 0.6em 0.7em;',
+    '  padding: 0.7em 0.8em;',
     '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
-    '  color: var(--color, #0F3A3A);',
-    '  min-width: 220px;',
+    '  color: #0F3A3A;',
+    '  min-width: 260px;',
+    '  max-width: 320px;',
     '  font-size: 12px;',
+    '  max-height: 70vh;',
+    '  overflow-y: auto;',
     '}',
+    // 팔레트 안 미니 버튼 그룹 (모드 · 그룹)
+    '.ep-hl-palette .hl-mode-row { display:flex; gap:0.3em; margin-bottom:0.6em; }',
+    '.ep-hl-palette .hl-mode {',
+    '  flex:1; padding:0.35em 0.4em; background:transparent;',
+    '  border:1px solid rgba(15,58,58,0.35); border-radius:2px;',
+    '  color:#0F3A3A; font-family:inherit; font-size:11px;',
+    '  cursor:pointer;',
+    '}',
+    '.ep-hl-palette .hl-mode.is-active { background:#0F3A3A; color:#fff; border-color:#0F3A3A; }',
+    '.ep-hl-palette .hl-mode:hover:not(.is-active) { color:var(--point,#FF9A76); border-color:var(--point,#FF9A76); }',
+    '.ep-hl-palette .hl-group-row { display:flex; flex-wrap:wrap; gap:0.25em; margin-bottom:0.5em; }',
+    '.ep-hl-palette .hl-group {',
+    '  padding:0.2em 0.5em; background:transparent;',
+    '  border:1px solid rgba(15,58,58,0.35); border-radius:2px;',
+    '  color:#0F3A3A; font-family:inherit; font-size:10.5px;',
+    '  cursor:pointer;',
+    '}',
+    '.ep-hl-palette .hl-group.is-active { background:#0F3A3A; color:#fff; border-color:#0F3A3A; }',
+    '.ep-hl-palette .hl-group:hover:not(.is-active) { color:var(--point,#FF9A76); border-color:var(--point,#FF9A76); }',
+    '.ep-hl-palette .hl-slider-row {',
+    '  display:grid; grid-template-columns:60px 1fr 34px; gap:0.4em;',
+    '  align-items:center; margin:0.35em 0; font-size:11px;',
+    '}',
+    '.ep-hl-palette .hl-slider-row input[type=range] { width:100%; }',
     '.ep-hl-palette.is-open { display: block; }',
     '.ep-hl-palette .hl-title {',
     '  font-family: "Cafe24Danjunghae","Gowun Batang",serif;',
@@ -9507,36 +9538,86 @@
   // ═══════════════════════════════════════════════════════════
   // p18j: 인라인 조작 유틸 (형광펜 · 방점 · 루비 · 위첨자 · 아래첨자 · 서식 지우기)
   // ═══════════════════════════════════════════════════════════
-  function applyHighlightColor(color){
-    // color === '' 또는 'none' 이면 형광펜 해제
+  // p18k: 마지막으로 사용한 하이라이트 조합 (단색/그라데이션/패턴)
+  function getLastHlSpec(){
+    try {
+      var raw = GM_getValue('inline_hl_last_spec', '');
+      if (raw) return JSON.parse(raw);
+    } catch(_){}
+    return { mode:'solid', c1:'#FFF176', c2:'#F8BBD0', a1:100, a2:100, angle:45, pattern:'dot', size:10 };
+  }
+  function setLastHlSpec(spec){
+    try { GM_setValue('inline_hl_last_spec', JSON.stringify(spec)); } catch(_){}
+    if (spec && spec.c1) setLastHlColor(spec.c1);
+  }
+  function specToBackground(spec){
+    if (!spec) return '';
+    function rgba(c, a){
+      var rgb = (typeof parseRgb === 'function') ? parseRgb(c) : null;
+      if (!rgb) return c;
+      return 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + ((a||100)/100) + ')';
+    }
+    var c1 = rgba(spec.c1 || '#FFF176', spec.a1);
+    var c2 = rgba(spec.c2 || '#F8BBD0', spec.a2);
+    var mode = spec.mode || 'solid';
+    if (mode === 'gradient') {
+      return 'linear-gradient(' + (spec.angle||45) + 'deg, ' + c1 + ', ' + c2 + ')';
+    }
+    if (mode === 'pattern') {
+      var s = spec.size || 10;
+      var p = spec.pattern || 'dot';
+      if (p === 'dot') return 'radial-gradient(circle at ' + (s/2) + 'px ' + (s/2) + 'px, ' + c2 + ' ' + (s*0.15) + 'px, ' + c1 + ' ' + (s*0.16) + 'px) 0 0 / ' + s + 'px ' + s + 'px';
+      if (p === 'stripe') return 'repeating-linear-gradient(45deg, ' + c1 + ' 0, ' + c1 + ' ' + (s/2) + 'px, ' + c2 + ' ' + (s/2) + 'px, ' + c2 + ' ' + s + 'px)';
+      if (p === 'check') return 'conic-gradient(' + c1 + ' 25%, ' + c2 + ' 25% 50%, ' + c1 + ' 50% 75%, ' + c2 + ' 75%) 0 0 / ' + s + 'px ' + s + 'px';
+    }
+    return c1;
+  }
+
+  // p18k: 확장된 형광펜 적용 — spec 객체(mode/c1/c2/a1/a2/angle/pattern/size) 받음.
+  // 이전 시그니처 유지: 문자열 하나 넘어오면 단색으로 처리.
+  function applyHighlightColor(input){
     if (!savedRange) return;
+    // 언랩 케이스
+    var isNone = (input === '' || input === 'none');
+    var spec;
+    if (typeof input === 'string' && !isNone) {
+      spec = { mode:'solid', c1:input, a1:100, a2:100 };
+    } else if (typeof input === 'object' && input) {
+      spec = input;
+    } else if (isNone) {
+      spec = null;
+    } else {
+      spec = getLastHlSpec();
+    }
     restoreRange();
     var sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
     var range = sel.getRangeAt(0);
-    // 이미 mark 로 감싸져 있으면 색 변경 or 언랩
     var container = range.commonAncestorContainer;
     var el = container.nodeType === 1 ? container : container.parentElement;
     var innerMark = el && el.closest && el.closest('mark');
     if (innerMark) {
-      if (!color || color === 'none') {
-        // 언랩
+      if (isNone) {
         var parent = innerMark.parentNode;
         while (innerMark.firstChild) parent.insertBefore(innerMark.firstChild, innerMark);
         parent.removeChild(innerMark);
         return;
       }
-      innerMark.style.backgroundColor = color;
+      // 색 갱신
+      innerMark.style.background = specToBackground(spec);
+      innerMark.style.backgroundColor = ''; // shorthand 로 덮어씀 방지
       innerMark.style.color = 'inherit';
+      setLastHlSpec(spec);
       return;
     }
-    if (!color || color === 'none') return; // 이미 없음
-    setLastHlColor(color);
+    if (isNone) return;
     var m = document.createElement('mark');
-    m.style.backgroundColor = color;
+    m.style.background = specToBackground(spec);
     m.style.color = 'inherit';
     m.style.padding = '0.02em 0.15em';
     m.style.borderRadius = '2px';
+    // 데이터 속성으로 저장/재현 힌트
+    try { m.setAttribute('data-hl-spec', JSON.stringify(spec)); } catch(_){}
     try {
       m.appendChild(range.extractContents());
       range.insertNode(m);
@@ -9545,7 +9626,8 @@
       nr.selectNodeContents(m);
       sel.addRange(nr);
       saveRange();
-    } catch(err){ console.warn('[p18j] highlight error', err); }
+      setLastHlSpec(spec);
+    } catch(err){ console.warn('[p18k] highlight error', err); }
   }
 
   function toggleEmphasisDot(){
@@ -9581,31 +9663,36 @@
     restoreRange();
     var sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
-      alert('루비(후리가나)를 달 텍스트를 먼저 선택하세요.');
+      openEditorConfirm('선택 필요', '윗글씨(루비)를 달 텍스트를 먼저 드래그로 선택하세요.', function(){}, { okLabel:'확인', cancelLabel:null });
       return;
     }
     var baseText = sel.toString();
-    var rubyText = prompt('선택한 "' + baseText + '" 위에 표시할 텍스트를 입력하세요.\n(한글·한자·일본어·영문·특수문자 모두 가능)', '');
-    if (rubyText == null) return;
-    rubyText = String(rubyText).trim();
-    if (!rubyText) return;
-    restoreRange();
-    sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    var range = sel.getRangeAt(0);
-    var ruby = document.createElement('ruby');
-    var rt = document.createElement('rt');
-    rt.textContent = rubyText;
-    try {
-      ruby.appendChild(range.extractContents());
-      ruby.appendChild(rt);
-      range.insertNode(ruby);
-      sel.removeAllRanges();
-      var nr = document.createRange();
-      nr.selectNodeContents(ruby);
-      sel.addRange(nr);
-      saveRange();
-    } catch(err){ console.warn('[p18j] ruby error', err); }
+    // 선택 유지
+    saveRange();
+    openEditorDialog('윗글씨 (루비)', [
+      { key:'ruby', label:'선택한 "' + baseText + '" 위에 표시할 내용', default:'', placeholder:'한글·영문·한자·기호 등 자유롭게' }
+    ], function(vals){
+      if (!vals) return;
+      var rubyText = (vals.ruby || '').trim();
+      if (!rubyText) return;
+      restoreRange();
+      var sel2 = window.getSelection();
+      if (!sel2 || sel2.rangeCount === 0) return;
+      var range = sel2.getRangeAt(0);
+      var ruby = document.createElement('ruby');
+      var rt = document.createElement('rt');
+      rt.textContent = rubyText;
+      try {
+        ruby.appendChild(range.extractContents());
+        ruby.appendChild(rt);
+        range.insertNode(ruby);
+        sel2.removeAllRanges();
+        var nr = document.createRange();
+        nr.selectNodeContents(ruby);
+        sel2.addRange(nr);
+        saveRange();
+      } catch(err){ console.warn('[p18k] ruby error', err); }
+    });
   }
 
   function toggleSupSub(which){
@@ -9666,24 +9753,33 @@
   function setupFloatingToolbar(){
     var bar = document.createElement('div');
     bar.className = 'ep-float-toolbar';
+    // p18k: SVG 아이콘 (사이트 톤 얇은 실선)
+    var _svg_link = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>';
+    var _svg_clear = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h12"/><path d="M10 11l4 6"/><path d="M14 11l-4 6"/><path d="M18 4L4 18"/></svg>';
+    // 루비: 큰 "가" 위에 작은 두 점(방점 대신 위쪽 텍스트 표기 느낌) — 일본어 문자 대신 사이트 톤 마크
+    var _svg_ruby = '<svg width="16" height="14" viewBox="0 0 24 20" fill="none" stroke="#0F3A3A" stroke-width="1.4" stroke-linecap="round"><line x1="6" y1="3" x2="18" y2="3"/><text x="12" y="17" text-anchor="middle" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="12" fill="#0F3A3A" stroke="none">가</text></svg>';
+    // 형광펜: 마커 펜 형태
+    var _svg_hl = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h6"/><path d="M8 14l6-6 4 4-6 6H8v-4z"/><path d="M14 8l3-3 3 3-3 3"/></svg>';
+    // 서식 프리셋: 별표 사이트 톤
+    var _svg_star = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linejoin="round"><polygon points="12,3 14.5,9 21,9.5 16,14 17.5,20.5 12,17 6.5,20.5 8,14 3,9.5 9.5,9"/></svg>';
     bar.innerHTML =
-      '<button data-cmd="bold" title="볼드"><b>B</b></button>' +
-      '<button data-cmd="italic" title="이탤릭"><i>I</i></button>' +
-      '<button data-cmd="underline" title="밑줄"><u>U</u></button>' +
-      '<button data-cmd="strikeThrough" title="취소선"><s>S</s></button>' +
+      '<button data-cmd="bold" title="볼드" style="font-weight:800;">B</button>' +
+      '<button data-cmd="italic" title="이탤릭" style="font-style:italic; font-family:serif;">I</button>' +
+      '<button data-cmd="underline" title="밑줄" style="text-decoration:underline;">U</button>' +
+      '<button data-cmd="strikeThrough" title="취소선" style="text-decoration:line-through;">S</button>' +
       '<span class="ftb-sep"></span>' +
-      '<button data-cmd="sup" title="위첨자">X<sup style="font-size:0.7em;">2</sup></button>' +
-      '<button data-cmd="sub" title="아래첨자">X<sub style="font-size:0.7em;">2</sub></button>' +
-      '<button data-cmd="emphasis" title="방점(강조점)">·A·</button>' +
-      '<button data-cmd="ruby" title="루비(후리가나)">ル</button>' +
+      '<button data-cmd="sup" title="위첨자" style="font-size:0.85em;">X<sup style="font-size:0.7em;">2</sup></button>' +
+      '<button data-cmd="sub" title="아래첨자" style="font-size:0.85em;">X<sub style="font-size:0.7em;">2</sub></button>' +
+      '<button data-cmd="emphasis" title="방점(강조점)" style="font-family:Cafe24Danjunghae,Gowun Batang,serif;">·가·</button>' +
+      '<button data-cmd="ruby" title="루비 (윗글씨 삽입)">' + _svg_ruby + '</button>' +
       '<span class="ftb-sep"></span>' +
-      '<button data-cmd="highlight-quick" title="형광펜 (마지막 색)">🖍</button>' +
-      '<button data-cmd="highlight-palette" title="형광펜 색 선택">▾</button>' +
+      '<button data-cmd="highlight-quick" title="형광펜 (마지막 색)">' + _svg_hl + '</button>' +
+      '<button data-cmd="highlight-palette" title="형광펜 색 선택" style="font-size:0.75em;">▾</button>' +
       '<span class="ftb-sep"></span>' +
-      '<button data-cmd="createLink" title="링크">\u2398</button>' +
-      '<button data-cmd="removeFormat" title="서식 지우기">\u2205</button>' +
+      '<button data-cmd="createLink" title="링크">' + _svg_link + '</button>' +
+      '<button data-cmd="removeFormat" title="서식 지우기">' + _svg_clear + '</button>' +
       '<span class="ftb-sep"></span>' +
-      '<button data-cmd="open-presets" title="인라인 서식 프리셋">\u2605 서식</button>';
+      '<button data-cmd="open-presets" title="인라인 서식 프리셋" style="display:inline-flex; align-items:center; gap:0.25em;">' + _svg_star + '<span>서식</span></button>';
     document.body.appendChild(bar);
 
     // 형광펜 팔레트 팝오버 (분리 요소)
@@ -9691,30 +9787,109 @@
     palette.className = 'ep-hl-palette';
     document.body.appendChild(palette);
 
+    // p18k: 확장 팔레트 — 상단 모드 탭 + 색1/색2 + 투명도 + 미리보기 + 프리셋 저장
     function renderPalette(){
+      var spec = getLastHlSpec();
       var user = loadHlUserPresets();
-      var html = '<div class="hl-title">형광펜 색</div>';
+
+      var html = '<div class="hl-title">형광펜</div>';
+      // 모드
+      html += '<div class="hl-mode-row">'
+        + '<button type="button" class="hl-mode ' + (spec.mode==='solid'?'is-active':'') + '" data-hl-mode="solid">단색</button>'
+        + '<button type="button" class="hl-mode ' + (spec.mode==='gradient'?'is-active':'') + '" data-hl-mode="gradient">그라데이션</button>'
+        + '<button type="button" class="hl-mode ' + (spec.mode==='pattern'?'is-active':'') + '" data-hl-mode="pattern">패턴</button>'
+        + '</div>';
+
+      // 기본 그룹 색상 스와치
+      html += '<div class="hl-group-label">기본 색</div>';
       html += '<div class="hl-grid">';
-      // '없음' (해제) 스와치
-      html += '<div class="hl-sw is-none" data-hl="none" title="형광펜 없음"></div>';
+      html += '<div class="hl-sw is-none" data-hl-color="c1" data-hl-value="none" title="형광펜 해제"></div>';
       HL_PALETTE_BASIC.forEach(function(o){
-        html += '<div class="hl-sw" data-hl="' + o.c + '" title="' + o.name + '" style="background:' + o.c + '"></div>';
+        html += '<div class="hl-sw" data-hl-color="c1" data-hl-value="' + o.c + '" title="' + o.name + ' (색 1)" style="background:' + o.c + '"></div>';
       });
       html += '</div>';
+
+      // 그라데이션·패턴이면 색 2 선택 UI
+      if (spec.mode === 'gradient' || spec.mode === 'pattern') {
+        html += '<div class="hl-group-label">색 1 · 색 2 지정</div>';
+        html += '<div class="hl-slider-row">'
+          + '<span>색 1</span>'
+          + '<input type="color" data-hl-c1 value="' + toHex(spec.c1 || '#FFF176') + '" style="width:100%; height:22px; padding:0; border:1px solid rgba(15,58,58,0.35);">'
+          + '<span></span>'
+          + '</div>';
+        html += '<div class="hl-slider-row">'
+          + '<span>투명도 1</span>'
+          + '<input type="range" data-hl-a1 min="0" max="100" step="5" value="' + (spec.a1||100) + '">'
+          + '<span data-hl-a1-lbl>' + (spec.a1||100) + '%</span>'
+          + '</div>';
+        html += '<div class="hl-slider-row">'
+          + '<span>색 2</span>'
+          + '<input type="color" data-hl-c2 value="' + toHex(spec.c2 || '#F8BBD0') + '" style="width:100%; height:22px; padding:0; border:1px solid rgba(15,58,58,0.35);">'
+          + '<span></span>'
+          + '</div>';
+        html += '<div class="hl-slider-row">'
+          + '<span>투명도 2</span>'
+          + '<input type="range" data-hl-a2 min="0" max="100" step="5" value="' + (spec.a2||100) + '">'
+          + '<span data-hl-a2-lbl>' + (spec.a2||100) + '%</span>'
+          + '</div>';
+        if (spec.mode === 'gradient') {
+          html += '<div class="hl-slider-row">'
+            + '<span>각도</span>'
+            + '<input type="range" data-hl-angle min="0" max="360" step="15" value="' + (spec.angle||45) + '">'
+            + '<span data-hl-angle-lbl>' + (spec.angle||45) + '°</span>'
+            + '</div>';
+        }
+        if (spec.mode === 'pattern') {
+          html += '<div class="hl-group-label">패턴</div>';
+          html += '<div class="hl-group-row">'
+            + '<button type="button" class="hl-group ' + (spec.pattern==='dot'?'is-active':'') + '" data-hl-pattern="dot">도트</button>'
+            + '<button type="button" class="hl-group ' + (spec.pattern==='stripe'?'is-active':'') + '" data-hl-pattern="stripe">줄무늬</button>'
+            + '<button type="button" class="hl-group ' + (spec.pattern==='check'?'is-active':'') + '" data-hl-pattern="check">체크</button>'
+            + '</div>';
+          html += '<div class="hl-slider-row">'
+            + '<span>크기</span>'
+            + '<input type="range" data-hl-size min="4" max="40" step="1" value="' + (spec.size||10) + '">'
+            + '<span data-hl-size-lbl>' + (spec.size||10) + 'px</span>'
+            + '</div>';
+        }
+      } else {
+        // 단색 모드에서도 투명도 슬라이더 노출
+        html += '<div class="hl-slider-row">'
+          + '<span>투명도</span>'
+          + '<input type="range" data-hl-a1 min="0" max="100" step="5" value="' + (spec.a1||100) + '">'
+          + '<span data-hl-a1-lbl>' + (spec.a1||100) + '%</span>'
+          + '</div>';
+      }
+
+      // 미리보기
+      html += '<div class="hl-group-label">미리보기</div>';
+      html += '<div style="padding:0.5em 0.7em; border:1px dashed rgba(15,58,58,0.3); border-radius:2px; text-align:center;">'
+        + '<mark style="background:' + specToBackground(spec) + '; color:inherit; padding:0.15em 0.4em; border-radius:2px;">형광펜 예시 Aa 가나 123</mark>'
+        + '</div>';
+
+      // 적용 버튼
+      html += '<div class="hl-mode-row" style="margin-top:0.6em;">'
+        + '<button type="button" class="hl-mode is-active" data-hl-apply style="background:var(--point,#FF9A76); border-color:var(--point,#FF9A76);">이 형광펜 적용</button>'
+        + '</div>';
+
+      // 사용자 프리셋
       if (user.length) {
-        html += '<div class="hl-group-label">내 색</div>';
+        html += '<div class="hl-group-label">내 프리셋</div>';
         html += '<div class="hl-grid">';
         user.forEach(function(o, i){
-          html += '<div class="hl-sw" data-hl="' + o.c + '" title="' + (o.name || '') + '" style="background:' + o.c + '">'
+          var bg = o.spec ? specToBackground(o.spec) : ('#' === (o.c||'').charAt(0) ? o.c : (o.c || '#ccc'));
+          html += '<div class="hl-sw" data-hl-user="' + i + '" title="' + (o.name || '') + '" style="background:' + bg + '">'
             + '<button type="button" class="hl-del" data-hl-del="' + i + '" title="삭제">×</button>'
             + '</div>';
         });
         html += '</div>';
       }
+
+      // 현재 조합 저장
       html += '<div class="hl-add">'
-        + '<input type="color" data-hl-picker value="' + getLastHlColor() + '">'
-        + '<button type="button" data-hl-save>현재 색 저장</button>'
+        + '<button type="button" data-hl-save-spec>💾 현재 형광펜 저장</button>'
         + '</div>';
+
       palette.innerHTML = html;
     }
 
@@ -9745,8 +9920,11 @@
     }
 
     palette.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    // p18k: 통합 이벤트 처리 (모드 / 색1·2 / 투명도 / 패턴 / 사용자 프리셋)
     palette.addEventListener('click', function(e){
-      // 삭제
+      var spec = getLastHlSpec();
+
+      // 사용자 프리셋 삭제
       var del = e.target.closest('[data-hl-del]');
       if (del) {
         e.stopPropagation();
@@ -9757,33 +9935,128 @@
         renderPalette();
         return;
       }
-      // 스와치 (없음 포함)
-      var sw = e.target.closest('[data-hl]');
-      if (sw) {
-        var c = sw.getAttribute('data-hl');
-        applyHighlightColor(c === 'none' ? '' : c);
+      // 모드 전환
+      var modeBtn = e.target.closest('[data-hl-mode]');
+      if (modeBtn) {
+        spec.mode = modeBtn.getAttribute('data-hl-mode');
+        setLastHlSpec(spec);
+        renderPalette();
+        return;
+      }
+      // 색 1 스와치 (기본 색 그리드)
+      var swC1 = e.target.closest('[data-hl-color="c1"]');
+      if (swC1) {
+        var v = swC1.getAttribute('data-hl-value');
+        if (v === 'none') {
+          applyHighlightColor('');
+          palette.classList.remove('is-open');
+          updateBar();
+          return;
+        }
+        spec.c1 = v;
+        setLastHlSpec(spec);
+        // 단색 모드면 즉시 적용 후 닫기
+        if (spec.mode === 'solid') {
+          applyHighlightColor(spec);
+          palette.classList.remove('is-open');
+          updateBar();
+        } else {
+          renderPalette();
+        }
+        return;
+      }
+      // 패턴 종류
+      var patBtn = e.target.closest('[data-hl-pattern]');
+      if (patBtn) {
+        spec.pattern = patBtn.getAttribute('data-hl-pattern');
+        setLastHlSpec(spec);
+        renderPalette();
+        return;
+      }
+      // 사용자 프리셋 적용
+      var userBtn = e.target.closest('[data-hl-user]');
+      if (userBtn) {
+        var ui = parseInt(userBtn.getAttribute('data-hl-user'), 10);
+        var uL = loadHlUserPresets();
+        var uP = uL[ui];
+        if (uP) {
+          var uS = uP.spec || { mode:'solid', c1:uP.c || '#FFF176', a1:100 };
+          setLastHlSpec(uS);
+          applyHighlightColor(uS);
+          palette.classList.remove('is-open');
+          updateBar();
+        }
+        return;
+      }
+      // 현재 조합 저장
+      var saveSpec = e.target.closest('[data-hl-save-spec]');
+      if (saveSpec) {
+        var sList = loadHlUserPresets();
+        // openEditorDialog 로 이름·그룹 받음
+        openEditorDialog('형광펜 저장', [
+          { key:'name', label:'이름', default:'내 형광펜', placeholder:'예: 파스텔 노랑' }
+        ], function(vals){
+          if (!vals) return;
+          var nm = (vals.name || '').trim() || '내 형광펜';
+          sList.push({ name:nm, spec:JSON.parse(JSON.stringify(spec)) });
+          saveHlUserPresets(sList);
+          renderPalette();
+        });
+        return;
+      }
+      // 적용 버튼
+      var applyBtn = e.target.closest('[data-hl-apply]');
+      if (applyBtn) {
+        applyHighlightColor(spec);
         palette.classList.remove('is-open');
         updateBar();
         return;
       }
-      // 저장
-      var saveBtn = e.target.closest('[data-hl-save]');
-      if (saveBtn) {
-        var pk = palette.querySelector('[data-hl-picker]');
-        var c2 = pk ? pk.value : getLastHlColor();
-        var list2 = loadHlUserPresets();
-        list2.push({ name:'', c:c2 });
-        saveHlUserPresets(list2);
-        setLastHlColor(c2);
-        renderPalette();
+    });
+    // 슬라이더/픽커 실시간
+    palette.addEventListener('input', function(e){
+      var spec = getLastHlSpec();
+      var t = e.target;
+      if (t.hasAttribute && t.hasAttribute('data-hl-c1')) {
+        spec.c1 = t.value; setLastHlSpec(spec);
+        renderPalettePreviewOnly();
+        return;
+      }
+      if (t.hasAttribute && t.hasAttribute('data-hl-c2')) {
+        spec.c2 = t.value; setLastHlSpec(spec);
+        renderPalettePreviewOnly();
+        return;
+      }
+      if (t.hasAttribute && t.hasAttribute('data-hl-a1')) {
+        spec.a1 = parseInt(t.value,10); setLastHlSpec(spec);
+        var lbl = palette.querySelector('[data-hl-a1-lbl]'); if (lbl) lbl.textContent = spec.a1 + '%';
+        renderPalettePreviewOnly();
+        return;
+      }
+      if (t.hasAttribute && t.hasAttribute('data-hl-a2')) {
+        spec.a2 = parseInt(t.value,10); setLastHlSpec(spec);
+        var lbl2 = palette.querySelector('[data-hl-a2-lbl]'); if (lbl2) lbl2.textContent = spec.a2 + '%';
+        renderPalettePreviewOnly();
+        return;
+      }
+      if (t.hasAttribute && t.hasAttribute('data-hl-angle')) {
+        spec.angle = parseInt(t.value,10); setLastHlSpec(spec);
+        var lblA = palette.querySelector('[data-hl-angle-lbl]'); if (lblA) lblA.textContent = spec.angle + '°';
+        renderPalettePreviewOnly();
+        return;
+      }
+      if (t.hasAttribute && t.hasAttribute('data-hl-size')) {
+        spec.size = parseInt(t.value,10); setLastHlSpec(spec);
+        var lblS = palette.querySelector('[data-hl-size-lbl]'); if (lblS) lblS.textContent = spec.size + 'px';
+        renderPalettePreviewOnly();
         return;
       }
     });
-    palette.addEventListener('input', function(e){
-      if (e.target.hasAttribute && e.target.hasAttribute('data-hl-picker')) {
-        setLastHlColor(e.target.value);
-      }
-    });
+    function renderPalettePreviewOnly(){
+      var spec = getLastHlSpec();
+      var previewMark = palette.querySelector('mark');
+      if (previewMark) previewMark.style.background = specToBackground(spec);
+    }
 
     function updateBar(){
       var sel = window.getSelection();
@@ -9829,11 +10102,17 @@
       var cmd = btn.getAttribute('data-cmd');
       // 대부분의 커맨드는 range 복원 후 실행
       if (cmd === 'createLink') {
-        var url = prompt('링크 URL (비우면 링크 해제)', 'https://');
-        if (url === null) return;
-        restoreRange();
-        if (url === '') document.execCommand('unlink');
-        else document.execCommand('createLink', false, url);
+        // p18k: 사이트 톤 다이얼로 (prompt 제거)
+        saveRange();
+        openEditorDialog('링크', [
+          { key:'url', label:'링크 URL (비우면 링크 해제)', default:'https://', placeholder:'https://…' }
+        ], function(vals){
+          if (!vals) return;
+          restoreRange();
+          var u = (vals.url || '').trim();
+          if (!u || u === 'https://') document.execCommand('unlink');
+          else document.execCommand('createLink', false, u);
+        });
       } else if (cmd === 'open-presets') {
         // 프리셋 모달이 스스로 restoreRange 함
         openPresetModal();
@@ -9901,57 +10180,149 @@
   }
 
   function openPresetModal(){
-    var existing = document.querySelector('.ep-modal-backdrop.presets');
+    var existing = document.querySelector('.ep-popup.inline-presets');
     if (existing) existing.remove();
     var presets = loadPresets();
 
+    // p18k: 사이트 톤 팝업 (콜아웃/버튼/구분선과 동일한 구조)
     var backdrop = document.createElement('div');
-    backdrop.className = 'ep-modal-backdrop presets';
-    var modal = document.createElement('div');
-    modal.className = 'ep-modal wide';
-    backdrop.appendChild(modal);
+    backdrop.className = 'ep-preset-backdrop';
+    backdrop.style.cssText = 'position:fixed; inset:0; background:rgba(15,58,58,0.15); z-index:1004;';
     document.body.appendChild(backdrop);
 
-    function render(){
-      var html = '<h3>인라인 서식 프리셋</h3>';
-      var groups = Object.keys(presets);
-      if (groups.length === 0) groups = ['기본'];
-      groups.forEach(function(g){
-        html += '<div class="grp-title">\u25a2 ' + escapeHtml(g) + '</div>';
-        html += '<div class="preset-list">';
-        var items = presets[g] || [];
-        items.forEach(function(p, i){
-          html += '<button type="button" class="preset-item" data-group="' + escapeHtml(g) + '" data-idx="' + i + '">'
-            + '<span style="' + styleToCss(p) + '">' + escapeHtml(p.name || '(이름 없음)') + '</span>'
-            + '<span class="p-del" data-del="1" data-group="' + escapeHtml(g) + '" data-idx="' + i + '">\u00d7</span>'
-            + '</button>';
-        });
-        if (items.length === 0) html += '<span style="opacity:0.5;font-size:0.9em">— 비어있음 —</span>';
-        html += '</div>';
-      });
+    var popup = document.createElement('div');
+    popup.className = 'ep-popup inline-presets';
+    popup.style.width = '440px';
+    popup.style.top = '10vh';
+    popup.style.left = '50%';
+    popup.style.transform = 'translateX(-50%)';
+    // 탭 · 헤더 구조를 콜아웃 팝업과 맞춤
+    popup.innerHTML =
+        '<div class="ep-popup-header" id="ep-preset-drag">'
+      + '  <span>인라인 서식 프리셋</span>'
+      + '  <button type="button" class="ep-popup-close" data-close="1">×</button>'
+      + '</div>'
+      + '<div class="ep-popup-tabs">'
+      + '  <button type="button" class="ep-popup-tab is-active" data-preset-tab="list">프리셋</button>'
+      + '  <button type="button" class="ep-popup-tab" data-preset-tab="add">새로 만들기</button>'
+      + '</div>'
+      + '<div class="ep-popup-body" id="ep-preset-body"></div>';
+    document.body.appendChild(popup);
 
-      html += '<div class="grp-title">\u2295 새 프리셋 추가</div>';
-      html += '<div class="row"><label>이름</label><input type="text" id="pf-name" placeholder="예: 강조 노란배경"></div>';
-      html += '<div class="row"><label>그룹</label><input type="text" id="pf-group" placeholder="예: 강조 / 색상" value="기본"></div>';
-      html += '<div class="row"><label>글자색</label><div class="color-row"><input type="color" id="pf-color" value="#0F3A3A"><label><input type="checkbox" id="pf-color-none"> 사용 안 함</label></div></div>';
-      html += '<div class="row"><label>배경색</label><div class="color-row"><input type="color" id="pf-bg" value="#FFF59D"><label><input type="checkbox" id="pf-bg-none" checked> 사용 안 함</label></div></div>';
-      html += '<div class="row"><label>굵기</label><select id="pf-weight"><option value="">기본</option><option value="bold">볼드</option><option value="500">미디엄</option><option value="300">라이트</option></select></div>';
-      html += '<div class="row"><label>기울임</label><select id="pf-italic"><option value="">기본</option><option value="italic">이탤릭</option></select></div>';
-      html += '<div class="row"><label>장식</label><select id="pf-deco"><option value="">없음</option><option value="underline">밑줄</option><option value="line-through">취소선</option><option value="underline double">이중 밑줄</option></select></div>';
-      html += '<div class="row"><label>폰트</label><select id="pf-family"><option value="">기본 (Pretendard)</option><option value="\'Cafe24Danjunghae\',serif">카페단정해</option><option value="\'NanumURiDdarSonGeurSsi\',cursive">나눔손글씨</option><option value="\'Gowun Batang\',serif">고운바탕</option><option value="\'JetBrains Mono\',monospace">코드체</option></select></div>';
-      html += '<div class="row"><label>자간</label><select id="pf-tracking"><option value="">기본</option><option value="0.05em">넓게</option><option value="0.1em">더 넓게</option><option value="-0.02em">좁게</option></select></div>';
-      html += '<div class="preview" id="pf-preview">미리보기: 예시 텍스트</div>';
-      html += '<div class="ep-modal-actions">'
-        + '<button type="button" class="secondary" data-close="1">닫기</button>'
-        + '<button type="button" class="primary" data-add="1">+ 추가</button>'
-        + '</div>';
-      modal.innerHTML = html;
+    // 드래그 이동 (콜아웃 팝업의 setupPopupDrag 유사 구현 — 간이)
+    (function(){
+      var drag = popup.querySelector('#ep-preset-drag');
+      var isDown = false, startX=0, startY=0, origLeft=0, origTop=0;
+      drag.addEventListener('mousedown', function(e){
+        if (e.target.closest('button')) return;
+        isDown = true;
+        var r = popup.getBoundingClientRect();
+        popup.style.transform = 'none';
+        popup.style.left = r.left + 'px';
+        popup.style.top = r.top + 'px';
+        origLeft = r.left; origTop = r.top;
+        startX = e.clientX; startY = e.clientY;
+        document.body.style.userSelect = 'none';
+      });
+      document.addEventListener('mousemove', function(e){
+        if (!isDown) return;
+        popup.style.left = (origLeft + e.clientX - startX) + 'px';
+        popup.style.top  = (origTop  + e.clientY - startY) + 'px';
+      });
+      document.addEventListener('mouseup', function(){
+        isDown = false; document.body.style.userSelect = '';
+      });
+    })();
+
+    var activeTab = 'list';
+
+    function render(){
+      var body = popup.querySelector('#ep-preset-body');
+      var html = '';
+
+      if (activeTab === 'list') {
+        var groups = Object.keys(presets);
+        if (groups.length === 0) groups = ['기본'];
+        groups.forEach(function(g){
+          var items = presets[g] || [];
+          html += '<div class="row">'
+            + '<div class="row-label" style="display:flex; align-items:center; justify-content:space-between;">'
+            + '<span>' + escapeHtml(g) + '</span>'
+            + (g !== '기본' ? '<button type="button" class="pop-btn" data-group-del="' + escapeAttr(g) + '" style="padding:0.15em 0.5em; font-size:0.75em;">그룹 삭제</button>' : '')
+            + '</div>'
+            + '<div style="display:flex; flex-wrap:wrap; gap:0.35em;">';
+          items.forEach(function(p, i){
+            html += '<button type="button" class="pop-btn" data-group="' + escapeAttr(g) + '" data-idx="' + i + '" style="position:relative;">'
+              + '<span style="' + styleToCss(p) + '">' + escapeHtml(p.name || '(이름 없음)') + '</span>'
+              + '<span class="p-del" data-del="1" data-group="' + escapeAttr(g) + '" data-idx="' + i + '" style="margin-left:0.4em; opacity:0.4; font-size:0.85em;">×</span>'
+              + '</button>';
+          });
+          if (items.length === 0) html += '<span style="opacity:0.5; font-size:0.85em;">— 비어있음 —</span>';
+          html += '</div></div>';
+        });
+        html += '<div class="row" style="border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.7em; margin-top:0.7em;">'
+          + '<button type="button" class="pop-btn" data-preset-tab="add" style="width:100%; padding:0.5em;">+ 새 프리셋 만들기</button>'
+          + '</div>';
+      } else {
+        // add 탭
+        var grpKeys = Object.keys(presets);
+        if (grpKeys.length === 0) grpKeys = ['기본'];
+        html += '<div class="row"><div class="row-label">이름</div>'
+          + '<input type="text" id="pf-name" placeholder="예: 강조 노란배경"></div>';
+        html += '<div class="row"><div class="row-label">그룹</div>'
+          + '<select id="pf-group-sel" style="margin-bottom:6px;">';
+        grpKeys.forEach(function(g){
+          html += '<option value="' + escapeAttr(g) + '">' + escapeHtml(g) + '</option>';
+        });
+        html += '<option value="__new__">+ 새 그룹 만들기</option>';
+        html += '</select>';
+        html += '<input type="text" id="pf-group-new" placeholder="새 그룹 이름" style="display:none;">';
+        html += '</div>';
+        html += '<div class="row"><div class="row-label">글자색</div>'
+          + '<div style="display:flex; align-items:center; gap:0.5em;">'
+          + '<input type="color" id="pf-color" value="#0F3A3A">'
+          + '<label style="font-size:0.75em; opacity:0.7;"><input type="checkbox" id="pf-color-none"> 사용 안 함</label>'
+          + '</div></div>';
+        html += '<div class="row"><div class="row-label">배경색</div>'
+          + '<div style="display:flex; align-items:center; gap:0.5em;">'
+          + '<input type="color" id="pf-bg" value="#FFF59D">'
+          + '<label style="font-size:0.75em; opacity:0.7;"><input type="checkbox" id="pf-bg-none" checked> 사용 안 함</label>'
+          + '</div></div>';
+        html += '<div class="row"><div class="row-label">굵기</div>'
+          + '<select id="pf-weight"><option value="">기본</option><option value="bold">볼드</option><option value="500">미디엄</option><option value="300">라이트</option></select>'
+          + '</div>';
+        html += '<div class="row"><div class="row-label">기울임</div>'
+          + '<select id="pf-italic"><option value="">기본</option><option value="italic">이탤릭</option></select>'
+          + '</div>';
+        html += '<div class="row"><div class="row-label">장식</div>'
+          + '<select id="pf-deco"><option value="">없음</option><option value="underline">밑줄</option><option value="line-through">취소선</option><option value="underline double">이중 밑줄</option></select>'
+          + '</div>';
+        html += '<div class="row"><div class="row-label">폰트</div>'
+          + '<select id="pf-family"><option value="">기본 (Pretendard)</option><option value="\'Cafe24Danjunghae\',serif">카페단정해</option><option value="\'NanumURiDdarSonGeurSsi\',cursive">나눔손글씨</option><option value="\'Gowun Batang\',serif">고운바탕</option><option value="\'JetBrains Mono\',monospace">코드체</option></select>'
+          + '</div>';
+        html += '<div class="row"><div class="row-label">자간</div>'
+          + '<select id="pf-tracking"><option value="">기본</option><option value="0.05em">넓게</option><option value="0.1em">더 넓게</option><option value="-0.02em">좁게</option></select>'
+          + '</div>';
+        html += '<div class="row"><div class="row-label">미리보기</div>'
+          + '<div id="pf-preview" style="padding:0.6em 0.9em; border:1px dashed rgba(15,58,58,0.3); border-radius:2px;">예시 텍스트</div>'
+          + '</div>';
+        html += '<div class="row" style="display:flex; gap:0.5em; justify-content:flex-end;">'
+          + '<button type="button" class="pop-btn" data-preset-tab="list">취소</button>'
+          + '<button type="button" class="pop-btn is-active" data-add="1">+ 추가</button>'
+          + '</div>';
+      }
+
+      body.innerHTML = html;
+      // 탭 활성 상태
+      popup.querySelectorAll('.ep-popup-tab').forEach(function(tb){
+        tb.classList.toggle('is-active', tb.getAttribute('data-preset-tab') === activeTab);
+      });
       bindEvents();
     }
 
     function readForm(){
-      function v(id){ var el = modal.querySelector('#'+id); return el ? el.value : ''; }
-      function c(id){ var el = modal.querySelector('#'+id); return el && el.checked; }
+      function v(id){ var el = popup.querySelector('#'+id); return el ? el.value : ''; }
+      function c(id){ var el = popup.querySelector('#'+id); return el && el.checked; }
       return {
         name: v('pf-name').trim(),
         color: c('pf-color-none') ? '' : v('pf-color'),
@@ -9963,31 +10334,67 @@
         letterSpacing: v('pf-tracking')
       };
     }
+    function readGroupName(){
+      var sel = popup.querySelector('#pf-group-sel');
+      if (!sel) return '기본';
+      var g = sel.value;
+      if (g === '__new__') {
+        var nw = popup.querySelector('#pf-group-new');
+        return (nw && nw.value.trim()) || '기본';
+      }
+      return g || '기본';
+    }
 
     function bindEvents(){
       function updatePreview(){
         var p = readForm();
-        var prev = modal.querySelector('#pf-preview');
-        if (prev) prev.innerHTML = '미리보기: <span style="' + styleToCss(p) + '">' + escapeHtml(p.name || '예시 텍스트') + '</span>';
+        var prev = popup.querySelector('#pf-preview');
+        if (prev) prev.innerHTML = '<span style="' + styleToCss(p) + '">' + escapeHtml(p.name || '예시 텍스트') + '</span>';
       }
-      modal.querySelectorAll('input, select').forEach(function(el){
+      popup.querySelectorAll('input, select').forEach(function(el){
         el.addEventListener('input', updatePreview);
         el.addEventListener('change', updatePreview);
       });
+      // 그룹 select 변화 → 신규 입력 표시
+      var gSel = popup.querySelector('#pf-group-sel');
+      var gNew = popup.querySelector('#pf-group-new');
+      if (gSel && gNew) {
+        var toggle = function(){ gNew.style.display = (gSel.value === '__new__') ? 'block' : 'none'; };
+        gSel.addEventListener('change', toggle);
+        toggle();
+      }
       updatePreview();
     }
 
-    function close(){ backdrop.remove(); }
-    backdrop.addEventListener('click', function(e){ if (e.target === backdrop) close(); });
-    modal.addEventListener('click', function(e){
-      var item = e.target.closest('.preset-item');
-      if (item && !e.target.hasAttribute('data-del')) {
-        var g = item.getAttribute('data-group');
-        var i = parseInt(item.getAttribute('data-idx'), 10);
-        var p = presets[g] && presets[g][i];
-        if (p) { applyPreset(p); close(); }
+    function close(){ backdrop.remove(); popup.remove(); }
+    backdrop.addEventListener('click', close);
+    popup.addEventListener('click', function(e){
+      // 탭 전환
+      var tab = e.target.closest('[data-preset-tab]');
+      if (tab) {
+        activeTab = tab.getAttribute('data-preset-tab');
+        render();
         return;
       }
+      // 그룹 전체 삭제
+      var gdel = e.target.closest('[data-group-del]');
+      if (gdel) {
+        e.stopPropagation();
+        var gk = gdel.getAttribute('data-group-del');
+        openEditorConfirm(
+          '그룹 전체 삭제',
+          '"' + gk + '" 그룹의 모든 프리셋을 삭제할까요?\n이 작업은 되돌릴 수 없습니다.',
+          function(ok){
+            if (!ok) return;
+            delete presets[gk];
+            savePresetsAll(presets);
+            render();
+          },
+          { okLabel:'그룹 삭제', cancelLabel:'취소', danger:true }
+        );
+        return;
+      }
+      // 프리셋 개별 삭제
       if (e.target.hasAttribute('data-del')) {
         e.stopPropagation();
         var g2 = e.target.getAttribute('data-group');
@@ -9997,6 +10404,7 @@
           '이 프리셋을 삭제할까요?\n이 작업은 되돌릴 수 없습니다.',
           function(ok){
             if (!ok) return;
+            if (!presets[g2]) return;
             presets[g2].splice(i2, 1);
             if (presets[g2].length === 0 && g2 !== '기본') delete presets[g2];
             savePresetsAll(presets);
@@ -10006,16 +10414,31 @@
         );
         return;
       }
+      // 프리셋 클릭 → 적용
+      var item = e.target.closest('[data-group][data-idx]');
+      if (item) {
+        var g = item.getAttribute('data-group');
+        var i = parseInt(item.getAttribute('data-idx'), 10);
+        var p = presets[g] && presets[g][i];
+        if (p) { applyPreset(p); close(); }
+        return;
+      }
+      // + 추가
       if (e.target.hasAttribute('data-add')) {
-        var p = readForm();
-        if (!p.name) { alert('이름을 입력해주세요.'); return; }
-        var grp = modal.querySelector('#pf-group').value.trim() || '기본';
+        var p2 = readForm();
+        if (!p2.name) {
+          openEditorConfirm('이름 필요', '프리셋 이름을 입력해주세요.', function(){}, { okLabel:'확인', cancelLabel:null });
+          return;
+        }
+        var grp = readGroupName();
         if (!presets[grp]) presets[grp] = [];
-        presets[grp].push(p);
+        presets[grp].push(p2);
         savePresetsAll(presets);
+        activeTab = 'list';
         render();
         return;
       }
+      // 닫기 (× 버튼)
       if (e.target.hasAttribute('data-close')) { close(); return; }
     });
 
