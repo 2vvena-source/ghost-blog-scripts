@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p18h';
+  var VERSION = 'v2.0-β-p18i';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2983,10 +2983,16 @@
         + '</div>';
       html += renderColorSection('icon', iconColor);
 
-      // p13b: 아이콘 투명도 + 컷아웃
+      // p18i: 아이콘 색상 자체 알파 (rgba 알파)
+      var iconColorAlpha = box.getAttribute('data-icon-color-alpha') || '100';
+      html += '<div class="row"><div class="row-label">색상 투명도 (' + iconColorAlpha + '%) <span style="font-size:0.7em; opacity:0.55;">— 도형 색만 반투명</span></div>'
+        + '<input type="range" id="pop-icon-color-alpha" min="0" max="100" step="5" value="' + iconColorAlpha + '" style="width:100%;">'
+        + '</div>';
+
+      // p13b: 아이콘 요소 투명도 (아이콘 전체 opacity — 색+테두리 다 포함)
       var iconOpacity = box.getAttribute('data-icon-opacity') || '100';
       var iconCutout = box.getAttribute('data-icon-cutout') === '1';
-      html += '<div class="row"><div class="row-label">아이콘 투명도 (' + iconOpacity + '%)</div>'
+      html += '<div class="row"><div class="row-label">전체 투명도 (' + iconOpacity + '%) <span style="font-size:0.7em; opacity:0.55;">— 아이콘 요소 전체</span></div>'
         + '<input type="range" id="pop-icon-opacity" min="0" max="100" step="5" value="' + iconOpacity + '" style="width:100%;">'
         + '</div>';
       html += '<div class="row"><div class="row-label">컷아웃 (뒤가 뚫림)</div>'
@@ -3348,6 +3354,11 @@
       var curColor = box.style.color || '#0F3A3A';
       // p12.2: 배경과 동일한 색상 섹션 (그룹+프리셋+직접+저장)
       html += renderColorSection('text', curColor);
+      // p18i: 글자 색상 자체 알파
+      var textColorAlpha = box.getAttribute('data-text-color-alpha') || '100';
+      html += '<div class="row"><div class="row-label">글자색 투명도 (' + textColorAlpha + '%)</div>'
+        + '<input type="range" id="pop-text-color-alpha" min="0" max="100" step="5" value="' + textColorAlpha + '" style="width:100%;">'
+        + '</div>';
     }
 
     html += '<div class="row"><div class="row-label">폰트</div>'
@@ -3761,6 +3772,45 @@
         applyBorderToBox(box);
         var lbl2 = t.parentNode.querySelector('.row-label');
         if (lbl2) lbl2.textContent = '투명도 (' + bop + '%)';
+        return;
+      }
+      // p18i: 아이콘 색상 자체 알파 → data-icon-color 를 rgba 로 재조립
+      if (t.id === 'pop-icon-color-alpha') {
+        var iAlpha = parseInt(t.value, 10);
+        box.setAttribute('data-icon-color-alpha', String(iAlpha));
+        var iCur = box.getAttribute('data-icon-color') || '#0F3A3A';
+        var iRgb = parseRgb(iCur) || parseRgb(toHex(iCur));
+        if (iRgb) {
+          var iRgba = 'rgba(' + iRgb.r + ',' + iRgb.g + ',' + iRgb.b + ',' + (iAlpha/100) + ')';
+          box.setAttribute('data-icon-color', iRgba);
+          var iconElA = box.querySelector('.callout-icon');
+          if (iconElA) {
+            if (iconElA.classList.contains('is-shape')) {
+              iconElA.style.setProperty('--icon-color', iRgba);
+              if (typeof updateShapeSpanStyle === 'function') updateShapeSpanStyle(iconElA);
+            } else {
+              iconElA.style.color = iRgba;
+            }
+          }
+        }
+        var lblIA = t.parentNode.querySelector('.row-label');
+        if (lblIA) lblIA.innerHTML = '색상 투명도 (' + iAlpha + '%) <span style="font-size:0.7em; opacity:0.55;">— 도형 색만 반투명</span>';
+        return;
+      }
+      // p18i: 텍스트 색상 자체 알파
+      if (t.id === 'pop-text-color-alpha') {
+        var tAlpha = parseInt(t.value, 10);
+        box.setAttribute('data-text-color-alpha', String(tAlpha));
+        var tCur = box.getAttribute('data-text-hex') || box.style.color || '#0F3A3A';
+        var tRgb = parseRgb(tCur) || parseRgb(toHex(tCur));
+        if (tRgb) {
+          var tRgba = 'rgba(' + tRgb.r + ',' + tRgb.g + ',' + tRgb.b + ',' + (tAlpha/100) + ')';
+          box.style.color = tRgba;
+          var bodyElA = box.querySelector('.callout-body');
+          if (bodyElA) bodyElA.style.color = tRgba;
+        }
+        var lblTA = t.parentNode.querySelector('.row-label');
+        if (lblTA) lblTA.textContent = '글자색 투명도 (' + tAlpha + '%)';
         return;
       }
       // p13b: 아이콘 투명도
@@ -4644,6 +4694,329 @@
     var img = iconEl.querySelector('img');
     if (img) img.remove();
   }
+
+  // ══════════════════════════════════════════════════════════
+  //  p18i: 텍스트 서식 플로팅 툴바
+  //  콜아웃 body(.callout-body) 안에서 셀렉션이 생기면 상단에 툴바 표시
+  //  - B / I / U / S / X² / X₂ (execCommand)
+  //  - 방점 토글 · 하이라이트 · 링크
+  // ══════════════════════════════════════════════════════════
+  var textToolbarEl = null;
+  var textToolbarRange = null;
+
+  function ensureTextToolbar(){
+    if (textToolbarEl) return textToolbarEl;
+    var bar = document.createElement('div');
+    bar.className = 'ep-text-toolbar';
+    bar.setAttribute('contenteditable', 'false');
+    bar.style.cssText = 'position:absolute; z-index:9999; display:none; background:#0F3A3A; color:#fff; padding:4px 6px; border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,0.25); font-size:13px; gap:2px; align-items:center; white-space:nowrap; user-select:none;';
+    bar.innerHTML =
+        '<button type="button" data-tt="bold" title="굵게" style="background:none; border:none; color:#fff; padding:4px 8px; cursor:pointer; font-weight:800; font-family:serif;">B</button>'
+      + '<button type="button" data-tt="italic" title="기울임" style="background:none; border:none; color:#fff; padding:4px 8px; cursor:pointer; font-style:italic; font-family:serif;">I</button>'
+      + '<button type="button" data-tt="underline" title="밑줄" style="background:none; border:none; color:#fff; padding:4px 8px; cursor:pointer; text-decoration:underline;">U</button>'
+      + '<button type="button" data-tt="strike" title="취소선" style="background:none; border:none; color:#fff; padding:4px 8px; cursor:pointer; text-decoration:line-through;">S</button>'
+      + '<button type="button" data-tt="sup" title="위첨자" style="background:none; border:none; color:#fff; padding:4px 6px; cursor:pointer; font-size:11px;">X<sup>2</sup></button>'
+      + '<button type="button" data-tt="sub" title="아래첨자" style="background:none; border:none; color:#fff; padding:4px 6px; cursor:pointer; font-size:11px;">X<sub>2</sub></button>'
+      + '<span style="width:1px; height:16px; background:rgba(255,255,255,0.25); margin:0 4px;"></span>'
+      + '<button type="button" data-tt="emphasis" title="방점(강조점)" style="background:none; border:none; color:#fff; padding:4px 6px; cursor:pointer; font-size:11px;">•̇A</button>'
+      + '<button type="button" data-tt="highlight" title="하이라이트(형광펜)" style="background:none; border:none; color:#fff; padding:4px 6px; cursor:pointer;">🖍️</button>'
+      + '<button type="button" data-tt="highlight-color" title="하이라이트 색 선택" style="background:none; border:none; color:#fff; padding:4px 4px; cursor:pointer; position:relative;">'
+          + '<span data-hl-swatch style="display:inline-block; width:14px; height:14px; background:#FFF176; border:1px solid rgba(255,255,255,0.4); border-radius:2px; vertical-align:middle;"></span>'
+          + '<span style="font-size:9px; margin-left:2px;">▾</span>'
+      + '</button>'
+      + '<button type="button" data-tt="link" title="링크 삽입" style="background:none; border:none; color:#fff; padding:4px 8px; cursor:pointer;">🔗</button>'
+      + '<button type="button" data-tt="clear" title="서식 지우기" style="background:none; border:none; color:#fff; padding:4px 6px; cursor:pointer; font-size:11px;">✕서식</button>';
+    document.body.appendChild(bar);
+
+    // 하이라이트 색상 팝오버 (그룹 지원 - 배경 프리셋 재사용)
+    var pop = document.createElement('div');
+    pop.className = 'ep-hl-popover';
+    pop.setAttribute('contenteditable', 'false');
+    pop.style.cssText = 'position:absolute; z-index:10000; display:none; background:#fff; color:#0F3A3A; padding:8px; border-radius:6px; box-shadow:0 6px 20px rgba(0,0,0,0.2); font-size:12px; min-width:200px;';
+    document.body.appendChild(pop);
+    bar._hlPop = pop;
+
+    // 클릭 처리
+    bar.addEventListener('mousedown', function(e){
+      // 클릭 전 셀렉션 유지
+      var sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) textToolbarRange = sel.getRangeAt(0).cloneRange();
+    });
+    bar.addEventListener('click', function(e){
+      var btn = e.target.closest('[data-tt]');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // 선택 복원
+      if (textToolbarRange) {
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(textToolbarRange);
+      }
+      var cmd = btn.getAttribute('data-tt');
+      handleTextToolbarCommand(cmd, btn);
+    });
+    // 하이라이트 팝오버 클릭
+    pop.addEventListener('mousedown', function(e){
+      var sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) textToolbarRange = sel.getRangeAt(0).cloneRange();
+    });
+    pop.addEventListener('click', function(e){
+      var sw = e.target.closest('[data-hl-color]');
+      if (!sw) return;
+      e.preventDefault(); e.stopPropagation();
+      var color = sw.getAttribute('data-hl-color');
+      if (textToolbarRange) {
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(textToolbarRange);
+      }
+      applyHighlight(color);
+      // 스와치 업데이트
+      var swMain = bar.querySelector('[data-hl-swatch]');
+      if (swMain) swMain.style.background = color;
+      pop.style.display = 'none';
+    });
+
+    textToolbarEl = bar;
+    return bar;
+  }
+
+  function handleTextToolbarCommand(cmd, btn){
+    var body = getCurrentEditableBody();
+    if (!body) return;
+    if (cmd === 'bold') document.execCommand('bold');
+    else if (cmd === 'italic') document.execCommand('italic');
+    else if (cmd === 'underline') document.execCommand('underline');
+    else if (cmd === 'strike') document.execCommand('strikeThrough');
+    else if (cmd === 'sup') document.execCommand('superscript');
+    else if (cmd === 'sub') document.execCommand('subscript');
+    else if (cmd === 'emphasis') toggleEmphasis();
+    else if (cmd === 'highlight') applyHighlight(getCurrentHighlightColor());
+    else if (cmd === 'highlight-color') openHighlightPopover(btn);
+    else if (cmd === 'link') insertLink();
+    else if (cmd === 'clear') document.execCommand('removeFormat');
+    // 셀렉션 유지 & 툴바 위치 재계산
+    updateTextToolbarPosition();
+  }
+
+  function getCurrentEditableBody(){
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    var node = sel.anchorNode;
+    if (!node) return null;
+    var el = node.nodeType === 1 ? node : node.parentElement;
+    if (!el) return null;
+    return el.closest('.callout-body, [contenteditable="true"]');
+  }
+
+  function toggleEmphasis(){
+    // 선택 범위를 <span class="ep-emphasis"> 로 감싸거나 해제
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    var range = sel.getRangeAt(0);
+    // 이미 emphasis span 안이면 해제
+    var container = range.commonAncestorContainer;
+    var el = container.nodeType === 1 ? container : container.parentElement;
+    var wrap = el && el.closest('.ep-emphasis');
+    if (wrap) {
+      // 언랩
+      var parent = wrap.parentNode;
+      while (wrap.firstChild) parent.insertBefore(wrap.firstChild, wrap);
+      parent.removeChild(wrap);
+      return;
+    }
+    var span = document.createElement('span');
+    span.className = 'ep-emphasis';
+    span.style.cssText = 'text-emphasis: dot; -webkit-text-emphasis: dot; text-emphasis-position: over; -webkit-text-emphasis-position: over;';
+    try {
+      span.appendChild(range.extractContents());
+      range.insertNode(span);
+      // 선택 유지
+      sel.removeAllRanges();
+      var newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      sel.addRange(newRange);
+    } catch(err){ console.warn('[p18i] emphasis error', err); }
+  }
+
+  function getCurrentHighlightColor(){
+    try {
+      var stored = GM_getValue('text_hl_last_color', '#FFF176');
+      return stored || '#FFF176';
+    } catch(_){ return '#FFF176'; }
+  }
+  function setCurrentHighlightColor(c){
+    try { GM_setValue('text_hl_last_color', c); } catch(_){}
+  }
+
+  function applyHighlight(color){
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    setCurrentHighlightColor(color);
+    // 이미 mark 안이면 색만 갱신
+    var range = sel.getRangeAt(0);
+    var container = range.commonAncestorContainer;
+    var el = container.nodeType === 1 ? container : container.parentElement;
+    var mark = el && el.closest('mark');
+    if (mark) {
+      mark.style.backgroundColor = color;
+      return;
+    }
+    // 새로 감싸기
+    var m = document.createElement('mark');
+    m.style.backgroundColor = color;
+    m.style.color = 'inherit';
+    try {
+      m.appendChild(range.extractContents());
+      range.insertNode(m);
+      sel.removeAllRanges();
+      var nr = document.createRange();
+      nr.selectNodeContents(m);
+      sel.addRange(nr);
+    } catch(err){ console.warn('[p18i] highlight error', err); }
+  }
+
+  var HL_COLORS_BASIC = [
+    { name:'노랑', c:'#FFF176' }, { name:'분홍', c:'#F8BBD0' },
+    { name:'하늘', c:'#B3E5FC' }, { name:'연두', c:'#DCEDC8' },
+    { name:'주황', c:'#FFCCBC' }, { name:'라벤더', c:'#D1C4E9' },
+    { name:'회색', c:'#EEEEEE' }, { name:'복숭아', c:'#FFE0B2' }
+  ];
+
+  function openHighlightPopover(btn){
+    var bar = textToolbarEl;
+    if (!bar) return;
+    var pop = bar._hlPop;
+    // 사용자 프리셋 로드
+    var userHL = [];
+    try {
+      var raw = GM_getValue('text_hl_presets', '[]');
+      userHL = JSON.parse(raw) || [];
+    } catch(_){}
+    var html = '<div style="font-weight:600; margin-bottom:6px;">하이라이트 색</div>'
+      + '<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">';
+    HL_COLORS_BASIC.forEach(function(o){
+      html += '<button type="button" data-hl-color="' + o.c + '" title="' + o.name + '" style="width:100%; aspect-ratio:1; background:' + o.c + '; border:1px solid rgba(0,0,0,0.1); border-radius:4px; cursor:pointer;"></button>';
+    });
+    html += '</div>';
+    if (userHL.length) {
+      html += '<div style="font-weight:600; margin-top:8px; margin-bottom:4px; font-size:11px; opacity:0.7;">내 프리셋</div>'
+        + '<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">';
+      userHL.forEach(function(o, i){
+        html += '<button type="button" data-hl-color="' + o.c + '" title="' + (o.name||'') + '" style="width:100%; aspect-ratio:1; background:' + o.c + '; border:1px solid rgba(0,0,0,0.1); border-radius:4px; cursor:pointer; position:relative;">'
+          + '<button type="button" data-hl-del="' + i + '" title="삭제" style="position:absolute; top:-4px; right:-4px; width:14px; height:14px; border-radius:50%; background:#000; color:#fff; border:none; font-size:9px; cursor:pointer; line-height:12px; padding:0;">×</button>'
+          + '</button>';
+      });
+      html += '</div>';
+    }
+    html += '<div style="margin-top:8px; display:flex; gap:4px; align-items:center;">'
+      + '<input type="color" data-hl-picker value="' + getCurrentHighlightColor() + '" style="flex:0 0 30px; height:26px; padding:0; border:1px solid #ddd;">'
+      + '<button type="button" data-hl-save style="flex:1; padding:4px 8px; font-size:11px; background:#0F3A3A; color:#fff; border:none; border-radius:4px; cursor:pointer;">현재 색 저장</button>'
+      + '</div>';
+    pop.innerHTML = html;
+
+    // 사용자 프리셋 삭제 · 저장 이벤트
+    pop.querySelectorAll('[data-hl-del]').forEach(function(delBtn){
+      delBtn.addEventListener('click', function(e){
+        e.preventDefault(); e.stopPropagation();
+        var i = parseInt(delBtn.getAttribute('data-hl-del'), 10);
+        var list = [];
+        try { list = JSON.parse(GM_getValue('text_hl_presets', '[]')) || []; } catch(_){}
+        list.splice(i, 1);
+        try { GM_setValue('text_hl_presets', JSON.stringify(list)); } catch(_){}
+        openHighlightPopover(btn); // 재렌더
+      });
+    });
+    var saveBtn = pop.querySelector('[data-hl-save]');
+    var pickerEl = pop.querySelector('[data-hl-picker]');
+    if (pickerEl) {
+      pickerEl.addEventListener('input', function(){ setCurrentHighlightColor(pickerEl.value); });
+    }
+    if (saveBtn) {
+      saveBtn.addEventListener('click', function(e){
+        e.preventDefault(); e.stopPropagation();
+        var c = pickerEl ? pickerEl.value : getCurrentHighlightColor();
+        var list = [];
+        try { list = JSON.parse(GM_getValue('text_hl_presets', '[]')) || []; } catch(_){}
+        list.push({ name:'', c:c });
+        try { GM_setValue('text_hl_presets', JSON.stringify(list)); } catch(_){}
+        openHighlightPopover(btn);
+      });
+    }
+
+    // 위치
+    var r = btn.getBoundingClientRect();
+    pop.style.display = 'block';
+    pop.style.left = (r.left + window.pageXOffset) + 'px';
+    pop.style.top = (r.bottom + window.pageYOffset + 6) + 'px';
+
+    // 팝오버 밖 클릭 시 닫기
+    setTimeout(function(){
+      var closer = function(ev){
+        if (pop.contains(ev.target) || btn.contains(ev.target)) return;
+        pop.style.display = 'none';
+        document.removeEventListener('mousedown', closer, true);
+      };
+      document.addEventListener('mousedown', closer, true);
+    }, 0);
+  }
+
+  function insertLink(){
+    var url = prompt('링크 URL을 입력하세요 (비우면 링크 해제)', '');
+    if (url === null) return;
+    if (url === '') {
+      document.execCommand('unlink');
+    } else {
+      document.execCommand('createLink', false, url);
+    }
+  }
+
+  function updateTextToolbarPosition(){
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      if (textToolbarEl) textToolbarEl.style.display = 'none';
+      return;
+    }
+    var body = getCurrentEditableBody();
+    // 콜아웃 body 안에서만 표시
+    if (!body || !body.classList.contains('callout-body')) {
+      if (textToolbarEl) textToolbarEl.style.display = 'none';
+      return;
+    }
+    var range = sel.getRangeAt(0);
+    var rect = range.getBoundingClientRect();
+    if (!rect || (rect.width === 0 && rect.height === 0)) return;
+    var bar = ensureTextToolbar();
+    bar.style.display = 'flex';
+    // 위치: 셀렉션 위, 화면 좌표 → 문서 좌표
+    var top = rect.top + window.pageYOffset - bar.offsetHeight - 8;
+    var left = rect.left + window.pageXOffset + (rect.width / 2) - (bar.offsetWidth / 2);
+    // 뷰포트 위로 넘어가면 아래에 붙임
+    if (top < window.pageYOffset + 4) {
+      top = rect.bottom + window.pageYOffset + 8;
+    }
+    // 좌우 클램프
+    var maxLeft = document.documentElement.clientWidth - bar.offsetWidth - 8;
+    if (left < 8) left = 8;
+    if (left > maxLeft) left = maxLeft;
+    bar.style.top = top + 'px';
+    bar.style.left = left + 'px';
+    // 스와치 최신화
+    var sw = bar.querySelector('[data-hl-swatch]');
+    if (sw) sw.style.background = getCurrentHighlightColor();
+  }
+
+  // 셀렉션 변경 감지
+  document.addEventListener('selectionchange', function(){
+    // 툴바나 팝오버 내부 조작 중에는 숨기지 않기
+    var active = document.activeElement;
+    if (textToolbarEl && (textToolbarEl.contains(active) || (textToolbarEl._hlPop && textToolbarEl._hlPop.contains(active)))) return;
+    updateTextToolbarPosition();
+  });
+  // 창 크기 바뀌면 재배치
+  window.addEventListener('scroll', function(){ if (textToolbarEl && textToolbarEl.style.display !== 'none') updateTextToolbarPosition(); }, true);
+  window.addEventListener('resize', function(){ if (textToolbarEl && textToolbarEl.style.display !== 'none') updateTextToolbarPosition(); });
 
   // p11: 노션식 - 편집기 빈 영역 클릭 시 마지막 블록 뒤에 새 p 생성 후 포커스
   function setupBlankClickCreate(){
