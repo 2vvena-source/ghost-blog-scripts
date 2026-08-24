@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p20d
+ * 2vvena Editor Core - v2.0-β-p20e
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -1940,9 +1940,46 @@
   }
 
 
+  // p20e: 블록 컨테이너 공용 시스템
+  //   콜아웃 body 에 data-block-container="true" 마커를 붙이면
+  //   → 슬래시 명령 / 드래그드랍 / 향후 접은글도 동일하게 처리.
+  //   이 함수 하나만 업데이트하면 새 컨테이너 타입 추가 시 여기만 손보면 됨.
+  function _markBlockContainers(root){
+    if (!root) return;
+    try {
+      // 콜아웃 body
+      var bodies = root.querySelectorAll('.callout-body');
+      bodies.forEach(function(b){
+        if (b.getAttribute('data-block-container') !== 'true'){
+          b.setAttribute('data-block-container', 'true');
+        }
+        if (b.getAttribute('contenteditable') !== 'true'){
+          b.setAttribute('contenteditable', 'true');
+        }
+      });
+      // 향후 접은글 등: '.collapse-body' 같은 새 컬래스도 여기서 붙입었음.
+    } catch(_){}
+  }
+
+  // p20e: 특수블록(구분선/버튼 등) 의 block-handle 에 draggable=true 보장
+  //   기존에 draggable 속성이 설정 안 되어있던 구버전 복원용.
+  function _ensureHandleDraggable(root){
+    if (!root) return;
+    try {
+      root.querySelectorAll('.editor-block .block-handle').forEach(function(h){
+        if (h.getAttribute('draggable') !== 'true'){
+          h.setAttribute('draggable', 'true');
+        }
+      });
+    } catch(_){}
+  }
+
   // p13i: 편집기 안 모든 콜아웃을 전수 검사·보정
   function fixupAllCallouts(){
     if (!contentEl) return;
+    // p20e: 컨테이너 마커 + handle draggable 보장
+    _markBlockContainers(contentEl);
+    _ensureHandleDraggable(contentEl);
     var boxes = contentEl.querySelectorAll('.callout-box');
     var fixed = 0;
     boxes.forEach(function(box){
@@ -2402,12 +2439,24 @@
     }, true);
   }
 
+  // p20e: 드래그드랍을 컨테이너(콜아웃 body 등) 안에도 넣을 수 있도록 개편.
+  //   대상 target 은 (1) 다른 editor-block, 혹은 (2) 빈 컨테이너 자체.
+  //   drop 시자신 또는 본인을 담고 있는 상위 블록으로는 이동 불가 (순환 방지).
   function setupBlockDragOrder(){
     var dragged = null;
 
+    function _clearDropClasses(){
+      contentEl.querySelectorAll('.editor-block.drop-before, .editor-block.drop-after').forEach(function(b){
+        b.classList.remove('drop-before','drop-after');
+      });
+      contentEl.querySelectorAll('[data-block-container="true"].drop-into').forEach(function(c){
+        c.classList.remove('drop-into');
+      });
+    }
+
     contentEl.addEventListener('dragstart', function(e){
       var handle = e.target.closest('.block-handle');
-      if (!handle) { e.preventDefault(); return; }
+      if (!handle) return; // preventDefault 하지 않음 — 다른 드래그(예: 이미지 파일)을 방해하지 않게
       dragged = handle.closest('.editor-block');
       if (!dragged) return;
       dragged.classList.add('is-dragging');
@@ -2417,35 +2466,72 @@
 
     contentEl.addEventListener('dragend', function(){
       if (dragged) dragged.classList.remove('is-dragging');
-      contentEl.querySelectorAll('.editor-block').forEach(function(b){
-        b.classList.remove('drop-before','drop-after');
-      });
+      _clearDropClasses();
       dragged = null;
     });
 
+    // 순환 방지: dragged 안에 target 이 있으면 이동 불가 (본인이 본인 안으로 들어가면 사라짐)
+    function _canDropInto(container){
+      if (!container || !dragged) return false;
+      if (dragged === container) return false;
+      if (dragged.contains(container)) return false;
+      return true;
+    }
+
     contentEl.addEventListener('dragover', function(e){
       if (!dragged) return;
-      e.preventDefault();
-      var target = e.target.closest('.editor-block');
-      if (!target || target === dragged) return;
-      var rect = target.getBoundingClientRect();
-      var above = e.clientY < rect.top + rect.height / 2;
-      contentEl.querySelectorAll('.editor-block').forEach(function(b){
-        b.classList.remove('drop-before','drop-after');
-      });
-      target.classList.add(above ? 'drop-before' : 'drop-after');
+      var target = e.target.closest ? e.target.closest('.editor-block') : null;
+      var container = e.target.closest ? e.target.closest('[data-block-container="true"]') : null;
+      // target 이 dragged 자신 이면 무시
+      if (target === dragged) target = null;
+      // target 이 없고 컨테이너만 있으면 컨테이너 마지막에 삽입 모드
+      if (target || container){
+        e.preventDefault();
+      } else {
+        return;
+      }
+      _clearDropClasses();
+      if (target){
+        var rect = target.getBoundingClientRect();
+        var above = e.clientY < rect.top + rect.height / 2;
+        target.classList.add(above ? 'drop-before' : 'drop-after');
+      } else if (container && _canDropInto(container)){
+        container.classList.add('drop-into');
+      }
     });
 
     contentEl.addEventListener('drop', function(e){
       if (!dragged) return;
       e.preventDefault();
-      var target = e.target.closest('.editor-block');
-      if (!target || target === dragged) return;
-      var rect = target.getBoundingClientRect();
-      var above = e.clientY < rect.top + rect.height / 2;
-      if (above) target.parentNode.insertBefore(dragged, target);
-      else target.parentNode.insertBefore(dragged, target.nextSibling);
+      var target = e.target.closest ? e.target.closest('.editor-block') : null;
+      var container = e.target.closest ? e.target.closest('[data-block-container="true"]') : null;
+      if (target === dragged) target = null;
+      _clearDropClasses();
+
+      if (target){
+        // 순환 방지
+        if (dragged.contains(target)) return;
+        var rect = target.getBoundingClientRect();
+        var above = e.clientY < rect.top + rect.height / 2;
+        if (above) target.parentNode.insertBefore(dragged, target);
+        else target.parentNode.insertBefore(dragged, target.nextSibling);
+      } else if (container && _canDropInto(container)){
+        // 컨테이너 안 마지막에 append
+        // 이 때 컨테이너가 <br> 만 가지고 있으면 정리
+        try {
+          var onlyBr = container.childNodes.length === 1 && container.firstChild && container.firstChild.tagName === 'BR';
+          if (onlyBr) container.removeChild(container.firstChild);
+        } catch(_){}
+        container.appendChild(dragged);
+      }
     });
+
+    // drop-into 시각화 CSS 뒱롑이감 — 기존 CSS 뒤에 추가
+    try {
+      var _st = document.createElement('style');
+      _st.textContent = '[data-block-container="true"].drop-into { outline: 2px dashed var(--point, #FF9A76); outline-offset: -2px; background: rgba(255,154,118,0.06); }';
+      document.head.appendChild(_st);
+    } catch(_){}
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -2708,6 +2794,9 @@
     var bodyEl = document.createElement('div');
     bodyEl.className = 'callout-body';
     bodyEl.setAttribute('contenteditable', 'true');
+    // p20e: 블록 컨테이너 마커 — 드래그드랍 · 슬래시 명령이 이걸 인식해 안으로 삽입함.
+    //   나중 접은글 등 다른 컨테이너도 이 마커 붙이면 자동 지원.
+    bodyEl.setAttribute('data-block-container', 'true');
     bodyEl.innerHTML = '<br>';
 
     box.appendChild(iconEl);
@@ -3069,10 +3158,26 @@
     ];
   }
 
-  function openSlashMenu(block, range){
+  // p20e: 콜아웃 body 감지 — 컨테이너 시스템으로 확장
+  //   editable 이 카당하는 컨테이너(현재 콜아웃 body · 추후 접은글 body 등)를 찾아서 반환.
+  //   없으면 null.
+  function _detectSlashContainer(editable){
+    if (!editable) return null;
+    // editable 자체가 컨테이너이면 그것을 반환
+    if (editable.getAttribute && editable.getAttribute('data-block-container') === 'true') return editable;
+    // 또는 callout-body 자체 (과거 콘텐츠 호환성 — data-block-container 없는 오래된 저장 HTML)
+    if (editable.classList && editable.classList.contains('callout-body')) return editable;
+    // 이웃에서 가장 가까운 컨테이너 찾기 (예: <p contenteditable="true"> 이면 이게 자식이고 body가 부모)
+    var cont = editable.closest ? editable.closest('[data-block-container="true"], .callout-body') : null;
+    return cont || null;
+  }
+
+  function openSlashMenu(block, range, editable){
     closeSlashMenu();
     slashOriginBlock = block;
     slashOriginRange = range;
+    slashOriginEditable = editable || null;
+    slashInCalloutBody = _detectSlashContainer(editable || block);
     slashCommands = getSlashCommands();
     slashActiveIdx = 0;
 
@@ -3136,24 +3241,36 @@
   }
 
   function executeSlash(cmd){
-    // p11.2: originBlock을 지역변수로 저장 (closeSlashMenu가 null로 리셋하기 전)
+    // p20e: slashInCalloutBody / slashOriginEditable 을 exec 이후까지 유지해야
+    //       각 slash 커맨드의 exec() 가 연쒰다. 따라서 closeSlashMenu 를 부른 따로이지 않고,
+    //       DOM 삭제만 먼저 하고 exec 끝난 뒤에 상태 리셋.
     var originBlock = slashOriginBlock;
+    var originEditable = slashOriginEditable;
 
-    // 슬래시 입력 텍스트 지우기
-    if (originBlock) {
-      try {
-        var editable = originBlock.querySelector('[contenteditable="true"]');
-        if (editable) {
-          var text = editable.textContent || '';
-          var slashIdx = text.lastIndexOf('/');
-          if (slashIdx >= 0) {
-            editable.textContent = text.substring(0, slashIdx);
-          }
+    // 슬래시 입력 텍스트 지우기 — 먼저 저장해둔 slashOriginEditable 에서 지우고,
+    //   그게 없으면 fallback 으로 originBlock.querySelector 
+    try {
+      var ed = originEditable || (originBlock && originBlock.querySelector ? originBlock.querySelector('[contenteditable="true"]') : null);
+      if (ed) {
+        var text = ed.textContent || '';
+        var slashIdx = text.lastIndexOf('/');
+        if (slashIdx >= 0) {
+          ed.textContent = text.substring(0, slashIdx);
         }
-      } catch(_) {}
-    }
-    closeSlashMenu();
-    try { cmd.exec(originBlock); } catch(err) { log('slash exec 에러:', err.message); }
+      }
+    } catch(_) {}
+
+    // 메뉴 DOM 만 제거 (상태는 exec 후 리셋)
+    if (slashMenuEl && slashMenuEl.parentNode) slashMenuEl.parentNode.removeChild(slashMenuEl);
+    slashMenuEl = null;
+
+    try { cmd.exec(originBlock); } catch(err) { try{log('slash exec 에러:', err && err.message);}catch(_){} }
+
+    // exec 완료 후 상태 리셋
+    slashOriginBlock = null;
+    slashOriginRange = null;
+    slashOriginEditable = null;
+    slashInCalloutBody = null;
   }
 
   function closeSlashMenu(){
@@ -3161,6 +3278,8 @@
     slashMenuEl = null;
     slashOriginBlock = null;
     slashOriginRange = null;
+    slashOriginEditable = null;
+    slashInCalloutBody = null;
   }
 
   function setupSlashMenu(){
@@ -6939,9 +7058,11 @@
     block.setAttribute('data-shape-stroke', '#555555');
     block.setAttribute('data-align', 'center');
 
+    // p20e: draggable 속성이 빠져서 드래그가 안 되었음 — 복원
     var handle = document.createElement('div');
     handle.className = 'block-handle';
     handle.setAttribute('contenteditable', 'false');
+    handle.setAttribute('draggable', 'true');
     handle.innerHTML = '⋮⋮';
     block.appendChild(handle);
 
@@ -6964,10 +7085,11 @@
     var next = document.createElement('div');
     next.className = 'editor-block';
     next.setAttribute('data-block-type', 'p');
-    // block-handle
+    // block-handle (p20e: draggable 복원)
     var nextHandle = document.createElement('div');
     nextHandle.className = 'block-handle';
     nextHandle.setAttribute('contenteditable', 'false');
+    nextHandle.setAttribute('draggable', 'true');
     nextHandle.innerHTML = '⋮⋮';
     next.appendChild(nextHandle);
     // 실제 <p> 자식
@@ -11368,9 +11490,11 @@
     block.setAttribute('data-btn-cutout', '0');         // 0/1
     block.setAttribute('data-align', 'center');
 
+    // p20e: draggable 속성 복원 (드래그 모달리티로 이동 필요)
     var handle = document.createElement('div');
     handle.className = 'block-handle';
     handle.setAttribute('contenteditable', 'false');
+    handle.setAttribute('draggable', 'true');
     handle.innerHTML = '⋮⋮';
     block.appendChild(handle);
 
@@ -12991,6 +13115,8 @@
         contentEl.innerHTML = data.contentHTML || '';
         if (data.postId) currentPostId = data.postId;
         wrapExistingContentInBlocks();
+        // p20e: 컨테이너 마커 + 특수블록 handle draggable 보장
+        if (typeof fixupAllCallouts === 'function') fixupAllCallouts();
         setStatus('복구 완료');
       } else {
         clearLocalBackup();
@@ -13231,6 +13357,8 @@
       titleEl.textContent = p.title || '';
       contentEl.innerHTML = p.html || '<p><br></p>';
       wrapExistingContentInBlocks();
+      // p20e: 컨테이너 마커 + 특수블록 handle draggable 보장
+      if (typeof fixupAllCallouts === 'function') fixupAllCallouts();
       var tagInput = document.getElementById('ep-tags');
       if (tagInput) tagInput.value = (p.tags || []).map(function(t){return t.name;}).join(', ');
       var excerpt = document.getElementById('ep-excerpt');
@@ -15881,19 +16009,29 @@
         isAtEnd = (testRange.toString().length === 0);
       } catch(err) {}
 
-      // ← / → 는 첫/끝 오프셋일 때만 이웃 블록으로
+      // p20e: ← / → 는 첫/끝 오프셋일 때만 이웃 블록으로 이동 (특수블록 건너뛰기)
+      function _findNextEditableSibling(startIdx, dirLR){
+        var step = (dirLR === 'right') ? 1 : -1;
+        for (var i = startIdx + step; i >= 0 && i < all.length; i += step){
+          var b = all[i];
+          if (b.querySelector && b.querySelector('[contenteditable="true"]')) return b;
+        }
+        return null;
+      }
       if (e.key === 'ArrowLeft') {
         if (!isAtStart) return; // 중간이면 기본 동작
-        if (idx === 0) return;
+        var prev = _findNextEditableSibling(idx, 'left');
+        if (!prev) return;
         e.preventDefault();
-        moveCaretToBlock(all[idx - 1], 'end', null);
+        moveCaretToBlock(prev, 'end', null);
         return;
       }
       if (e.key === 'ArrowRight') {
         if (!isAtEnd) return;
-        if (idx === all.length - 1) return;
+        var nx = _findNextEditableSibling(idx, 'right');
+        if (!nx) return;
         e.preventDefault();
-        moveCaretToBlock(all[idx + 1], 'start', null);
+        moveCaretToBlock(nx, 'start', null);
         return;
       }
 
@@ -15903,11 +16041,22 @@
         var beforeNode = sel.anchorNode;
         var beforeOffset = sel.anchorOffset;
 
+        // p20e: 특수블록(구분선/버튼 등 contenteditable=false)을 건너뛰어 다음 editable 블록으로 이동
+        function _nextEditableBlockIdx(startIdx, dir){
+          var step = (dir === 'down') ? 1 : -1;
+          for (var i = startIdx + step; i >= 0 && i < all.length; i += step){
+            var b = all[i];
+            if (b.querySelector && b.querySelector('[contenteditable="true"]')) return b;
+          }
+          return null;
+        }
+
         if (!sel.modify) {
-          // Selection.modify 미지원 브라우저는 fallback: 그냥 블록 이동
+          // Selection.modify 미지원 브라우저는 fallback: 특수블록 건너뛰며 블록 이동
           e.preventDefault();
-          if (e.key === 'ArrowUp' && idx > 0) moveCaretToBlock(all[idx - 1], 'end', beforeLeft);
-          else if (e.key === 'ArrowDown' && idx < all.length - 1) moveCaretToBlock(all[idx + 1], 'start', beforeLeft);
+          var dirFB = (e.key === 'ArrowUp') ? 'up' : 'down';
+          var nxtFB = _nextEditableBlockIdx(idx, dirFB);
+          if (nxtFB) moveCaretToBlock(nxtFB, dirFB === 'up' ? 'end' : 'start', beforeLeft);
           return;
         }
 
@@ -15941,11 +16090,10 @@
           sel.addRange(restoreR);
         } catch(_) {}
 
-        if (e.key === 'ArrowUp' && idx > 0) {
-          moveCaretToBlock(all[idx - 1], 'end', beforeLeft);
-        } else if (e.key === 'ArrowDown' && idx < all.length - 1) {
-          moveCaretToBlock(all[idx + 1], 'start', beforeLeft);
-        }
+        // p20e: 특수블록 건너뛰며 이동
+        var dir2 = (e.key === 'ArrowUp') ? 'up' : 'down';
+        var nxt2 = _nextEditableBlockIdx(idx, dir2);
+        if (nxt2) moveCaretToBlock(nxt2, dir2 === 'up' ? 'end' : 'start', beforeLeft);
         return;
       }
     }, true); // capture 단계
