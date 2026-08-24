@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19j-fix2';
+  var VERSION = 'v2.0-β-p19j';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -9063,11 +9063,9 @@
     });
     var html = parts.join('\n');
 
-    // p19i: 저장 전 mark.ddl-ruby 안 시각화용 <span.ddl-ruby-rt> 제거.
-    // data-has-rt 속성도 저장물에서 제거 (복원 시 다시 세팅됨).
+    // p19i: 저장 전 mark.ddl-ruby 안 시각화용 <span.ddl-ruby-rt> 제거
     html = html.replace(/(<mark\s[^>]*ddl-ruby[^>]*>)([\s\S]*?)(<\/mark>)/g, function(_m, open, inner, close){
-      var cleanOpen = open.replace(/\s*data-has-rt="[^"]*"/g, '');
-      return cleanOpen + inner.replace(/<span[^>]*class="ddl-ruby-rt"[^>]*>[\s\S]*?<\/span>/g, '') + close;
+      return open + inner.replace(/<span[^>]*class="ddl-ruby-rt"[^>]*>[\s\S]*?<\/span>/g, '') + close;
     });
 
     // p19j: 루비 마커. HTML 서식 있는 경우 base64-url-safe 로 인코딩해
@@ -10273,7 +10271,6 @@
         _rtSpan.setAttribute('contenteditable', 'false');
         _rtSpan.innerHTML = rubyHtml;
         el.appendChild(_rtSpan);
-        el.setAttribute('data-has-rt', '1');
       }
       try {
         el.appendChild(range.extractContents());
@@ -10392,9 +10389,6 @@
               _rt.setAttribute('contenteditable', 'false');
               _rt.innerHTML = newRt;
               mark.insertBefore(_rt, mark.firstChild);
-              mark.setAttribute('data-has-rt', '1');
-            } else {
-              mark.removeAttribute('data-has-rt');
             }
           }
         });
@@ -11996,10 +11990,8 @@
     '  font-weight: normal !important;',
     '}',
     '[contenteditable] mark.ddl-ruby { cursor: pointer !important; }',
-    /* rt-span 이 있으면 mark 에 data-has-rt='1' 세팅되고 ::before 는 숨김.
-       :has() 미지원 브라우저 호환을 위해 속성 분기 사용. */
-    'mark.ddl-ruby[data-has-rt]::before { display: none !important; content: none !important; }',
-    'mark.ddl-ruby::before {',
+    /* rt-span 이 있으면 그것으로 표시, 없으면 ::before 로 attr(data-rt) */
+    'mark.ddl-ruby:not(:has(.ddl-ruby-rt))::before {',
     '  content: attr(data-rt) !important;',
     '  position: absolute !important;',
     '  left: 50% !important;',
@@ -12023,13 +12015,12 @@
     '  line-height: 1 !important;',
     '  white-space: nowrap !important;',
     '  opacity: 0.85 !important;',
+    '  color: inherit !important;',
     '  font-family: inherit !important;',
     '  pointer-events: none !important;',
     '  display: block !important;',
     '  background: transparent !important;',
     '}',
-    /* rt 안 자식 요소는 자체 color 유지 (font color, span style color 등) */
-    'mark.ddl-ruby .ddl-ruby-rt * { color: revert !important; }',
     /* 표준 <ruby> 도 지원 (편집기 안 임시 상태 대비) */
     'ruby { display: ruby; ruby-position: over; }',
     'ruby rt { display: ruby-text !important; font-size: 0.5em !important; opacity: 0.85 !important; }',
@@ -12105,7 +12096,6 @@
           rtSpan.className = 'ddl-ruby-rt';
           rtSpan.innerHTML = htmlVal;
           mark.appendChild(rtSpan);
-          mark.setAttribute('data-has-rt', '1');
         }
         mark.appendChild(document.createTextNode(m[3]));
         frag.appendChild(mark);
@@ -12181,11 +12171,6 @@
       // β 기능
       setupFloatingToolbar();
       setupRubyEditHandler(); // p19h
-      // p19j-fix2: 우리 편집기에서도 마커 복원 (편집 캔버스 안 스캔)
-      try { restoreRubyMarkers(contentEl); } catch(_){}
-      // 편집 시작 후 3초까지 다시 한 번 (편집기 콘텐츠 지연 로드 대비)
-      setTimeout(function(){ try { restoreRubyMarkers(contentEl); } catch(_){} }, 500);
-      setTimeout(function(){ try { restoreRubyMarkers(contentEl); } catch(_){} }, 2000);
       // p14c: 블록 정렬·폭 시스템
       setupBlockToolbar();
       setupBlockPanelListeners();
