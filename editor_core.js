@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p19u
+ * 2vvena Editor Core - v2.0-β-p19v
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -7220,7 +7220,7 @@
 
     // ── DOM 생성 ─────────────────────────────────────────
     var root = document.createElement('div');
-    root.className = 'ep-popup-v2';
+    root.className = 'ep-popup-v2 ddl-editor-popup';
     root.setAttribute('data-shell-variant', shellVariant);
     if (width) root.style.width = width;
 
@@ -7596,7 +7596,7 @@
   function setupModernToolbar(){
     if (_modernToolbarEl) return _modernToolbarEl;
     var bar = document.createElement('div');
-    bar.className = 'ep-modern-toolbar';
+    bar.className = 'ep-modern-toolbar ddl-editor-popup';
 
     // 아이콘 세트 (클래식 툴바에서 사용하는 것과 같은 농도)
     var svgAlignL = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg>';
@@ -8370,7 +8370,7 @@
 
     // === 오버레이 (마스크 + 다이얼로그 중앙 배치) ===
     var overlay = document.createElement('div');
-    overlay.className = 'ddl-edit-overlay';
+    overlay.className = 'ddl-edit-overlay ddl-editor-popup';
     overlay.style.cssText = 'position: fixed; inset: 0; z-index: 100000;'
       + ' background: rgba(15,58,58,0.18);'
       + ' display: flex; align-items: center; justify-content: center;'
@@ -8671,21 +8671,49 @@
       else if (activeTab === 'color') renderColorTab();
     }
 
+    // p19v Step 2-A: 시각 언어 완성
+    //   각 속성이 자기 자신을 시각화하는 컨트롤로 표현.
+    //   - 폰트: 6개 카드 갤러리 (각 카드가 그 폰트로 "가나다" 렌더)
+    //   - 크기: 슬라이더 + 숫자 (기존 유지)
+    //   - 굵기: 5개 "가" 미니 버튼 (각 굵기로 렌더)
+    //   - 자간/줄간격/여백: 시각 아이콘 + 값 프리셋 버튼
     function renderPropsTab(){
-      // 폰트
-      var fontSelect = document.createElement('select');
-      fontSelect.style.cssText = _selCss();
-      FONTS.forEach(function(f){
-        var o = document.createElement('option');
-        o.value = f.value; o.textContent = f.label;
-        if (current.style.fontFamily === f.value) o.selected = true;
-        fontSelect.appendChild(o);
-      });
-      _selHover(fontSelect);
-      fontSelect.addEventListener('change', function(){ current.style.fontFamily = fontSelect.value; renderPreview(); });
-      tabContent.appendChild(rowInline('폰트', fontSelect));
+      // === 폰트 카드 갤러리 ===
+      var fontLabel = document.createElement('div');
+      fontLabel.style.cssText = 'font-size: 12px; color: rgba(15,58,58,0.6); margin: 4px 0 8px;';
+      fontLabel.textContent = '폰트';
+      tabContent.appendChild(fontLabel);
 
-      // 크기 (숫자 인풋 + 슬라이더)
+      var fontGrid = document.createElement('div');
+      fontGrid.style.cssText = 'display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px;';
+      FONTS.forEach(function(f){
+        var card = document.createElement('button');
+        card.type = 'button';
+        var isActive = current.style.fontFamily === f.value;
+        card.style.cssText = 'padding: 10px 6px; border-radius: 6px; cursor: pointer; text-align: center;'
+          + ' background: ' + (isActive ? 'rgba(255,154,118,0.08)' : '#fff') + ';'
+          + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';'
+          + ' transition: background 120ms, border-color 120ms;';
+        var sample = document.createElement('div');
+        sample.textContent = '가나다';
+        sample.style.cssText = 'font-family: ' + f.value + '; font-size: 16px; color: var(--color, #0F3A3A); margin-bottom: 3px;';
+        var lbl = document.createElement('div');
+        lbl.textContent = f.label;
+        lbl.style.cssText = 'font-size: 10px; opacity: 0.55;';
+        card.appendChild(sample);
+        card.appendChild(lbl);
+        card.addEventListener('mouseenter', function(){ if (!isActive) card.style.borderColor = 'rgba(15,58,58,0.35)'; });
+        card.addEventListener('mouseleave', function(){ if (!isActive) card.style.borderColor = 'rgba(15,58,58,0.15)'; });
+        card.addEventListener('click', function(){
+          current.style.fontFamily = f.value;
+          renderPreview();
+          renderPropsTab.__rerender();  // 카드 상태 갱신
+        });
+        fontGrid.appendChild(card);
+      });
+      tabContent.appendChild(fontGrid);
+
+      // === 크기 (슬라이더 + 숫자) ===
       var sizeWrap = document.createElement('div');
       sizeWrap.style.cssText = 'display: flex; gap: 8px; align-items: center;';
       var sizeSlider = document.createElement('input');
@@ -8717,65 +8745,161 @@
       sizeWrap.appendChild(pxTxt);
       tabContent.appendChild(rowInline('크기', sizeWrap));
 
-      // 굵기
-      var weightSelect = document.createElement('select');
-      weightSelect.style.cssText = _selCss();
+      // === 굵기 「가」 버튼 5개 ===
+      var weightWrap = document.createElement('div');
+      weightWrap.style.cssText = 'display: flex; gap: 4px;';
       WEIGHTS.forEach(function(w){
-        var o = document.createElement('option');
-        o.value = w.value; o.textContent = w.label;
-        if (String(current.style.fontWeight) === String(w.value)) o.selected = true;
-        weightSelect.appendChild(o);
+        var b = document.createElement('button');
+        b.type = 'button';
+        var isActive = String(current.style.fontWeight) === String(w.value);
+        b.style.cssText = 'width: 34px; height: 34px; border-radius: 4px; cursor: pointer;'
+          + ' background: ' + (isActive ? 'rgba(255,154,118,0.08)' : 'transparent') + ';'
+          + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';'
+          + ' font-family: "Cafe24Danjunghae","Gowun Batang",serif;'
+          + ' font-size: 16px; font-weight: ' + w.value + ';'
+          + ' color: var(--color, #0F3A3A);'
+          + ' transition: background 120ms, border-color 120ms;';
+        b.textContent = '가';
+        b.title = w.label;
+        b.addEventListener('mouseenter', function(){ if (!isActive) b.style.borderColor = 'rgba(15,58,58,0.35)'; });
+        b.addEventListener('mouseleave', function(){ if (!isActive) b.style.borderColor = 'rgba(15,58,58,0.15)'; });
+        b.addEventListener('click', function(){
+          current.style.fontWeight = w.value;
+          renderPreview();
+          renderPropsTab.__rerender();
+        });
+        weightWrap.appendChild(b);
       });
-      _selHover(weightSelect);
-      weightSelect.addEventListener('change', function(){ current.style.fontWeight = parseInt(weightSelect.value, 10) || 400; renderPreview(); });
-      tabContent.appendChild(rowInline('굵기', weightSelect));
+      tabContent.appendChild(rowInline('굵기', weightWrap));
 
-      // 자간
-      var trackSelect = document.createElement('select');
-      trackSelect.style.cssText = _selCss();
-      [
-        { label: '좁게 -0.04em', value: '-0.04em' },
-        { label: '다소 좁게 -0.02em', value: '-0.02em' },
-        { label: '약간 좁게 -0.01em', value: '-0.01em' },
-        { label: '기본 0em', value: '0em' },
-        { label: '약간 넓게 0.02em', value: '0.02em' },
-        { label: '넓게 0.05em', value: '0.05em' }
-      ].forEach(function(t){
-        var o = document.createElement('option');
-        o.value = t.value; o.textContent = t.label;
-        if (current.style.letterSpacing === t.value) o.selected = true;
-        trackSelect.appendChild(o);
+      // === 자간 (시각 아이콘 + 값) ===
+      var TRACKS = [
+        { value: '-0.04em', gap: '-3px', label: '좁게' },
+        { value: '-0.02em', gap: '-1.5px', label: '' },
+        { value: '0em',     gap: '0',    label: '기본' },
+        { value: '0.02em',  gap: '1.5px', label: '' },
+        { value: '0.05em',  gap: '4px',  label: '넓게' }
+      ];
+      var trackWrap = document.createElement('div');
+      trackWrap.style.cssText = 'display: flex; gap: 4px;';
+      TRACKS.forEach(function(t){
+        var b = document.createElement('button');
+        b.type = 'button';
+        var isActive = current.style.letterSpacing === t.value;
+        b.style.cssText = 'flex: 1; min-width: 42px; padding: 6px 4px; border-radius: 4px; cursor: pointer;'
+          + ' background: ' + (isActive ? 'rgba(255,154,118,0.08)' : 'transparent') + ';'
+          + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';'
+          + ' color: var(--color, #0F3A3A); font-family: inherit;';
+        // 아이콘: 가나 사이 간격을 실제 자간으로 표시
+        var icon = document.createElement('div');
+        icon.textContent = '가나';
+        icon.style.cssText = 'font-size: 13px; letter-spacing: ' + t.value + '; line-height: 1;';
+        var lbl = document.createElement('div');
+        lbl.textContent = t.label || t.value;
+        lbl.style.cssText = 'font-size: 9px; opacity: 0.5; margin-top: 2px;';
+        b.appendChild(icon);
+        b.appendChild(lbl);
+        b.title = t.value;
+        b.addEventListener('click', function(){
+          current.style.letterSpacing = t.value;
+          renderPreview();
+          renderPropsTab.__rerender();
+        });
+        trackWrap.appendChild(b);
       });
-      _selHover(trackSelect);
-      trackSelect.addEventListener('change', function(){ current.style.letterSpacing = trackSelect.value; renderPreview(); });
-      tabContent.appendChild(rowInline('자간', trackSelect));
+      tabContent.appendChild(rowInline('자간', trackWrap));
 
-      // 줄간격
-      var lhSelect = document.createElement('select');
-      lhSelect.style.cssText = _selCss();
-      [1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.0].forEach(function(v){
-        var o = document.createElement('option');
-        o.value = v; o.textContent = String(v);
-        if (parseFloat(current.style.lineHeight) === v) o.selected = true;
-        lhSelect.appendChild(o);
+      // === 줄간격 (시각 아이콘 + 값) ===
+      var LHS = [
+        { value: 1.2, label: '1.2' },
+        { value: 1.4, label: '1.4' },
+        { value: 1.6, label: '1.6' },
+        { value: 1.8, label: '1.8' },
+        { value: 2.0, label: '2.0' }
+      ];
+      var lhWrap = document.createElement('div');
+      lhWrap.style.cssText = 'display: flex; gap: 4px;';
+      LHS.forEach(function(t){
+        var b = document.createElement('button');
+        b.type = 'button';
+        var isActive = parseFloat(current.style.lineHeight) === t.value;
+        b.style.cssText = 'flex: 1; min-width: 42px; padding: 6px 4px; border-radius: 4px; cursor: pointer;'
+          + ' background: ' + (isActive ? 'rgba(255,154,118,0.08)' : 'transparent') + ';'
+          + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';'
+          + ' color: var(--color, #0F3A3A); font-family: inherit;'
+          + ' display: flex; flex-direction: column; align-items: center; gap: 2px;';
+        // 아이콘: 가로줄 3개를 그 줄간격 비율로
+        var icon = document.createElement('div');
+        var barGap = Math.round((t.value - 1.0) * 4);  // 1.2→1, 1.4→2, ...
+        icon.innerHTML = '<div style="width:14px; height:1.5px; background:currentColor; opacity:0.7;"></div>'
+                       + '<div style="width:14px; height:1.5px; background:currentColor; opacity:0.7; margin-top:' + barGap + 'px;"></div>'
+                       + '<div style="width:14px; height:1.5px; background:currentColor; opacity:0.7; margin-top:' + barGap + 'px;"></div>';
+        icon.style.cssText = 'display: flex; flex-direction: column;';
+        var lbl = document.createElement('div');
+        lbl.textContent = t.label;
+        lbl.style.cssText = 'font-size: 10px; opacity: 0.6;';
+        b.appendChild(icon);
+        b.appendChild(lbl);
+        b.addEventListener('click', function(){
+          current.style.lineHeight = t.value;
+          renderPreview();
+          renderPropsTab.__rerender();
+        });
+        lhWrap.appendChild(b);
       });
-      _selHover(lhSelect);
-      lhSelect.addEventListener('change', function(){ current.style.lineHeight = parseFloat(lhSelect.value); renderPreview(); });
-      tabContent.appendChild(rowInline('줄간격', lhSelect));
+      tabContent.appendChild(rowInline('줄간격', lhWrap));
 
-      // 아래 여백
-      var mbSelect = document.createElement('select');
-      mbSelect.style.cssText = _selCss();
-      ['0em', '0.2em', '0.3em', '0.4em', '0.5em', '0.6em', '0.8em', '1em', '1.2em'].forEach(function(v){
-        var o = document.createElement('option');
-        o.value = v; o.textContent = v;
-        if (current.style.marginBottom === v) o.selected = true;
-        mbSelect.appendChild(o);
+      // === 아래 여백 (시각 아이콘 + 값) ===
+      var MBS = [
+        { value: '0em',   label: '0' },
+        { value: '0.3em', label: '0.3' },
+        { value: '0.6em', label: '0.6' },
+        { value: '1em',   label: '1' },
+        { value: '1.2em', label: '1.2' }
+      ];
+      var mbWrap = document.createElement('div');
+      mbWrap.style.cssText = 'display: flex; gap: 4px;';
+      MBS.forEach(function(t){
+        var b = document.createElement('button');
+        b.type = 'button';
+        var isActive = current.style.marginBottom === t.value;
+        b.style.cssText = 'flex: 1; min-width: 42px; padding: 6px 4px; border-radius: 4px; cursor: pointer;'
+          + ' background: ' + (isActive ? 'rgba(255,154,118,0.08)' : 'transparent') + ';'
+          + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';'
+          + ' color: var(--color, #0F3A3A); font-family: inherit;'
+          + ' display: flex; flex-direction: column; align-items: center; gap: 2px;';
+        // 아이콘: 텍스트 한 줄 + 아래에 여백 그리기
+        var iconWrap = document.createElement('div');
+        iconWrap.style.cssText = 'display: flex; flex-direction: column; align-items: center;';
+        var textLine = document.createElement('div');
+        textLine.style.cssText = 'width: 16px; height: 3px; background: currentColor; opacity: 0.7; border-radius: 1px;';
+        var gapH = { '0em': 0, '0.3em': 3, '0.6em': 6, '1em': 10, '1.2em': 13 }[t.value] || 0;
+        var gapEl = document.createElement('div');
+        gapEl.style.cssText = 'height: ' + gapH + 'px;';
+        var nextLine = document.createElement('div');
+        nextLine.style.cssText = 'width: 16px; height: 1.5px; background: currentColor; opacity: 0.3; border-radius: 1px;';
+        iconWrap.appendChild(textLine);
+        iconWrap.appendChild(gapEl);
+        iconWrap.appendChild(nextLine);
+        var lbl = document.createElement('div');
+        lbl.textContent = t.label;
+        lbl.style.cssText = 'font-size: 10px; opacity: 0.6;';
+        b.appendChild(iconWrap);
+        b.appendChild(lbl);
+        b.addEventListener('click', function(){
+          current.style.marginBottom = t.value;
+          renderPreview();
+          renderPropsTab.__rerender();
+        });
+        mbWrap.appendChild(b);
       });
-      _selHover(mbSelect);
-      mbSelect.addEventListener('change', function(){ current.style.marginBottom = mbSelect.value; renderPreview(); });
-      tabContent.appendChild(rowInline('아래 여백', mbSelect));
+      tabContent.appendChild(rowInline('아래 여백', mbWrap));
     }
+
+    // 활성 상태 갱신을 위한 재렌더 (탭 다시 그리기)
+    renderPropsTab.__rerender = function(){
+      if (activeTab === 'props') renderTabContent();
+    };
 
     function renderColorTab(){
       // 현재 색 표시
@@ -12365,7 +12489,7 @@
 
     var pop = document.createElement('div');
     pop.id = 'ep-align-popover';
-    pop.className = 'ep-mini-popover';
+    pop.className = 'ep-mini-popover ddl-editor-popup';
     pop.innerHTML =
       '<button type="button" data-align="justifyLeft"   title="왼쪽 정렬">'   + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg>' + '</button>' +
       '<button type="button" data-align="justifyCenter" title="가운데 정렬">' + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="5" y1="18" x2="19" y2="18"/></svg>' + '</button>' +
@@ -12459,6 +12583,7 @@
     if (old) { old.remove(); return; }
     var mask = document.createElement('div');
     mask.id = 'ddl-settings-modal';
+    mask.className = 'ddl-editor-popup';
     mask.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(15,58,58,0.28);display:flex;align-items:center;justify-content:center;';
     var box = document.createElement('div');
     box.className = 'ddl-scroll-invisible';
@@ -12611,7 +12736,7 @@
 
     // 형광펜 팔레트 팝오버 (분리 요소)
     var palette = document.createElement('div');
-    palette.className = 'ep-hl-palette';
+    palette.className = 'ep-hl-palette ddl-editor-popup';
     document.body.appendChild(palette);
 
     // p18l: 심플 팔레트 (기본 색 + 없음 + 사용자 색). 상세 옵션은 다음 AI에서 재설계 예정.
@@ -13825,19 +13950,12 @@
       if (e.target.closest('#ep-div-popup')) return;
       if (e.target.closest('#ep-cal-popup')) return;
       if (e.target.closest('#ep-dialog-overlay')) return;
-      // p19u: ⭐ 결정적 버그 수정
-      //   이 capture-단계 리스너가 편집 다이얼로그 안 mousedown 도 다 보고 preventDefault 해서
-      //   인풋/드롭다운/슬라이더 동작이 다 죽은 것.
-      //   사용자 증상: 「이름칸 눌러 입력해도 뒤 블록에 텍스트 입력」, 「슬라이더 활성화만 되고 조절 안 됨」
-      //   그리고 이 리스너는 편집기 밖 모든 팝업을 예외로 적어놓았으므로 우리가 새로 만든 
-      //   오버레이/다이얼로그도 마찬가지로 예외처리 해야 함.
-      if (e.target.closest('.ddl-edit-overlay')) return;
-      if (e.target.closest('.ddl-edit-dialog')) return;
-      if (e.target.closest('.ep-popup-v2')) return;
-      if (e.target.closest('#ddl-settings-modal')) return;
-      if (e.target.closest('.ep-modern-toolbar')) return;
-      if (e.target.closest('.ep-hl-palette')) return;
-      if (e.target.closest('.ep-mini-popover')) return;
+      // p19v: ⭐ 예외 시스템화 — 통합 마커 클래스 `.ddl-editor-popup` 하나로 처리.
+      //   새 팝업을 만들 때 이 클래스를 붙이기만 하면 자동으로 이 리스너에서 예외 처리됨.
+      //   앞으로 하이라이터/코드/색상/크기/폰트 편집창 등 어떤 새 팝업도 마커만 붙이면 됨.
+      //   과거 이슈: p19u 이전엔 새 팝업 만들 때마다 이 리스너에 예외 추가해야 했음. 
+      //             까먹으면 팝업 안 mousedown 이 preventDefault 로 죽고, 뒤 편집기 블록으로 이벤트가 감.
+      if (e.target.closest('.ddl-editor-popup')) return;
 
       // 편집기 근처가 아니면 다중선택 해제하고 종료
       if (!isNearEditor(e.clientX, e.clientY)) {
