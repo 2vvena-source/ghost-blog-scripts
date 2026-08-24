@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p19w
+ * 2vvena Editor Core - v2.0-β-p19x
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19o';
+  var VERSION = 'v2.0-β-p19x';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -9024,9 +9024,9 @@
 
   // 내장 기본 폰트 (라이브러리에 자동 시드)
   var FONT_BUILTINS = [
-    { id: 'sys-pretendard', name: '본문 (Pretendard)', cssName: '"Pretendard Variable", "Pretendard"', fallback: 'sans-serif', source: 'system', url: '', weights: [300, 400, 500, 700, 900], isFavorite: true, license: '내장 (Pretendard OFL 1.1)', isBuiltin: true },
-    { id: 'sys-cafe24',     name: '헤더 (카페단정해)',  cssName: '"Cafe24Danjunghae"',                    fallback: 'serif',      source: 'system', url: '', weights: [400],                     isFavorite: true, license: '내장 (Cafe24 무료 상업용)', isBuiltin: true },
-    { id: 'sys-gowun',      name: '고운바탕',           cssName: '"Gowun Batang"',                        fallback: 'serif',      source: 'system', url: '', weights: [400, 700],                isFavorite: false, license: '내장 (SIL OFL)',              isBuiltin: true }
+    { id: 'sys-pretendard', name: '본문 (Pretendard)', cssName: '"Pretendard Variable", "Pretendard"', fallback: 'sans-serif', source: 'system', url: '', weights: [300, 400, 500, 700, 900], isFavorite: true, license: 'Pretendard OFL 1.1', commercial: 'yes', isBuiltin: true },
+    { id: 'sys-cafe24',     name: '헤더 (카페단정해)',  cssName: '"Cafe24Danjunghae"',                    fallback: 'serif',      source: 'system', url: '', weights: [400],                     isFavorite: true, license: 'Cafe24 무료 상업용',      commercial: 'yes', isBuiltin: true },
+    { id: 'sys-gowun',      name: '고운바탕',           cssName: '"Gowun Batang"',                        fallback: 'serif',      source: 'system', url: '', weights: [400, 700],                isFavorite: false, license: 'SIL OFL',                    commercial: 'yes', isBuiltin: true }
   ];
 
   function _uidFont(){ return 'fnt-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7); }
@@ -9082,9 +9082,12 @@
   }
 
   // 사이트 반영용 CSS 스니펫 (Code Injection 붙여넣기용)
+  // p19x: 마커 코멘트로 감싸서 사용자가 매번 전체 교체하기 쉽도록
   function _generateSiteFontCSS(){
     var lib = loadFontLibrary();
-    var lines = ['<style id="ddl-fonts-imported">'];
+    var lines = [];
+    lines.push('<!-- font library start -->');
+    lines.push('<style id="ddl-fonts-imported">');
     lib.fonts.forEach(function(f){
       if (f.isBuiltin || !f.url) return;
       var famStr = (f.cssName || f.name || '').split(',')[0].trim().replace(/^["']|["']$/g, '');
@@ -9094,10 +9097,11 @@
       else if (/\.otf(\?.*)?$/i.test(f.url)) format = 'opentype';
       else if (/\.woff(\?.*)?$/i.test(f.url)) format = 'woff';
       (f.weights && f.weights.length ? f.weights : [400]).forEach(function(w){
-        lines.push('@font-face { font-family: "' + famStr + '"; src: url("' + f.url + '") format("' + format + '"); font-weight: ' + w + '; font-display: swap; }');
+        lines.push('  @font-face { font-family: "' + famStr + '"; src: url("' + f.url + '") format("' + format + '"); font-weight: ' + w + '; font-display: swap; }');
       });
     });
     lines.push('</style>');
+    lines.push('<!-- font library end -->');
     return lines.join('\n');
   }
 
@@ -9239,6 +9243,14 @@
     });
     toolbar.appendChild(copyBtn);
 
+    // p19x: 사이트 반영 가이드 버튼
+    var pasteGuideBtn = document.createElement('button');
+    pasteGuideBtn.type = 'button';
+    pasteGuideBtn.textContent = '❔ 어디에 붙여넣나요?';
+    pasteGuideBtn.style.cssText = 'padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; background: transparent; border: 1px solid rgba(15,58,58,0.15); color: rgba(15,58,58,0.7);';
+    pasteGuideBtn.addEventListener('click', function(){ openSitePasteGuide(); });
+    toolbar.appendChild(pasteGuideBtn);
+
     var addBtn = document.createElement('button');
     addBtn.type = 'button';
     addBtn.textContent = '+ 새 폰트';
@@ -9303,8 +9315,30 @@
       var meta = document.createElement('div');
       var srcLabel = f.source === 'system' ? '내장' : (f.source === 'url' ? 'URL' : f.source);
       meta.textContent = srcLabel + (f.isFavorite ? ' · ★' : '');
-      meta.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.5);';
+      meta.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.5); margin-bottom: 4px;';
       card.appendChild(meta);
+
+      // p19x: 상업 사용 가능 여부 배지
+      var badge = document.createElement('div');
+      badge.style.cssText = 'display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 9px; line-height: 1.4; font-weight: 500;';
+      var com = f.commercial || 'unknown';
+      if (com === 'yes'){
+        badge.textContent = '✓ 상업 가능';
+        badge.style.background = 'rgba(255,154,118,0.15)';
+        badge.style.color = 'var(--point, #FF9A76)';
+      } else if (com === 'no'){
+        badge.textContent = '✗ 상업 불가';
+        badge.style.background = 'rgba(211,51,51,0.08)';
+        badge.style.color = '#d33';
+      } else {
+        badge.textContent = '? 모름';
+        badge.style.background = 'rgba(15,58,58,0.06)';
+        badge.style.color = 'rgba(15,58,58,0.5)';
+      }
+      if (f.license && f.license.trim()){
+        badge.title = f.license;   // hover 메모
+      }
+      card.appendChild(badge);
 
       // hover 시 액션 아이콘 (우상단)
       var actions = document.createElement('div');
@@ -9409,9 +9443,51 @@
       url: '',
       weights: [400],
       isFavorite: false,
-      license: '',
+      license: '',            // 자유 메모 (검증 없음)
+      commercial: 'unknown',  // 'yes' | 'no' | 'unknown' — 상업적 사용 가능 여부 배지
       preview: '가나다 ABC 123'
     };
+    // 하위 호환: 기존 데이터에 commercial 없으면 기본값
+    if (!current.commercial) current.commercial = 'unknown';
+
+    // ── @font-face 블록 파서 (p19x 신규) ─────────────────────────
+    // 사용자가 눈누 등에서 복사한 CSS 블록을 통째 붙여넣으면 name/url/weights 추출.
+    // 반환: { cssName, url, weights, weight, style } 또는 null
+    function _parseFontFaceBlock(text){
+      if (!text || typeof text !== 'string') return null;
+      if (text.indexOf('@font-face') === -1) return null;
+      var out = {};
+      var mFam = text.match(/font-family\s*:\s*['"]([^'"]+)['"]/i);
+      if (mFam) out.cssName = mFam[1].trim();
+      // src 안의 첫 번째 http(s) URL — 확장자 상관 없이 폰트 자원으로 간주
+      var mUrl = text.match(/src\s*:[^;]*url\(\s*['"]?(https?:\/\/[^'"\)\s]+)['"]?\s*\)/i);
+      if (mUrl) out.url = mUrl[1].trim();
+      var mW = text.match(/font-weight\s*:\s*([0-9]{3})/i);
+      if (mW) out.weight = parseInt(mW[1], 10);
+      var mS = text.match(/font-style\s*:\s*(normal|italic|oblique)/i);
+      if (mS) out.style = mS[1];
+      // 최소 조건: cssName 또는 url 하나라도 있어야 유효
+      if (!out.cssName && !out.url) return null;
+      return out;
+    }
+
+    // URL 파일명에서 font-family 후보 추출 (p19x 신규)
+    // 예: '.../Cafe24Ohsquare.woff' → 'Cafe24Ohsquare'
+    //     '.../gowun-batang.woff2' → 'Gowun Batang' (하이픈은 공백으로, 각 단어 첫 글자 대문자)
+    function _guessFontFamilyFromUrl(url){
+      if (!url) return '';
+      var m = url.match(/\/([^\/\?#]+)\.(woff2?|ttf|otf)(\?.*)?$/i);
+      if (!m) return '';
+      var base = m[1];
+      // 하이픈 · 언더스코어를 공백으로. camelCase 는 그대로 유지 (Cafe24Ohsquare 등)
+      if (base.indexOf('-') !== -1 || base.indexOf('_') !== -1){
+        return base.split(/[-_]/).map(function(w){
+          if (!w) return '';
+          return w.charAt(0).toUpperCase() + w.slice(1);
+        }).join(' ').trim();
+      }
+      return base;
+    }
 
     var overlay = document.createElement('div');
     overlay.className = 'ddl-edit-overlay ddl-editor-popup';
@@ -9476,6 +9552,77 @@
       return 'width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1px solid rgba(15,58,58,0.2); border-radius: 4px; background: #fafafa; color: var(--color, #0F3A3A); font-family: inherit; font-size: 13px; outline: none;';
     }
 
+    // ── @font-face 블록 바로 붙여넣기 (p19x 신규) ─────────────────────
+    // 눈누에서 복사한 전체 CSS 블록을 붙여넣으면 자동으로
+    //   → font-family 값 → cssName + name(초기값)
+    //   → src url → url
+    //   → font-weight → weights
+    // 이 영역은 새 폰트 추가시에만 노출 (편집 중에는 숨김)
+    if (!existing) {
+      var pasteWrap = document.createElement('div');
+      pasteWrap.style.cssText = 'margin-bottom: 14px; padding: 10px 12px; background: rgba(255,154,118,0.06); border: 1px dashed rgba(255,154,118,0.5); border-radius: 4px;';
+
+      var pasteLbl = document.createElement('div');
+      pasteLbl.style.cssText = 'font-size: 11px; color: var(--color, #0F3A3A); margin-bottom: 6px; font-weight: 500;';
+      pasteLbl.innerHTML = '⚡ <b>빠른 등록</b> — 눈누 CSS 코드 붙여넣기';
+      pasteWrap.appendChild(pasteLbl);
+
+      var pasteHint = document.createElement('div');
+      pasteHint.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.55); margin-bottom: 6px; line-height: 1.5;';
+      pasteHint.textContent = '눈누 상세 페이지 → “웹폰트로 사용하기” @font-face { … } 블록 전체를 복사해서 이곳에 붙여넣으세요. 자동으로 이름 · URL · 굵기가 채워집니다.';
+      pasteWrap.appendChild(pasteHint);
+
+      var pasteTA = document.createElement('textarea');
+      pasteTA.placeholder = '@font-face {\n  font-family: \'Cafe24Ohsquare\';\n  src: url(\'https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/Cafe24Ohsquare.woff\') format(\'woff\');\n  font-weight: normal;\n  font-style: normal;\n}';
+      pasteTA.rows = 3;
+      pasteTA.style.cssText = 'width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1px solid rgba(15,58,58,0.2); border-radius: 4px; background: #fff; color: var(--color, #0F3A3A); font-family: Menlo,Consolas,monospace; font-size: 11px; line-height: 1.45; outline: none; resize: vertical; min-height: 60px;';
+      pasteWrap.appendChild(pasteTA);
+
+      var pasteMsg = document.createElement('div');
+      pasteMsg.style.cssText = 'font-size: 10px; margin-top: 6px; min-height: 14px; color: rgba(15,58,58,0.5);';
+      pasteWrap.appendChild(pasteMsg);
+
+      pasteTA.addEventListener('input', function(){
+        var val = pasteTA.value.trim();
+        if (!val){ pasteMsg.textContent = ''; pasteMsg.style.color = 'rgba(15,58,58,0.5)'; return; }
+        var parsed = _parseFontFaceBlock(val);
+        if (!parsed){
+          pasteMsg.style.color = '#d33';
+          pasteMsg.textContent = '⚠ @font-face 본문에서 font-family 또는 src url 을 찾지 못했어요.';
+          return;
+        }
+        // 적용
+        if (parsed.cssName){
+          current.cssName = parsed.cssName;
+          famInput.value = parsed.cssName;
+          if (!current.name){ current.name = parsed.cssName; nameInput.value = parsed.cssName; }
+        }
+        if (parsed.url){
+          current.url = parsed.url;
+          urlInput.value = parsed.url;
+        }
+        if (parsed.weight && current.weights.indexOf(parsed.weight) === -1){
+          current.weights.push(parsed.weight);
+          _refreshWeights();
+        }
+        pasteMsg.style.color = 'var(--point, #FF9A76)';
+        var bits = [];
+        if (parsed.cssName) bits.push('이름 → ' + parsed.cssName);
+        if (parsed.url) bits.push('URL → 채움');
+        if (parsed.weight) bits.push('굵기 → ' + parsed.weight);
+        pasteMsg.textContent = '✓ ' + bits.join(' · ');
+        _updatePreview();
+      });
+
+      body.appendChild(pasteWrap);
+
+      // 구분선
+      var pasteSep = document.createElement('div');
+      pasteSep.style.cssText = 'display: flex; align-items: center; gap: 8px; margin: 6px 0 14px; color: rgba(15,58,58,0.4); font-size: 10px;';
+      pasteSep.innerHTML = '<div style="flex:1; height:1px; background: rgba(15,58,58,0.1);"></div><span>또는 직접 입력</span><div style="flex:1; height:1px; background: rgba(15,58,58,0.1);"></div>';
+      body.appendChild(pasteSep);
+    }
+
     // 이름
     var nameInput = document.createElement('input');
     nameInput.type = 'text'; nameInput.value = current.name || '';
@@ -9498,8 +9645,23 @@
     urlInput.placeholder = 'https://cdn.jsdelivr.net/gh/사용자/저장소@main/fonts/파일명.woff2';
     urlInput.style.cssText = _inputCss();
     urlInput.disabled = !!current.isBuiltin;
-    urlInput.addEventListener('input', function(){ current.url = urlInput.value; });
-    var urlRow = _row('폰트 파일 URL', urlInput, current.isBuiltin ? '내장 폰트는 URL 변경 불가' : '.woff2 / .ttf / .otf / .woff 파일의 공개 URL');
+    urlInput.addEventListener('input', function(){
+      current.url = urlInput.value;
+      // p19x: URL 입력 중 cssName / name 이 비어있으면 파일명에서 자동 유추
+      if (!current.cssName || !current.cssName.trim()){
+        var guess = _guessFontFamilyFromUrl(urlInput.value);
+        if (guess){
+          current.cssName = guess;
+          famInput.value = guess;
+          if (!current.name || !current.name.trim()){
+            current.name = guess;
+            nameInput.value = guess;
+          }
+          _updatePreview();
+        }
+      }
+    });
+    var urlRow = _row('폰트 파일 URL', urlInput, current.isBuiltin ? '내장 폰트는 URL 변경 불가' : '.woff2 / .ttf / .otf / .woff 파일의 공개 URL — 붙여넣으면 이름 자동 추출');
     body.appendChild(urlRow);
 
     // 도움말 버튼 (URL 얻는 법)
@@ -9521,25 +9683,29 @@
     fbSelect.addEventListener('change', function(){ current.fallback = fbSelect.value; _updatePreview(); });
     body.appendChild(_row('폴백 스택', fbSelect, '폰트 로드 실패 시 대체'));
 
-    // 지원 굵기
+    // 지원 굵기 (p19x: @font-face 파서가 새 값 추가하면 다시 그릴 수 있도록 _refreshWeights 제공)
     var weightWrap = document.createElement('div');
     weightWrap.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap;';
-    [300, 400, 500, 700, 900].forEach(function(w){
-      var lbl = document.createElement('label');
-      lbl.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(15,58,58,0.15); cursor: pointer; font-size: 12px;';
-      var cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = current.weights && current.weights.indexOf(w) !== -1;
-      cb.addEventListener('change', function(){
-        current.weights = current.weights || [];
-        if (cb.checked){ if (current.weights.indexOf(w) === -1) current.weights.push(w); }
-        else { current.weights = current.weights.filter(function(x){ return x !== w; }); }
+    function _refreshWeights(){
+      weightWrap.innerHTML = '';
+      [300, 400, 500, 700, 900].forEach(function(w){
+        var lbl = document.createElement('label');
+        lbl.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(15,58,58,0.15); cursor: pointer; font-size: 12px;';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = current.weights && current.weights.indexOf(w) !== -1;
+        cb.addEventListener('change', function(){
+          current.weights = current.weights || [];
+          if (cb.checked){ if (current.weights.indexOf(w) === -1) current.weights.push(w); }
+          else { current.weights = current.weights.filter(function(x){ return x !== w; }); }
+        });
+        lbl.appendChild(cb);
+        var sp = document.createElement('span'); sp.textContent = String(w);
+        lbl.appendChild(sp);
+        weightWrap.appendChild(lbl);
       });
-      lbl.appendChild(cb);
-      var sp = document.createElement('span'); sp.textContent = String(w);
-      lbl.appendChild(sp);
-      weightWrap.appendChild(lbl);
-    });
+    }
+    _refreshWeights();
     body.appendChild(_row('지원 굵기', weightWrap, '이 폰트 파일이 지원하는 굵기'));
 
     // 미리보기 텍스트
@@ -9549,13 +9715,59 @@
     pvInput.addEventListener('input', function(){ current.preview = pvInput.value; _updatePreview(); });
     body.appendChild(_row('미리보기 텍스트', pvInput));
 
-    // 라이선스 (필수)
+    // 라이선스 — p19x: 검증 해제(비어도 OK) + 상업 사용 가능 여부만 배지로 유지
+    // 1) 상업 사용 3-way 배지 (가능 / 불가 / 모름)
+    var comWrap = document.createElement('div');
+    comWrap.style.cssText = 'display: inline-flex; gap: 0; border: 1px solid rgba(15,58,58,0.15); border-radius: 4px; overflow: hidden;';
+    var comOpts = [
+      { key: 'yes',     label: '✓ 상업 사용 가능' },
+      { key: 'no',      label: '✗ 상업 불가 / 제한' },
+      { key: 'unknown', label: '? 모름 / 비공개 전용' }
+    ];
+    comOpts.forEach(function(opt, i){
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = opt.label;
+      b.dataset.comKey = opt.key;
+      b.style.cssText = 'padding: 6px 10px; font-size: 11px; background: transparent; border: none; cursor: pointer; color: rgba(15,58,58,0.55); font-family: inherit;'
+        + (i > 0 ? ' border-left: 1px solid rgba(15,58,58,0.1);' : '');
+      b.addEventListener('click', function(){
+        current.commercial = opt.key;
+        _refreshCom();
+      });
+      comWrap.appendChild(b);
+    });
+    function _refreshCom(){
+      var kids = comWrap.querySelectorAll('button[data-com-key]');
+      for (var i = 0; i < kids.length; i++){
+        var k = kids[i];
+        var isActive = k.dataset.comKey === current.commercial;
+        if (isActive){
+          if (current.commercial === 'yes'){
+            k.style.background = 'rgba(255,154,118,0.15)';
+            k.style.color = 'var(--point, #FF9A76)';
+          } else if (current.commercial === 'no'){
+            k.style.background = 'rgba(211,51,51,0.08)';
+            k.style.color = '#d33';
+          } else {
+            k.style.background = 'rgba(15,58,58,0.08)';
+            k.style.color = 'var(--color, #0F3A3A)';
+          }
+        } else {
+          k.style.background = 'transparent';
+          k.style.color = 'rgba(15,58,58,0.55)';
+        }
+      }
+    }
+    _refreshCom();
+    body.appendChild(_row('상업 사용 가능 여부', comWrap, '난중에 구분하기 쉽게 배지로 표시 (저장에는 영향 없음)'));
+
+    // 2) 자유 메모 (버전이름 및 기타 메모, 비어도 OK)
     var licInput = document.createElement('input');
     licInput.type = 'text'; licInput.value = current.license || '';
-    licInput.placeholder = '예: 눈누 - 상업용 무료 / 개인 프로젝트 전용 / 비공개 전용 등';
+    licInput.placeholder = '예: 눈누 카페24 오스퀘어, SIL OFL, 비공개 등 — 비워두어도 됨';
     licInput.style.cssText = _inputCss();
     licInput.addEventListener('input', function(){ current.license = licInput.value; });
-    body.appendChild(_row('라이선스 (필수)', licInput, '나중에 알 수 있게 자유롭게 입력 (미입력 시 저장 안 됨)'));
+    body.appendChild(_row('라이선스 · 메모 (선택)', licInput, '나중에 알아보기 편하도록 자유롭게 적어두세요 (비어도 저장 가능)'));
 
     // 푸터
     var footer = document.createElement('div');
@@ -9574,11 +9786,10 @@
 
     footer.appendChild(makeBtn('취소', { onClick: function(){ close(); } }));
     footer.appendChild(makeBtn('저장', { primary: true, onClick: function(){
-      // 검증
+      // 검증 — p19x: 라이선스 검증 해제 (비어도 저장 가능)
       if (!current.name || !current.name.trim()){ alert('폰트 이름을 입력해 주세요.'); return; }
       if (!current.cssName || !current.cssName.trim()){ alert('font-family 값을 입력해 주세요.'); return; }
       if (!current.isBuiltin && (!current.url || !current.url.trim())){ alert('폰트 파일 URL 을 입력해 주세요.'); return; }
-      if (!current.license || !current.license.trim()){ alert('라이선스 정보를 입력해 주세요. (비공개 전용 등 자유로운 입력 가능)'); return; }
       if (!current.weights || current.weights.length === 0){ current.weights = [400]; }
       if (typeof onSave === 'function') onSave(current);
       close();
@@ -9722,6 +9933,130 @@
     document.body.appendChild(overlay);
   }
 
+  // === 사이트 반영 CSS 가이드 다이얼로그 (p19x 신규) ===
+  //   “복사한 CSS 를 어디에 붙여넣어야 하나?” 에 대한 6단계 안내.
+  //   폰트 라이브러리 관리창의 “❔ 어디에 붙여넣나요?” 버튼에서 진입.
+  function openSitePasteGuide(){
+    var overlay = document.createElement('div');
+    overlay.className = 'ddl-edit-overlay ddl-editor-popup';
+    overlay.style.cssText = 'position: fixed; inset: 0; z-index: 100002;'
+      + ' background: rgba(15,58,58,0.18);'
+      + ' display: flex; align-items: center; justify-content: center;'
+      + ' font-family: "Pretendard Variable","Pretendard",sans-serif;'
+      + ' color: var(--color, #0F3A3A);';
+
+    var dialog = document.createElement('div');
+    dialog.className = 'ddl-edit-dialog';
+    dialog.style.cssText = 'width: 640px; max-width: 92vw; max-height: 86vh;'
+      + ' background: #fff; border: 1px solid rgba(15,58,58,0.25); border-radius: 6px;'
+      + ' box-shadow: 0 10px 30px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden;';
+    dialog.addEventListener('click', function(e){ e.stopPropagation(); });
+    dialog.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+
+    var dHeader = document.createElement('div');
+    dHeader.style.cssText = 'padding: 0.7em 1em; background: rgba(15,58,58,0.06); border-bottom: 1px solid rgba(15,58,58,0.15); font-family: "Cafe24Danjunghae","Gowun Batang",serif; font-size: 1.05em; display: flex; justify-content: space-between; align-items: center;';
+    var dTitle = document.createElement('span'); dTitle.textContent = '📌 사이트 반영 CSS 붙여넣기 가이드';
+    var dClose = document.createElement('button');
+    dClose.type = 'button'; dClose.textContent = '×';
+    dClose.style.cssText = 'background: transparent; border: none; cursor: pointer; font-size: 1.3em; color: rgba(15,58,58,0.6); padding: 0 0.2em;';
+    dClose.addEventListener('click', function(){ close(); });
+    dHeader.appendChild(dTitle); dHeader.appendChild(dClose);
+    dialog.appendChild(dHeader);
+
+    var body = document.createElement('div');
+    body.className = 'ddl-scroll-invisible';
+    body.style.cssText = 'flex: 1; min-height: 0; overflow-y: auto; padding: 18px 22px; line-height: 1.65; color: var(--color, #0F3A3A); font-size: 13px;';
+
+    body.innerHTML =
+      '<div style="padding: 12px 14px; background: rgba(255,154,118,0.08); border-left: 3px solid var(--point, #FF9A76); border-radius: 4px; margin-bottom: 18px; font-size: 12px; line-height: 1.55;">'
+      + '💡 라이브러리의 <b>📋 사이트 반영 CSS 복사</b> 버튼을 누르면 등록된 모든 폰트의 <code style="background: rgba(15,58,58,0.06); padding: 1px 5px; border-radius: 3px;">@font-face</code> 블록이 클립보드에 담깁니다. 이걸 <b>Ghost 관리자 Code Injection</b>에 붙여넣어야 사이트 방문자에게도 폰트가 보입니다.'
+      + '</div>'
+
+      + '<h3 style="font-family: \'Cafe24Danjunghae\',\'Gowun Batang\',serif; margin: 0 0 6px; color: var(--color, #0F3A3A); font-size: 15px;">1･﹯ Ghost 관리자 접속</h3>'
+      + '<div style="margin-left: 14px; margin-bottom: 18px;">'
+      + '<div>▪ <a href="https://2vvena.ghost.io/ghost/" target="_blank" style="color: var(--point, #FF9A76); text-decoration: none;">https://2vvena.ghost.io/ghost/</a> 로 이동</div>'
+      + '<div>▪ 로그인 (이미 되어 있으면 자동 진입)</div>'
+      + '</div>'
+
+      + '<h3 style="font-family: \'Cafe24Danjunghae\',\'Gowun Batang\',serif; margin: 0 0 6px; font-size: 15px;">2･﹯ 좌측 메뉴에서 Settings 열기</h3>'
+      + '<div style="margin-left: 14px; margin-bottom: 18px;">'
+      + '<div>▪ 좌측 하단 “<b>Settings (⚙)</b>” 클릭</div>'
+      + '<div>▪ 설정 페이지가 오른쪽에 열림</div>'
+      + '</div>'
+
+      + '<h3 style="font-family: \'Cafe24Danjunghae\',\'Gowun Batang\',serif; margin: 0 0 6px; font-size: 15px;">3･﹯ “Code injection” 카드 찾기</h3>'
+      + '<div style="margin-left: 14px; margin-bottom: 18px;">'
+      + '<div>▪ Settings 페이지에서 아래로 스크롤</div>'
+      + '<div>▪ <b>Advanced</b> 섹션 → <b>Code injection</b> 카드 클릭</div>'
+      + '<div>▪ <b>Site Header</b> / <b>Site Footer</b> 두 입력창이 보임</div>'
+      + '</div>'
+
+      + '<h3 style="font-family: \'Cafe24Danjunghae\',\'Gowun Batang\',serif; margin: 0 0 6px; font-size: 15px;">4･﹯ <b>Site Header</b> 입력창에 붙여넣기 — 교체 방식</h3>'
+      + '<div style="margin-left: 14px; margin-bottom: 12px;">'
+      + '<div style="color: var(--point,#FF9A76); font-weight: 500; margin-bottom: 4px;">🔑 핵심: 매번 전체를 통째 교체합니다 (편집기 스크립트 교체 방식과 동일)</div>'
+      + '<div style="padding: 10px 12px; background: rgba(15,58,58,0.04); border-radius: 4px; margin: 8px 0; font-family: Menlo,Consolas,monospace; font-size: 11px; line-height: 1.5;">'
+      + '&lt;!-- font library start --&gt;<br>'
+      + '&lt;style id="ddl-fonts-imported"&gt;<br>'
+      + '&nbsp;&nbsp;… 이 사이 전체를 방금 복사한 것으로 교체 …<br>'
+      + '&lt;/style&gt;<br>'
+      + '&lt;!-- font library end --&gt;'
+      + '</div>'
+      + '<div>▪ 기존에 <code style="background: rgba(15,58,58,0.06); padding: 1px 5px; border-radius: 3px;">&lt;!-- font library start --&gt;</code> 이 있으면 <b>그 다음 줄부터 <code style="background: rgba(15,58,58,0.06); padding: 1px 5px; border-radius: 3px;">&lt;!-- font library end --&gt;</code> 까지 전부 삭제</b>하고 방금 복사한 걸 붙여넣기</div>'
+      + '<div>▪ 기존 마커가 없으면 (처음이면) Site Header 맨 아래에 그대로 붙여넣기</div>'
+      + '<div>▪ <b>기존 Site Header 안의 다른 스크립트/스타일은 건들지 말 것</b> (폰트 문서 바깥은 그대로 보존)</div>'
+      + '</div>'
+
+      + '<h3 style="font-family: \'Cafe24Danjunghae\',\'Gowun Batang\',serif; margin: 0 0 6px; font-size: 15px;">5･﹯ 저장</h3>'
+      + '<div style="margin-left: 14px; margin-bottom: 18px;">'
+      + '<div>▪ Code injection 페이지 우상단 “<b>Save</b>” 버튼 클릭</div>'
+      + '<div>▪ 이제 사이트 모든 페이지에 폰트가 로드됨</div>'
+      + '</div>'
+
+      + '<h3 style="font-family: \'Cafe24Danjunghae\',\'Gowun Batang\',serif; margin: 0 0 6px; font-size: 15px;">6･﹯ 확인</h3>'
+      + '<div style="margin-left: 14px; margin-bottom: 12px;">'
+      + '<div>▪ 새 탭으로 <a href="https://2vvena.ghost.io/" target="_blank" style="color: var(--point, #FF9A76); text-decoration: none;">https://2vvena.ghost.io/</a> 열기</div>'
+      + '<div>▪ 발행된 글에서 폰트가 적용되어 보이는지 확인</div>'
+      + '<div>▪ 안 보이면 캐시 문제 가능성 → <b>Ctrl+Shift+R</b> (맥: <b>⌘+Shift+R</b>) 강제 새로고침</div>'
+      + '</div>'
+
+      + '<div style="margin-top: 20px; padding: 12px 14px; background: rgba(15,58,58,0.04); border-radius: 4px; font-size: 11px; color: rgba(15,58,58,0.6); line-height: 1.6;">'
+      + '📌 <b>왜 매번 통째 교체?</b><br>'
+      + '폰트 하나만 추가한다고 그 부분만 찾아서 삽입하기가 번거롭고 실수하기 쉽음. 편집기 스크립트 교체 방식과 동일하게 <b>매번 전체 교체</b>가 안전합니다.<br><br>'
+      + '📌 <b>편집기에서는 바로 보이는데 사이트에서는 안 보임</b><br>'
+      + '편집기는 자체적으로 <code>@font-face</code>를 주입해서 미리보기가 가능하지만, 사이트 방문자에게는 <b>Ghost Code Injection에 준 것만</b> 적용되기 때문입니다.'
+      + '</div>';
+    dialog.appendChild(body);
+
+    var footer = document.createElement('div');
+    footer.style.cssText = 'padding: 0.7em 1em; border-top: 1px solid rgba(15,58,58,0.1); display: flex; justify-content: space-between; align-items: center; gap: 0.5em; background: #fff;';
+
+    var linkBtn = document.createElement('a');
+    linkBtn.href = 'https://2vvena.ghost.io/ghost/#/settings/code-injection';
+    linkBtn.target = '_blank';
+    linkBtn.textContent = '→ Code injection 바로 열기';
+    linkBtn.style.cssText = 'padding: 0.4em 0.8em; border-radius: 3px; text-decoration: none; background: transparent; color: var(--point, #FF9A76); font-size: 0.85em; border: 1px solid rgba(255,154,118,0.4);';
+    footer.appendChild(linkBtn);
+
+    var okBtn = document.createElement('button');
+    okBtn.type = 'button'; okBtn.textContent = '확인';
+    okBtn.style.cssText = 'padding: 0.4em 0.8em; border-radius: 3px; cursor: pointer; background: var(--point, #FF9A76); color: #fff; border: 1px solid var(--point, #FF9A76); font-size: 0.85em;';
+    okBtn.addEventListener('click', function(){ close(); });
+    footer.appendChild(okBtn);
+    dialog.appendChild(footer);
+
+    function close(){
+      try { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch(_){}
+    }
+
+    var escHandler = function(e){
+      if (e.key === 'Escape'){ close(); document.removeEventListener('keydown', escHandler); }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+  }
+
   // API 노출
   try {
     window.__DDL_EDITOR = window.__DDL_EDITOR || {};
@@ -9729,6 +10064,7 @@
     window.__DDL_EDITOR.saveFontLibrary       = saveFontLibrary;
     window.__DDL_EDITOR.openFontLibraryManager = openFontLibraryManager;
     window.__DDL_EDITOR.openFontHelpDialog    = openFontHelpDialog;
+    window.__DDL_EDITOR.openSitePasteGuide    = openSitePasteGuide;
     window.__DDL_EDITOR.getFontLibraryFiltered = _getFontLibraryFiltered;
     window.__DDL_EDITOR.reloadFontLibraryCSS  = _injectFontFaceCSS;
     window.__DDL_EDITOR.generateSiteFontCSS   = _generateSiteFontCSS;
@@ -13368,7 +13704,7 @@
       '</div>' +
       // 4. 버전
       '<div style="margin-top:20px;padding-top:12px;border-top:1px solid rgba(15,58,58,0.06);font-size:11px;color:rgba(15,58,58,0.4);text-align:center;">' +
-        'v2.0-β-p19w' +
+        'v2.0-β-p19x' +
       '</div>';
 
     mask.appendChild(box);
