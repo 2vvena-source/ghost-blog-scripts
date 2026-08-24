@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p20e
+ * 2vvena Editor Core - v2.0-β-p20f
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -227,11 +227,11 @@
     '  pointer-events: none;',
     '}',
 
-    // ─── 블록 ───
+    // ─── 블록 (p20f: 노션식 — 왜쪽 여백 없이 핸들은 밖으로 나오게) ───
     'section.gh-content .editor-block {',
     '  position: relative;',
     '  margin: 0.15em 0 !important;',
-    '  padding: 0.15em 0 0.15em 2em !important;',
+    '  padding: 0.15em 0 !important;',
     '  border-radius: 2px;',
     '  transition: background 0.12s ease;',
     '  min-height: 1.4em;',
@@ -258,30 +258,33 @@
     '  display: inline;',
     '}',
 
-    // ─── 드래그 손잡이 ───
+    // ─── 드래그 손잡이 (p20f: 노션 스타일) ───
+    //   블록 왜쪽 밖으로 무거심 (여백 사용 X)
+    //   hover 시만 보이며 항상 후광에서 모든 블록 자체를 잡아도 드래그 가능(script 로직)
     '.editor-block .block-handle {',
     '  position: absolute;',
-    '  left: 0.2em;',
-    '  top: 50%;',
-    '  transform: translateY(-50%);',
-    '  width: 1.4em;',
-    '  height: 1.4em;',
+    '  left: -1.4em;',                       // 블록 바깥으로
+    '  top: 0.15em;',                        // 바닥 서른 맞춤
+    '  width: 1.1em;',
+    '  height: 1.1em;',
     '  display: flex;',
     '  align-items: center;',
     '  justify-content: center;',
     '  cursor: grab;',
     '  opacity: 0;',
-    '  color: rgba(15,58,58,0.4);',
-    '  font-size: 0.9em;',
+    '  color: rgba(15,58,58,0.35);',
+    '  font-size: 0.8em;',
     '  user-select: none;',
     '  line-height: 1;',
-    '  border-radius: 2px;',
-    '  transition: opacity 0.15s ease, background 0.12s ease, color 0.12s ease;',
+    '  border-radius: 3px;',
+    '  pointer-events: none;',              // hover 전에는 클릭 안잡힌
+    '  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;',
     '}',
-    '.editor-block:hover .block-handle { opacity: 1; }',
+    '.editor-block:hover > .block-handle { opacity: 0.85; pointer-events: auto; }',
     '.editor-block .block-handle:hover {',
     '  color: var(--color, #0F3A3A);',
     '  background: rgba(15,58,58,0.08);',
+    '  opacity: 1;',
     '}',
     '.editor-block .block-handle:active { cursor: grabbing; }',
     '.editor-block.is-dragging { opacity: 0.4; background: rgba(255,154,118,0.1); }',
@@ -426,22 +429,23 @@
     '}',
         /* p13i: 콜아웃 리사이저 - !important 로 인라인 style 이겨내기 */
     '.callout-box { position: relative !important; }',
+    /* p20f: 리사이저 — 심플 점 하나, hover 시만 표시 */
     '.callout-resizer {',
     '  position: absolute !important;',
-    '  right: -4px !important;',
-    '  bottom: -4px !important;',
-    '  width: 18px !important;',
-    '  height: 18px !important;',
+    '  right: 3px !important;',
+    '  bottom: 3px !important;',
+    '  width: 10px !important;',
+    '  height: 10px !important;',
     '  cursor: nwse-resize !important;',
-    '  opacity: 0.4;',
-    '  transition: opacity 0.15s ease, background 0.15s ease;',
+    '  opacity: 0;',
+    '  transition: opacity 0.15s ease, background 0.15s ease, transform 0.15s ease;',
     '  z-index: 999 !important;',
-    '  background: linear-gradient(135deg, transparent 40%, rgba(15,58,58,0.7) 40%, rgba(15,58,58,0.7) 55%, transparent 55%, transparent 65%, rgba(15,58,58,0.7) 65%, rgba(15,58,58,0.7) 80%, transparent 80%);',
-    '  border-radius: 0 0 4px 0;',
+    '  background: rgba(15,58,58,0.4);',
+    '  border-radius: 50%;',
     '  pointer-events: auto !important;',
     '}',
-    '.callout-box:hover .callout-resizer { opacity: 1; }',
-    '.callout-resizer:hover { background: linear-gradient(135deg, transparent 40%, var(--point, #FF9A76) 40%, var(--point, #FF9A76) 55%, transparent 55%, transparent 65%, var(--point, #FF9A76) 65%, var(--point, #FF9A76) 80%, transparent 80%) !important; }',
+    '.callout-box:hover .callout-resizer { opacity: 0.55; }',
+    '.callout-resizer:hover { opacity: 1 !important; background: var(--point, #FF9A76) !important; transform: scale(1.15); }',
     '.callout-body {',
     '  flex: 1;',
     '  min-width: 0;',
@@ -1971,6 +1975,12 @@
           h.setAttribute('draggable', 'true');
         }
       });
+      // p20f: 노션식 — 특수블록의 요소 자체도 draggable=true 보장
+      root.querySelectorAll('.callout-box, .ep-divider-wrap, .kg-button-card, .editor-image-figure').forEach(function(el){
+        if (el.getAttribute('draggable') !== 'true'){
+          el.setAttribute('draggable', 'true');
+        }
+      });
     } catch(_){}
   }
 
@@ -2173,34 +2183,105 @@
       }
 
       if (e.key === 'Backspace') {
-        if ((target.textContent || '').trim() !== '') return;
         if (target.tagName === 'LI') return;
-        var prev = block.previousElementSibling;
-        if (!prev || !prev.classList.contains('editor-block')) return;
-        if (contentEl.querySelectorAll('.editor-block').length <= 1) return;
-        e.preventDefault();
-        block.remove();
-        var pi = prev.querySelector('[contenteditable="true"]');
-        if (pi) {
-          pi.focus();
-          var range = document.createRange();
-          range.selectNodeContents(pi);
-          range.collapse(false);
-          var sel = window.getSelection();
-          sel.removeAllRanges();
-          sel.addRange(range);
-        } else {
-          // 이전 블록이 편집불가(구분선 등)면 다시 그 앞으로
-          var pi2 = prev.previousElementSibling && prev.previousElementSibling.querySelector('[contenteditable="true"]');
-          if (pi2) {
-            pi2.focus();
-            var r2 = document.createRange();
-            r2.selectNodeContents(pi2);
-            r2.collapse(false);
-            var s3 = window.getSelection();
-            s3.removeAllRanges();
-            s3.addRange(r2);
+        // p20f: 커서가 블록 첫머리인지 판정 (텍스트 있는 바닥에서도 적용하기 위함)
+        var _s = window.getSelection();
+        var _isAtStart = false;
+        try {
+          if (_s && _s.rangeCount) {
+            var _r = _s.getRangeAt(0);
+            if (_r.collapsed) {
+              var _tr = document.createRange();
+              _tr.selectNodeContents(target);
+              _tr.setEnd(_r.startContainer, _r.startOffset);
+              _isAtStart = (_tr.toString().length === 0);
+            }
           }
+        } catch(_){}
+
+        // 기존 동작: 블록이 완전히 비어있으면 삭제 후 이전로 커서
+        // p20f 신규: 본문이 있고 커서가 첫머리면 “노션식 병합” — 이전 editable 마지막에 내용을 이어붙이고 현재 블록 제거
+        var isEmpty = (target.textContent || '').trim() === '' && !target.querySelector('img,figure,hr');
+        if (!isEmpty && !_isAtStart) return; // 가운데이면 기본 동작
+
+        var prev = block.previousElementSibling;
+        if (!prev || !prev.classList.contains('editor-block')) {
+          // p20f: 콜아웃 body 등 컨테이너 안 첫 블록이면—
+          //   기본 동작 허용(컨테이너에서 모두 지워질 수 있도록) — 메이브브 파먹을 피하기 위해 빈 <br>만 남기면 종료
+          return;
+        }
+        if (contentEl.querySelectorAll('.editor-block').length <= 1 && isEmpty) return;
+
+        // 이전에 editable 이 있는지 (구분선 등 건너뛰기)
+        function _findPrevEditableBlock(startBlock){
+          var p = startBlock.previousElementSibling;
+          while (p) {
+            if (p.classList && p.classList.contains('editor-block') && p.querySelector && p.querySelector('[contenteditable="true"]')) return p;
+            p = p.previousElementSibling;
+          }
+          return null;
+        }
+        var mergeTarget = _findPrevEditableBlock(block);
+        if (!mergeTarget) {
+          // 이전 editable 이 없고 현재 블록만 비어있으면 이전 비편집 블록(구분선 등)을 지움 (기존 line 2275 로직도 동작)
+          return;
+        }
+
+        e.preventDefault();
+        var pi = mergeTarget.querySelector('[contenteditable="true"]');
+        if (!pi) return;
+
+        if (isEmpty) {
+          // 기존 동작: 빈 블록 제거 후 이전 끝으로 커서
+          block.remove();
+          pi.focus();
+          var rangeE = document.createRange();
+          rangeE.selectNodeContents(pi);
+          rangeE.collapse(false);
+          _s.removeAllRanges();
+          _s.addRange(rangeE);
+          return;
+        }
+
+        // 노션식 병합: 현재 target 의 내용을 mergeTarget 의 pi 끝에 이어붙이고 블록 제거
+        try {
+          // 병합 직전 mergeTarget 의 끝 위치에 커서 놓기 위해 마커 노드 삽입
+          var beforeLen = (pi.textContent || '').length;
+          // 현재 target 의 자식(text + inline)을 pi 끝으로 이동
+          var frag = document.createDocumentFragment();
+          while (target.firstChild) frag.appendChild(target.firstChild);
+          // pi 가 비어있다면 (br만 있으면) br 제거 후 append
+          if (pi.childNodes.length === 1 && pi.firstChild && pi.firstChild.tagName === 'BR') {
+            pi.removeChild(pi.firstChild);
+          }
+          pi.appendChild(frag);
+          // 블록 제거
+          block.remove();
+          // 커서를 병합 경계에 놓기
+          pi.focus();
+          var rangeM = document.createRange();
+          // 병합 경계 = pi 의 beforeLen 길이에 해당하는 위치
+          var walker = document.createTreeWalker(pi, NodeFilter.SHOW_TEXT, null, false);
+          var acc = 0, targetNode = null, targetOffset = 0;
+          var t;
+          while ((t = walker.nextNode())){
+            var tLen = (t.nodeValue || '').length;
+            if (acc + tLen >= beforeLen){
+              targetNode = t; targetOffset = beforeLen - acc; break;
+            }
+            acc += tLen;
+          }
+          if (targetNode){
+            rangeM.setStart(targetNode, targetOffset);
+          } else {
+            rangeM.selectNodeContents(pi);
+            rangeM.collapse(false);
+          }
+          rangeM.collapse(true);
+          _s.removeAllRanges();
+          _s.addRange(rangeM);
+        } catch(err){
+          try{log('backspace merge 에러:', err && err.message);}catch(_){}
         }
       }
     });
@@ -2454,11 +2535,29 @@
       });
     }
 
+    // p20f: 노션 스타일 — 핸들 뿐 아니라 "contenteditable=false 요소 자체"를 잡아도 드래그 가능.
+    //   text editable(contenteditable=true) 안에서는 무시 — 기본 선택 동작 살림.
+    //   대상: 콜아웃 box(아이콘/리사이저 부분), 구분선, 버튼, 이미지 figure 등.
     contentEl.addEventListener('dragstart', function(e){
       var handle = e.target.closest('.block-handle');
-      if (!handle) return; // preventDefault 하지 않음 — 다른 드래그(예: 이미지 파일)을 방해하지 않게
-      dragged = handle.closest('.editor-block');
-      if (!dragged) return;
+      var block = null;
+      if (handle) {
+        block = handle.closest('.editor-block');
+      } else {
+        // 핸들이 아니면 target 이 편집 불가 영역이어야 드래그 시작 인정
+        var t = e.target;
+        // text editable 안에서의 드래그는 무시 (기본 동작 유지: 텍스트 선택·복사)
+        var inEditable = t && t.closest && t.closest('[contenteditable="true"]');
+        // 단, editable 안에도 contenteditable=false 자식(이미지 아이콘 등)이면 OK
+        var nonEditableChild = t && t.closest && t.closest('[contenteditable="false"]');
+        // editable 상위이면서 non-editable 자식 안이 아니면 거부
+        if (inEditable && !(nonEditableChild && inEditable.contains(nonEditableChild) && !nonEditableChild.contains(inEditable))){
+          return; // 기본 동작
+        }
+        block = t && t.closest ? t.closest('.editor-block') : null;
+      }
+      if (!block) return;
+      dragged = block;
       dragged.classList.add('is-dragging');
       e.dataTransfer.effectAllowed = 'move';
       try { e.dataTransfer.setData('text/plain', 'block'); } catch(_) {}
@@ -2775,6 +2874,8 @@
 
     var box = document.createElement('div');
     box.className = 'callout-box';
+    // p20f: box 자체를 잡아 드래그할 수 있게 — body(editable) 가 있음에도 draggable 부모 상속을 막지 않도록 box 자체만.
+    box.setAttribute('draggable', 'true');
     box.setAttribute('data-icon-type', 'emoji');
     box.setAttribute('data-icon-value', '💡');
     box.setAttribute('data-bg', 'rgba(203,145,47,0.14)');
@@ -2973,20 +3074,30 @@
   //   전달된 originBlock 이 콜아웃 body 자체이거나 body 안의 sentinel <br> 뿐인 경우,
   //   body 마지막 자식(또는 body 자체)을 반환해 새 블록이 body 안쪽으로 삽입되게 한다.
   //   originBlock 이 body 안의 실제 자식(예: <p>)이면 그대로 반환.
+  // p20f: 새 버전 — 목표: "사용자가 보는 컨테이너 안으로 삽입이 자연스러운 노션 스타일"
+  //   1) originBlock 이 body 자체 → body 마지막에 삽입 (body 반환)
+  //   2) originBlock 이 body 안의 직속 자식 예: <p> → 그 블록 다음에 삽입 (반환)
+  //   3) originBlock 이 body 안의 손자(예: 연속 네스티드 콜아웃 안 <p>) → 직속 조상까지 올라가 반환
+  //   4) originBlock 이 body 밖에 있음(예: originBlock == 컨테이너를 감싼는 editor-block)
+  //      → body 마지막에 append 하도록 body 반환.
   function _slashAnchorForCalloutBody(originBlock){
     if (!slashInCalloutBody) return originBlock;
     var body = slashInCalloutBody;
-    // originBlock 이 body 안의 자식이면 그대로
-    if (originBlock && originBlock !== body && body.contains(originBlock) && originBlock.parentNode === body) {
+    // 1) originBlock 이 body 자체면 body 반환
+    if (originBlock === body) return body;
+    // 2) originBlock 이 body 안의 직속 자식이면 그대로
+    if (originBlock && body.contains(originBlock) && originBlock.parentNode === body) {
       return originBlock;
     }
-    // originBlock 이 body 안의 손자면 body 안의 직속 자식까지 올라가기
-    var cur = originBlock;
-    while (cur && cur.parentNode && cur.parentNode !== body) cur = cur.parentNode;
-    if (cur && cur.parentNode === body) return cur;
-    // 그 외: body 안의 마지막 자식, 없으면 body 자체를 반환하고 호출측에서 처리
-    var last = body.lastElementChild;
-    return last || body;
+    // 3) originBlock 이 body 안의 손자면 body 직속 조상까지 올라가기
+    if (originBlock && body.contains(originBlock)) {
+      var cur = originBlock;
+      while (cur && cur.parentNode && cur.parentNode !== body) cur = cur.parentNode;
+      if (cur && cur.parentNode === body) return cur;
+    }
+    // 4) originBlock 이 body 밖 (예: body 를 감싼는 editor-block 자체) → body 마지막 append
+    //    body 를 반환하면 삽입측에서 anchor === body 분기로 버로 body 안에 append
+    return body;
   }
 
   // p20d: 콜아웃 body 안에서 슬래시로 새 블록 삽입 시 준비 작업
@@ -7069,6 +7180,7 @@
     var wrap = document.createElement('div');
     wrap.className = 'ep-divider-wrap';
     wrap.setAttribute('contenteditable', 'false');
+    wrap.setAttribute('draggable', 'true'); // p20f: 노션식 — 요소 자체를 잡아도 드래그
     wrap.innerHTML = renderDividerInner({
       presetId:'style5', color:'#555555', opacity:1, stroke:1,
       shapeMode:'unified', shapeFill:'empty', shapeStroke:'#555555'
@@ -11501,6 +11613,7 @@
     // 실제 Ghost 표준 카드
     var card = document.createElement('div');
     card.className = 'kg-card kg-button-card kg-align-center';
+    card.setAttribute('draggable', 'true'); // p20f: 요소 자체를 잡아도 드래그
     // p17d: 편집기 안에서는 <span> 사용 (링크 점프 방지). 저장 시 <a href> 로 변환.
     var a = document.createElement('span');
     a.className = 'kg-btn kg-btn-accent';
