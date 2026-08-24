@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p20b';
+  var VERSION = 'v2.0-β-p20c';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -14097,35 +14097,7 @@
     sizeSel.addEventListener('change', function(){ current.fontSize = sizeSel.value; _renderPreview(); });
     body.appendChild(_row('글자 크기', sizeSel));
 
-    // 배경색
-    var bgRow = document.createElement('div');
-    bgRow.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap;';
-    var bgOpts = [
-      { v: 'rgba(15,58,58,0.08)', l: '열은 회색 (기본)' },
-      { v: 'rgba(15,58,58,0.14)', l: '진한 회색' },
-      { v: 'rgba(255,154,118,0.10)', l: '연한 살구' },
-      { v: 'rgba(255,154,118,0.20)', l: '진한 살구' },
-      { v: '#F5F5F5', l: '사이트 배경' },
-      { v: 'transparent', l: '투명' }
-    ];
-    function _refreshBg(){
-      bgRow.innerHTML = '';
-      bgOpts.forEach(function(opt){
-        var b = document.createElement('button');
-        b.type = 'button'; b.textContent = opt.l;
-        var isActive = current.background === opt.v;
-        b.style.cssText = 'padding: 5px 8px; font-size: 11px; border-radius: 3px; cursor: pointer; font-family: inherit; background: ' + (opt.v === 'transparent' ? '#fff' : opt.v) + ';'
-          + ' color: var(--color, #0F3A3A);'
-          + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';';
-        b.addEventListener('click', function(){ current.background = opt.v; _refreshBg(); _renderPreview(); });
-        bgRow.appendChild(b);
-      });
-    }
-    _refreshBg();
-    body.appendChild(_row('배경색', bgRow));
-
-    // 글자색 — p20b: 프리셋 + 자유 color picker + 투명도
-    // 현재 값을 hex + alpha 로 분리 파싱하는 유틸
+    // 색상 유틸 (p20c: 배경 UI가 참조하므로 먼저 선언)
     function _parseColor(str){
       if (!str) return { hex: '#0F3A3A', alpha: 100 };
       str = String(str).trim();
@@ -14159,6 +14131,76 @@
       return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
     }
 
+    // 배경색 프리셋 (p20c)
+    var bgState = _parseColor(current.background);
+    var bgRow = document.createElement('div');
+    bgRow.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap;';
+    var bgOpts = [
+      { v: 'rgba(15,58,58,0.08)', l: '열은 회색 (기본)' },
+      { v: 'rgba(15,58,58,0.14)', l: '진한 회색' },
+      { v: 'rgba(255,154,118,0.10)', l: '연한 살구' },
+      { v: 'rgba(255,154,118,0.20)', l: '진한 살구' },
+      { v: '#F5F5F5', l: '사이트 배경' },
+      { v: 'transparent', l: '투명' }
+    ];
+    var bgPicker, bgAlphaSlider, bgAlphaLabel;
+    function _refreshBg(){
+      bgRow.innerHTML = '';
+      bgOpts.forEach(function(opt){
+        var b = document.createElement('button');
+        b.type = 'button'; b.textContent = opt.l;
+        var isActive = current.background === opt.v;
+        b.style.cssText = 'padding: 5px 8px; font-size: 11px; border-radius: 3px; cursor: pointer; font-family: inherit; background: ' + (opt.v === 'transparent' ? '#fff' : opt.v) + ';'
+          + ' color: var(--color, #0F3A3A);'
+          + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';';
+        b.addEventListener('click', function(){
+          current.background = opt.v;
+          bgState = _parseColor(current.background);
+          if (bgPicker) bgPicker.value = bgState.hex;
+          if (bgAlphaSlider) bgAlphaSlider.value = bgState.alpha;
+          if (bgAlphaLabel) bgAlphaLabel.textContent = bgState.alpha + '%';
+          _refreshBg(); _renderPreview();
+        });
+        bgRow.appendChild(b);
+      });
+    }
+    _refreshBg();
+    body.appendChild(_row('배경색 프리셋', bgRow));
+
+    // 배경색 자유 조절 — 색 픽커 + 투명도 (p20c 신규)
+    var bgCustomWrap = document.createElement('div');
+    bgCustomWrap.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+    bgPicker = document.createElement('input');
+    bgPicker.type = 'color'; bgPicker.value = bgState.hex;
+    bgPicker.style.cssText = 'width: 42px; height: 30px; padding: 2px; border: 1px solid rgba(15,58,58,0.15); border-radius: 3px; cursor: pointer; background: #fff;';
+    bgPicker.addEventListener('input', function(){
+      bgState.hex = bgPicker.value;
+      current.background = _makeRgba(bgState.hex, bgState.alpha);
+      _refreshBg(); _renderPreview();
+    });
+    bgCustomWrap.appendChild(bgPicker);
+
+    var bgAlphaWrap = document.createElement('div');
+    bgAlphaWrap.style.cssText = 'flex:1; display: flex; gap: 6px; align-items: center;';
+    bgAlphaSlider = document.createElement('input');
+    bgAlphaSlider.type = 'range'; bgAlphaSlider.min = '0'; bgAlphaSlider.max = '100'; bgAlphaSlider.step = '5';
+    bgAlphaSlider.value = bgState.alpha;
+    bgAlphaSlider.style.cssText = 'flex:1; accent-color: var(--point, #FF9A76);';
+    bgAlphaLabel = document.createElement('span');
+    bgAlphaLabel.textContent = bgState.alpha + '%';
+    bgAlphaLabel.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.6); min-width: 30px; text-align: right;';
+    bgAlphaSlider.addEventListener('input', function(){
+      bgState.alpha = parseInt(bgAlphaSlider.value, 10);
+      bgAlphaLabel.textContent = bgState.alpha + '%';
+      current.background = _makeRgba(bgState.hex, bgState.alpha);
+      _refreshBg(); _renderPreview();
+    });
+    bgAlphaWrap.appendChild(bgAlphaSlider);
+    bgAlphaWrap.appendChild(bgAlphaLabel);
+    bgCustomWrap.appendChild(bgAlphaWrap);
+    body.appendChild(_row('배경 자유 색 · 투명도', bgCustomWrap, '프리셋과 무관하게 자유롭게 설정'));
+
+    // 글자색 — p20b: 프리셋 + 자유 color picker + 투명도
     var colorState = _parseColor(current.color);
 
     // 프리셋 줄
