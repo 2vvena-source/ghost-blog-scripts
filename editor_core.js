@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p19t
+ * 2vvena Editor Core - v2.0-β-p19u
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -13825,6 +13825,19 @@
       if (e.target.closest('#ep-div-popup')) return;
       if (e.target.closest('#ep-cal-popup')) return;
       if (e.target.closest('#ep-dialog-overlay')) return;
+      // p19u: ⭐ 결정적 버그 수정
+      //   이 capture-단계 리스너가 편집 다이얼로그 안 mousedown 도 다 보고 preventDefault 해서
+      //   인풋/드롭다운/슬라이더 동작이 다 죽은 것.
+      //   사용자 증상: 「이름칸 눌러 입력해도 뒤 블록에 텍스트 입력」, 「슬라이더 활성화만 되고 조절 안 됨」
+      //   그리고 이 리스너는 편집기 밖 모든 팝업을 예외로 적어놓았으므로 우리가 새로 만든 
+      //   오버레이/다이얼로그도 마찬가지로 예외처리 해야 함.
+      if (e.target.closest('.ddl-edit-overlay')) return;
+      if (e.target.closest('.ddl-edit-dialog')) return;
+      if (e.target.closest('.ep-popup-v2')) return;
+      if (e.target.closest('#ddl-settings-modal')) return;
+      if (e.target.closest('.ep-modern-toolbar')) return;
+      if (e.target.closest('.ep-hl-palette')) return;
+      if (e.target.closest('.ep-mini-popover')) return;
 
       // 편집기 근처가 아니면 다중선택 해제하고 종료
       if (!isNearEditor(e.clientX, e.clientY)) {
