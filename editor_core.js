@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p20j
+ * 2vvena Editor Core - v2.0-β-p20k
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -2162,43 +2162,6 @@
         }
       });
       // 향후 접은글 등: '.collapse-body' 같은 새 컬래스도 여기서 붙입었음.
-      // p20j: 접은글 body 도 컨테이너로 마킹
-      var foldBodies = root.querySelectorAll('.ddl-fold-body');
-      foldBodies.forEach(function(b){
-        if (b.getAttribute('data-block-container') !== 'true'){
-          b.setAttribute('data-block-container', 'true');
-        }
-      });
-      // p20j: 접은글 복원 시 제목은 contenteditable=true 보장
-      var foldTitles = root.querySelectorAll('.ddl-fold-title');
-      foldTitles.forEach(function(t){
-        if (t.getAttribute('contenteditable') !== 'true') t.setAttribute('contenteditable', 'true');
-      });
-      // p20j: 접은글 블록은 contenteditable=false 유지 + 스타일 재적용
-      var foldBlocks = root.querySelectorAll('.ddl-fold-block');
-      foldBlocks.forEach(function(fb){
-        if (fb.getAttribute('contenteditable') !== 'false') fb.setAttribute('contenteditable', 'false');
-        var arr = fb.querySelector('.ddl-fold-arrow');
-        if (arr && arr.getAttribute('contenteditable') !== 'false') arr.setAttribute('contenteditable', 'false');
-        var gr = fb.querySelector('.ddl-fold-gear');
-        if (gr && gr.getAttribute('contenteditable') !== 'false') gr.setAttribute('contenteditable', 'false');
-        try { if (typeof _applyFoldStyles === 'function') _applyFoldStyles(fb); } catch(_){}
-      });
-      // p20j: 표 셀 contenteditable=true 보장 + 저장된 배경색 복원
-      var tableCells = root.querySelectorAll('.ddl-table td, .ddl-table th');
-      tableCells.forEach(function(c){
-        if (c.getAttribute('contenteditable') !== 'true') c.setAttribute('contenteditable', 'true');
-        var cb = c.getAttribute('data-cell-bg');
-        if (cb) c.style.background = cb;
-      });
-      // p20j: 표 블록 폭 모드 클래스 복원
-      var tableBlocks = root.querySelectorAll('.ddl-table-block');
-      tableBlocks.forEach(function(tb){
-        if (tb.getAttribute('contenteditable') !== 'false') tb.setAttribute('contenteditable', 'false');
-        var m = tb.getAttribute('data-t-width-mode') || 'content';
-        tb.classList.remove('is-t-narrow','is-t-content','is-t-editor','is-t-wide');
-        tb.classList.add('is-t-' + m);
-      });
     } catch(_){}
   }
 
@@ -3636,77 +3599,10 @@
             insertButtonBlock(b);
           }
         }
-      },
-      // p20j: 표 (Table)
-      { id:'table', label:'표', desc:'기본 표. 셀 색상·행/열 추가·폭 조절·전체보기(팝업)', icon:'▦',
-        keywords:['표','table','tbl','시트','sheet','그리드','grid'],
-        exec:function(originBlock){
-          if (slashInCalloutBody) {
-            var body = _prepareCalloutBodyForInsert();
-            var anchor = _slashAnchorForCalloutBody(originBlock);
-            if (anchor === body) {
-              var tmp = document.createElement('div');
-              tmp.className = 'editor-block';
-              tmp.setAttribute('data-block-type', 'p');
-              var tp = document.createElement('p');
-              tp.setAttribute('contenteditable', 'true');
-              tp.innerHTML = '<br>';
-              tmp.appendChild(makeBlockHandle());
-              tmp.appendChild(tp);
-              body.appendChild(tmp);
-              insertTableBlock(tmp);
-              if ((tp.textContent || '').trim() === '') { try { tmp.remove(); } catch(_){} }
-            } else {
-              var wasEmpty = anchor && (anchor.textContent || '').trim() === '' && anchor.getAttribute && anchor.getAttribute('data-block-type') === 'p';
-              insertTableBlock(anchor);
-              if (wasEmpty && anchor.parentNode) { try { anchor.remove(); } catch(_){} }
-            }
-            return;
-          }
-          var b = originBlock;
-          if (b && (b.textContent || '').trim() === '' && b.getAttribute && b.getAttribute('data-block-type') === 'p') {
-            insertTableBlock(b);
-            try { b.remove(); } catch(_){}
-          } else {
-            insertTableBlock(b);
-          }
-        }
-      },
-      // p20j: 접은글 (Fold / Toggle)
-      { id:'fold', label:'접은글', desc:'제목 클릭으로 펼치기·접기. 제목/본문 색 개별·서식 편집·중첩 가능', icon:'▶',
-        keywords:['접은글','접기','toggle','fold','collapse','details','summary','아코디언','accordion'],
-        exec:function(originBlock){
-          if (slashInCalloutBody) {
-            var body = _prepareCalloutBodyForInsert();
-            var anchor = _slashAnchorForCalloutBody(originBlock);
-            if (anchor === body) {
-              var tmp = document.createElement('div');
-              tmp.className = 'editor-block';
-              tmp.setAttribute('data-block-type', 'p');
-              var tp = document.createElement('p');
-              tp.setAttribute('contenteditable', 'true');
-              tp.innerHTML = '<br>';
-              tmp.appendChild(makeBlockHandle());
-              tmp.appendChild(tp);
-              body.appendChild(tmp);
-              insertFoldBlock(tmp);
-              if ((tp.textContent || '').trim() === '') { try { tmp.remove(); } catch(_){} }
-            } else {
-              var wasEmpty = anchor && (anchor.textContent || '').trim() === '' && anchor.getAttribute && anchor.getAttribute('data-block-type') === 'p';
-              insertFoldBlock(anchor);
-              if (wasEmpty && anchor.parentNode) { try { anchor.remove(); } catch(_){} }
-            }
-            return;
-          }
-          var b = originBlock;
-          if (b && (b.textContent || '').trim() === '' && b.getAttribute && b.getAttribute('data-block-type') === 'p') {
-            insertFoldBlock(b);
-            try { b.remove(); } catch(_){}
-          } else {
-            insertFoldBlock(b);
-          }
-        }
       }
+      // p20k: 표·접은글 슬래시 항목은 p20j 에서 임시 추가되었으나 지침 미준수로 인해 전면 철수.
+      //   다음 라운드에서 기존 콜아웃/버튼 편집 방식과 통일된 하나씩·면밀하게 재설계.
+      //   TABLE_v2_SPEC.md / FOLD_v2_SPEC.md 를 설계 지침으로 삼음.
     ];
   }
 
@@ -13199,6 +13095,27 @@
       body.style.minWidth = '0';
       body.style.lineHeight = '1.6';
       body.style.wordBreak = 'break-word';
+      // p20k: 본문 직계 자식들은 블록 레이아웃만 오게 (플렉스 상속 방지)
+      body.style.display = 'block';
+      // p20k: 직계 자식 사이 여백 보장 (특히 중첩 콜아웃이 붙어나오는 버그 방지)
+      var directChildren = body.children;
+      for (var i = 0; i < directChildren.length; i++) {
+        var ch = directChildren[i];
+        if (!ch || !ch.style) continue;
+        // 첫 자식은 margin-top 0, 마지막 자식은 margin-bottom 0 — 그 사이는 간격
+        var isFirst = (i === 0);
+        var isLast = (i === directChildren.length - 1);
+        // 중첩 콜아웃이면 확실히 margin 강제 (enhanceCalloutForSite 가 이미 margin 설정하지만, 플렉스 상속으로 무효화될 수 있으므로 재명시)
+        if (ch.classList && ch.classList.contains('callout-box')) {
+          ch.style.marginTop = isFirst ? '0' : '0.6em';
+          ch.style.marginBottom = isLast ? '0' : '0.6em';
+          ch.style.display = 'flex';
+        } else if (ch.tagName === 'DIV' || ch.tagName === 'P') {
+          // 일반 문단/블록도 상하 여백 약간
+          if (!ch.style.marginTop) ch.style.marginTop = isFirst ? '0' : '0.3em';
+          if (!ch.style.marginBottom) ch.style.marginBottom = isLast ? '0' : '0.3em';
+        }
+      }
     }
   }
 
@@ -13216,7 +13133,7 @@
     contentEl.querySelectorAll('.editor-block').forEach(function(b){
       // p20d: 콜아웃 body 안에 중첩된 editor-block 은 부모 콜아웃이 통째로 저장하므로 top-level 에서는 스킵
       //         (이 가드 없으면 안에 있는 블록이 밖에도 또 한 번 저장되어 노션 스타일 중첩이 깨짐)
-      try { if (b.parentElement && b.parentElement.closest && b.parentElement.closest('.callout-body, .ddl-fold-body')) return; } catch(_){}
+      try { if (b.parentElement && b.parentElement.closest && b.parentElement.closest('.callout-body')) return; } catch(_){}
       var blockType = b.getAttribute('data-block-type') || '';
       var innerEls = Array.from(b.children).filter(function(c){ return !c.classList.contains('block-handle'); });
       // p13f: data-block-type 뿐 아니라 실제 .callout-box 존재 여부로도 판단 (더 견고)
@@ -13225,16 +13142,13 @@
       var hasImageFig = !!(b.querySelector && b.querySelector('figure.editor-image-figure'));
       var hasDivider = (b.classList && b.classList.contains('ep-divider-block'));
       var hasButton = (b.classList && b.classList.contains('ep-button-block'));
-      // p20j: 표/접은글 모두 블록 자체 통째로 저장
-      var hasTable = (b.classList && b.classList.contains('ddl-table-block'));
-      var hasFold  = (b.classList && b.classList.contains('ddl-fold-block'));
       // p16e: 구분선은 블록 자체(.ep-divider-block)를 통째로 저장
       if (hasDivider) innerEls = [b];
       // p17a: 버튼도 블록 자체
       if (hasButton) innerEls = [b];
-      if (hasTable)  innerEls = [b];
-      if (hasFold)   innerEls = [b];
-      var isCustom = (blockType === 'callout' || hasCalloutBox || blockType === 'image' || hasImageFig || blockType === 'divider' || hasDivider || blockType === 'button' || hasButton || blockType === 'table' || hasTable || blockType === 'fold' || hasFold);
+      // p20k: 표·접은글 로직은 다음 라운드에서 재설계 (이번 라운드는 예외 처리 앞으로 앞당김)
+      var hasTable = false, hasFold = false;
+      var isCustom = (blockType === 'callout' || hasCalloutBox || blockType === 'image' || hasImageFig || blockType === 'divider' || hasDivider || blockType === 'button' || hasButton);
       // p13f: 감지 시 data-block-type 자동 교정
       if (hasCalloutBox && blockType !== 'callout') {
         log('[collectPostData] 콜아웃 감지, data-block-type 교정:', blockType, '→ callout');
@@ -13249,12 +13163,7 @@
       if (hasButton && blockType !== 'button') {
         b.setAttribute('data-block-type', 'button');
       }
-      if (hasTable && blockType !== 'table') {
-        b.setAttribute('data-block-type', 'table');
-      }
-      if (hasFold && blockType !== 'fold') {
-        b.setAttribute('data-block-type', 'fold');
-      }
+      // p20k: 표·접은글 data-block-type 교정 솔수 (다음 라운드에서 재도입)
       if (isCustom) {
         var innerHtml = '';
         innerEls.forEach(function(el){
@@ -13281,6 +13190,28 @@
             var innerBox = clone.querySelector && clone.querySelector('.callout-box');
             if (innerBox) enhanceCalloutForSite(innerBox);
           }
+          // p20k: 콜아웃(+모든 커스텀 블록) 안에 남은 편집기 전용 자산 완전 제거
+          //   - 드래그 핸들(⋮⋮): 예전에는 구분선/버튼만 제거해서 중첩 콜아웃에 그대로 남아버림 → 사이트에 노출되는 버그
+          //   - 칸이 캐랭터 샜열 그대로 노출되던 원인입니다.
+          try {
+            clone.querySelectorAll('.block-handle').forEach(function(h){ h.parentNode && h.parentNode.removeChild(h); });
+            // 드롭 인디케이터·설정 마커 등 편집 UI 상태 클래스 정리
+            clone.querySelectorAll('.drop-into, .is-editing-focus, .is-selected, .dragging').forEach(function(x){
+              x.classList.remove('drop-into');
+              x.classList.remove('is-editing-focus');
+              x.classList.remove('is-selected');
+              x.classList.remove('dragging');
+            });
+            // data-block-container 마커는 로드 시 다시 붙이므로 정리
+            clone.querySelectorAll('[data-block-container]').forEach(function(x){ x.removeAttribute('data-block-container'); });
+          } catch(_){}
+          // p20k: 중첩 콜아웃간 여백 보장 — 내부 .callout-box 다수에도 margin 강제 적용
+          try {
+            clone.querySelectorAll('.callout-box').forEach(function(inner){
+              if (inner === clone) return;
+              enhanceCalloutForSite(inner);
+            });
+          } catch(_){}
           // p15a: 이미지 미세 조정 적용
           if (clone.classList && clone.classList.contains('editor-image-figure')) {
             enhanceImageForSite(clone);
@@ -13469,7 +13400,7 @@
     html = html.replace(/<mark\s[^>]*data-rt="([^"]*)"[^>]*class="ddl-ruby"[^>]*>([\s\S]*?)<\/mark>/g, _rubyMarker);
 
     // p13e: 저장 HTML 진단 로그
-    log('[SAVE-HTML] 길이:', html.length, '/ 콜아웃:', (html.match(/callout-box/g)||[]).length, '/ 구분선:', (html.match(/ddl-divider-block/g)||[]).length, '/ 버튼:', (html.match(/ddl-button-block/g)||[]).length, '/ 표:', (html.match(/ddl-table-block/g)||[]).length, '/ 접은글:', (html.match(/ddl-fold-block/g)||[]).length, '/ kg-card:', (html.match(/kg-card-begin/g)||[]).length);
+    log('[SAVE-HTML] 길이:', html.length, '/ 콜아웃:', (html.match(/callout-box/g)||[]).length, '/ 구분선:', (html.match(/ddl-divider-block/g)||[]).length, '/ 버튼:', (html.match(/ddl-button-block/g)||[]).length, '/ kg-card:', (html.match(/kg-card-begin/g)||[]).length);
     console.log('[2vvena-editor SAVE-HTML]\n' + html);
 
     var tags = [];
@@ -17936,8 +17867,7 @@
       setupImageClickHandler();
     setupDividerClickHandler();  // p16a
     setupButtonClickHandler();   // p17a
-    setupTableClickHandler();    // p20j
-    setupFoldClickHandler();     // p20j
+    // p20k: 표·접은글 해들러는 다음 라운드에서 지침 준수로 재설계 후 재등록
       setupCopyModes();
       setupPasteHandler();
 
