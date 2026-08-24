@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p20g
+ * 2vvena Editor Core - v2.0-β-p20h
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -261,12 +261,13 @@
     // ─── 드래그 손잡이 (p20f: 노션 스타일) ───
     //   블록 왜쪽 밖으로 무거심 (여백 사용 X)
     //   hover 시만 보이며 항상 후광에서 모든 블록 자체를 잡아도 드래그 가능(script 로직)
+    /* p20h: pointer-events 유지. 핸들이 블록 밖에 있어도 마우스 상호작용 가능하도록. */
     '.editor-block .block-handle {',
     '  position: absolute;',
-    '  left: -1.4em;',                       // 블록 바깥으로
-    '  top: 0.15em;',                        // 바닥 서른 맞춤
-    '  width: 1.1em;',
-    '  height: 1.1em;',
+    '  left: -1.4em;',
+    '  top: 0.15em;',
+    '  width: 1.4em;',                       /* p20h: 잡기 쉽게 1.4em */
+    '  height: 1.4em;',
     '  display: flex;',
     '  align-items: center;',
     '  justify-content: center;',
@@ -277,16 +278,13 @@
     '  user-select: none;',
     '  line-height: 1;',
     '  border-radius: 3px;',
-    '  pointer-events: none;',              // hover 전에는 클릭 안잡힌
+    /* p20h: pointer-events: none 제거 — opacity 0 이어도 클릭/드래그 가능해야 함 */
     '  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;',
     '}',
-    '.editor-block:hover > .block-handle { opacity: 0.85; pointer-events: auto; }',
-    '.editor-block .block-handle:hover {',
-    '  color: var(--color, #0F3A3A);',
-    '  background: rgba(15,58,58,0.08);',
-    '  opacity: 1;',
-    '}',
-    '.editor-block .block-handle:active { cursor: grabbing; }',
+    /* p20h: 블록 hover 시 그 부모의 handle 보이기. 그리고 handle 자체 hover 시도 보이게 (블록 밖에서도 감지). */
+    '.editor-block:hover > .block-handle { opacity: 0.85; }',
+    '.editor-block .block-handle:hover { opacity: 1; color: var(--color, #0F3A3A); background: rgba(15,58,58,0.08); }',
+    '.editor-block .block-handle:active { cursor: grabbing; opacity: 1; }',
     '.editor-block.is-dragging { opacity: 0.4; background: rgba(255,154,118,0.1); }',
     '.editor-block.drop-before::before,',
     '.editor-block.drop-after::after {',
@@ -1901,7 +1899,7 @@
   function makeBlockHandle(){
     var h = document.createElement('span');
     h.className = 'block-handle';
-    h.setAttribute('draggable', 'true');
+    // p20h: native draggable 제거 - 커스텀 mouse-based drag 사용
     h.setAttribute('contenteditable', 'false');
     h.textContent = '\u22ee\u22ee';
     h.title = '드래그로 순서 변경';
@@ -1972,24 +1970,12 @@
 
   // p20e: 특수블록(구분선/버튼 등) 의 block-handle 에 draggable=true 보장
   //   기존에 draggable 속성이 설정 안 되어있던 구버전 복원용.
+  // p20h: 커스텀 mouse-based drag 사용. 기존 저장분에 남은 draggable=true 자산을 정리.
+  //   native drag 가 발동하면 우리 시스템과 두 번 실행되므로 반드시 제거.
   function _ensureHandleDraggable(root){
     if (!root) return;
     try {
-      root.querySelectorAll('.editor-block .block-handle').forEach(function(h){
-        if (h.getAttribute('draggable') !== 'true'){
-          h.setAttribute('draggable', 'true');
-        }
-      });
-      // p20g: 안전한 요소만 draggable=true.
-      //         버튼 card 는 제외 (클릭 = 편집창 열기이므로 drag 대상으로 부적합).
-      //         버튼은 handle 또는 그 부모 editor-block 으로 드래그.
-      root.querySelectorAll('.callout-icon, .callout-box, .ep-divider-wrap, .editor-image-figure').forEach(function(el){
-        if (el.getAttribute('draggable') !== 'true'){
-          el.setAttribute('draggable', 'true');
-        }
-      });
-      // p20g: kg-button-card 에 이전 버전에서 잘못 붙은 draggable 제거 (편집창 휴과 꾸짐 간섭)
-      root.querySelectorAll('.kg-button-card[draggable="true"]').forEach(function(el){
+      root.querySelectorAll('[draggable="true"]').forEach(function(el){
         el.removeAttribute('draggable');
       });
     } catch(_){}
@@ -2555,8 +2541,13 @@
   // p20e: 드래그드랍을 컨테이너(콜아웃 body 등) 안에도 넣을 수 있도록 개편.
   //   대상 target 은 (1) 다른 editor-block, 혹은 (2) 빈 컨테이너 자체.
   //   drop 시자신 또는 본인을 담고 있는 상위 블록으로는 이동 불가 (순환 방지).
+  // p20h: 드래그드랍을 native HTML5 drag API 대신 커스텀 mouse-based 방식으로 재작성.
+  //   이유: native drag 는 여러 이벤트 리스너(다중선택 등)와 서로 간섭해 mouseup 전에 무효화되는 이슈 발생.
+  //   mouse-based 로 변경 → 완전 독립적 제어, 다른 리스너와 충돌 없이 안정적으로 동작.
+  //   사용자 경험은 동일: 핸들 또는 특수블록 자체를 잡고 드래그 → 다른 바깥으로 이동.
   function setupBlockDragOrder(){
-    var dragged = null;
+    var dragging = null;      // { block, startX, startY, moved, dropTarget, dropSide, dropContainer, ghostEl }
+    var DRAG_THRESHOLD = 5;   // px 이상 이동해야 드래그 개시
 
     function _clearDropClasses(){
       contentEl.querySelectorAll('.editor-block.drop-before, .editor-block.drop-after').forEach(function(b){
@@ -2567,97 +2558,169 @@
       });
     }
 
-    // p20f: 노션 스타일 — 핸들 뿐 아니라 "contenteditable=false 요소 자체"를 잡아도 드래그 가능.
-    //   text editable(contenteditable=true) 안에서는 무시 — 기본 선택 동작 살림.
-    //   대상: 콜아웃 box(아이콘/리사이저 부분), 구분선, 버튼, 이미지 figure 등.
-    contentEl.addEventListener('dragstart', function(e){
-      var handle = e.target.closest('.block-handle');
-      var block = null;
-      if (handle) {
-        block = handle.closest('.editor-block');
-      } else {
-        // 핸들이 아니면 target 이 편집 불가 영역이어야 드래그 시작 인정
-        var t = e.target;
-        // text editable 안에서의 드래그는 무시 (기본 동작 유지: 텍스트 선택·복사)
-        var inEditable = t && t.closest && t.closest('[contenteditable="true"]');
-        // 단, editable 안에도 contenteditable=false 자식(이미지 아이콘 등)이면 OK
-        var nonEditableChild = t && t.closest && t.closest('[contenteditable="false"]');
-        // editable 상위이면서 non-editable 자식 안이 아니면 거부
-        if (inEditable && !(nonEditableChild && inEditable.contains(nonEditableChild) && !nonEditableChild.contains(inEditable))){
-          return; // 기본 동작
-        }
-        block = t && t.closest ? t.closest('.editor-block') : null;
-      }
-      if (!block) return;
-      dragged = block;
-      dragged.classList.add('is-dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      try { e.dataTransfer.setData('text/plain', 'block'); } catch(_) {}
-    });
-
-    contentEl.addEventListener('dragend', function(){
-      if (dragged) dragged.classList.remove('is-dragging');
-      _clearDropClasses();
-      dragged = null;
-    });
-
-    // 순환 방지: dragged 안에 target 이 있으면 이동 불가 (본인이 본인 안으로 들어가면 사라짐)
-    function _canDropInto(container){
-      if (!container || !dragged) return false;
-      if (dragged === container) return false;
-      if (dragged.contains(container)) return false;
-      return true;
+    // 드래그 시작을 허용할지 판단
+    //   - .block-handle 유무: 무조건 허용
+    //   - text editable 안에서는 불가 (텍스트 선택 우선)
+    //   - contenteditable=false 요소 (콜아웃 아이콘, 구분선, 이미지 figure, 콜아웃 box 여백) 은 가능
+    function _shouldStartDrag(e){
+      var t = e.target;
+      if (!t) return null;
+      // .block-handle 은 모든 상황 예외 없이 드래그 가능
+      var h = t.closest && t.closest('.block-handle');
+      if (h) return h.closest('.editor-block');
+      // 편집 팝업·다이얼로그 안은 드래그 안 됨
+      if (t.closest && (t.closest('.ep-popup') || t.closest('.ep-popup-v2') || t.closest('.ddl-editor-popup') || t.closest('#ep-btn-popup') || t.closest('#ep-div-popup') || t.closest('#ep-cal-popup') || t.closest('#ep-img-popup') || t.closest('.ep-crop-popup') || t.closest('.callout-resizer') || t.closest('.editor-image-resizer'))) return null;
+      // text editable 안이면 거부 (contenteditable=false 자식 예외는 허용)
+      var editable = t.closest && t.closest('[contenteditable="true"]');
+      var nonEd = t.closest && t.closest('[contenteditable="false"]');
+      if (editable && !(nonEd && editable.contains(nonEd) && !nonEd.contains(editable))) return null;
+      // 해당 바깥이 editor-block 이면 그것을 드래그 대상으로
+      var block = t.closest && t.closest('.editor-block');
+      if (!block) return null;
+      if (!contentEl.contains(block)) return null;
+      return block;
     }
 
-    contentEl.addEventListener('dragover', function(e){
-      if (!dragged) return;
-      var target = e.target.closest ? e.target.closest('.editor-block') : null;
-      var container = e.target.closest ? e.target.closest('[data-block-container="true"]') : null;
-      // target 이 dragged 자신 이면 무시
-      if (target === dragged) target = null;
-      // target 이 없고 컨테이너만 있으면 컨테이너 마지막에 삽입 모드
-      if (target || container){
-        e.preventDefault();
-      } else {
-        return;
+    // dropTarget 계산 (마우스 위치 아래 element 기준)
+    function _computeDropZone(clientX, clientY){
+      // 고스트 요소가 아래에 있으면 방해되므로 잠시 pointer-events: none 상태 유지 (이미 설정됨)
+      var el = document.elementFromPoint(clientX, clientY);
+      if (!el) return { target: null, side: null, container: null };
+      var block = el.closest && el.closest('.editor-block');
+      var container = el.closest && el.closest('[data-block-container="true"]');
+      // 드래그 중인 블록 자체와 그 자손은 드랍 대상 불가
+      if (block && dragging && (block === dragging.block || dragging.block.contains(block))) {
+        block = null;
       }
-      _clearDropClasses();
-      if (target){
-        var rect = target.getBoundingClientRect();
-        var above = e.clientY < rect.top + rect.height / 2;
-        target.classList.add(above ? 'drop-before' : 'drop-after');
-      } else if (container && _canDropInto(container)){
-        container.classList.add('drop-into');
+      if (container && dragging && (container === dragging.block || dragging.block.contains(container))) {
+        container = null;
       }
-    });
+      var side = null;
+      if (block){
+        var rect = block.getBoundingClientRect();
+        side = clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+      }
+      return { target: block, side: side, container: container };
+    }
 
-    contentEl.addEventListener('drop', function(e){
-      if (!dragged) return;
-      e.preventDefault();
-      var target = e.target.closest ? e.target.closest('.editor-block') : null;
-      var container = e.target.closest ? e.target.closest('[data-block-container="true"]') : null;
-      if (target === dragged) target = null;
-      _clearDropClasses();
+    // 고스트 생성 (드래그 중 보이는 반투명 미리보기)
+    function _createGhost(block){
+      var g = block.cloneNode(true);
+      g.style.cssText = 'position: fixed; pointer-events: none; opacity: 0.6; z-index: 100001; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: rotate(1deg); background: #fff; border-radius: 4px; margin: 0; padding: 4px 8px;';
+      g.style.width = block.getBoundingClientRect().width + 'px';
+      // 고스트에서는 draggable·editable 사이드 이벤트 야기하지 않게
+      g.querySelectorAll('[contenteditable]').forEach(function(x){ x.removeAttribute('contenteditable'); });
+      g.querySelectorAll('[draggable]').forEach(function(x){ x.removeAttribute('draggable'); });
+      document.body.appendChild(g);
+      return g;
+    }
 
-      if (target){
-        // 순환 방지
-        if (dragged.contains(target)) return;
-        var rect = target.getBoundingClientRect();
-        var above = e.clientY < rect.top + rect.height / 2;
-        if (above) target.parentNode.insertBefore(dragged, target);
-        else target.parentNode.insertBefore(dragged, target.nextSibling);
-      } else if (container && _canDropInto(container)){
-        // 컨테이너 안 마지막에 append
-        // 이 때 컨테이너가 <br> 만 가지고 있으면 정리
+    // p20h: document 스코프 capture 로 다중선택 리스너보다 먼저 발동.
+    //   중요: mousedown 시점에는 preventDefault 를 하지 않음 — click 이 정상 발동해야 버튼 편집창 등 을 열 수 있음.
+    //   실제 드래그 시작 시점(mousemove 에서 THRESHOLD 넘을 때)에만 preventDefault 하여 native 선택 무효화.
+    //   이대로하면 클릭과 드래그가 모두 공존.
+    document.addEventListener('mousedown', function(e){
+      if (e.button !== 0) return; // 왜클릭만
+      // contentEl 안에서의 이벤트만 처리
+      if (!contentEl || !contentEl.contains(e.target)) return;
+      var block = _shouldStartDrag(e);
+      if (!block) return;
+      dragging = { block: block, startX: e.clientX, startY: e.clientY, moved: false, ghostEl: null, dropTarget: null, dropSide: null, dropContainer: null };
+      // 중요: preventDefault/stopPropagation 미호출 — click 흐름과 다중선택 모두 살려둔.
+      //   다중선택은 리스너를 허용하되, mousemove 에서 우리가 실제 드래그 시작하면
+      //   그 시점에 다중선택을 취소함.
+    }, true); // capture 으로 다른 mousedown 보다 먼저 잡기
+
+    // mousemove → THRESHOLD 넘으면 드래그 시작 · 고스트 이동
+    document.addEventListener('mousemove', function(e){
+      if (!dragging) return;
+      var dx = Math.abs(e.clientX - dragging.startX);
+      var dy = Math.abs(e.clientY - dragging.startY);
+      if (!dragging.moved && (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD)){
+        dragging.moved = true;
+        dragging.block.classList.add('is-dragging');
+        dragging.ghostEl = _createGhost(dragging.block);
+        document.body.style.cursor = 'grabbing';
+        document.body.style.userSelect = 'none';
+        // p20h: 드래그 시작 시점에 다중선택 무효화 (이미 다중선택이 진행 중이라도)
         try {
-          var onlyBr = container.childNodes.length === 1 && container.firstChild && container.firstChild.tagName === 'BR';
-          if (onlyBr) container.removeChild(container.firstChild);
+          contentEl.querySelectorAll('.editor-block.is-multi-selected').forEach(function(b){ b.classList.remove('is-multi-selected'); });
+          window.getSelection && window.getSelection().removeAllRanges();
         } catch(_){}
-        container.appendChild(dragged);
       }
+      if (!dragging.moved) return;
+      // 드래그 진행 중은 기본 동작 차단
+      e.preventDefault();
+      // 고스트 이동
+      if (dragging.ghostEl){
+        dragging.ghostEl.style.left = (e.clientX + 8) + 'px';
+        dragging.ghostEl.style.top = (e.clientY + 8) + 'px';
+      }
+      // 드랍 존 계산 · 시각화
+      var zone = _computeDropZone(e.clientX, e.clientY);
+      _clearDropClasses();
+      if (zone.target){
+        zone.target.classList.add(zone.side === 'before' ? 'drop-before' : 'drop-after');
+        dragging.dropTarget = zone.target;
+        dragging.dropSide = zone.side;
+        dragging.dropContainer = null;
+      } else if (zone.container){
+        zone.container.classList.add('drop-into');
+        dragging.dropTarget = null;
+        dragging.dropSide = null;
+        dragging.dropContainer = zone.container;
+      } else {
+        dragging.dropTarget = null; dragging.dropSide = null; dragging.dropContainer = null;
+      }
+    }, true);
+
+    // mouseup → 실제 이동 실행
+    document.addEventListener('mouseup', function(e){
+      if (!dragging) return;
+      var d = dragging;
+      dragging = null;
+      if (d.ghostEl && d.ghostEl.parentNode) d.ghostEl.parentNode.removeChild(d.ghostEl);
+      d.block.classList.remove('is-dragging');
+      _clearDropClasses();
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      if (!d.moved) return; // 단순 클릭은 리턴 (click 이벤트가 이후 자연스럽게 발동)
+      // 드래그를 실제 수행했으면 mouseup 후 click 이벤트는 무시해야 함 (드롭 후 버튼 편집창 열기 방지)
+      var _capBlock = function(ev){ ev.stopPropagation(); ev.preventDefault(); document.removeEventListener('click', _capBlock, true); };
+      document.addEventListener('click', _capBlock, true);
+      // 혹시를 대비해 유효 시간을 짧게만
+      setTimeout(function(){ document.removeEventListener('click', _capBlock, true); }, 300);
+      // 실제 삽입
+      var b = d.block;
+      if (d.dropTarget){
+        if (b.contains(d.dropTarget)) return; // 순환 방지
+        if (d.dropSide === 'before') d.dropTarget.parentNode.insertBefore(b, d.dropTarget);
+        else d.dropTarget.parentNode.insertBefore(b, d.dropTarget.nextSibling);
+      } else if (d.dropContainer){
+        if (b.contains(d.dropContainer)) return;
+        // 컨테이너에 <br> 만 있으면 정리
+        try {
+          var onlyBr = d.dropContainer.childNodes.length === 1 && d.dropContainer.firstChild && d.dropContainer.firstChild.tagName === 'BR';
+          if (onlyBr) d.dropContainer.removeChild(d.dropContainer.firstChild);
+        } catch(_){}
+        d.dropContainer.appendChild(b);
+      }
+    }, true);
+
+    // ESC 로 드래그 취소
+    document.addEventListener('keydown', function(e){
+      if (e.key !== 'Escape') return;
+      if (!dragging) return;
+      var d = dragging;
+      dragging = null;
+      if (d.ghostEl && d.ghostEl.parentNode) d.ghostEl.parentNode.removeChild(d.ghostEl);
+      d.block.classList.remove('is-dragging');
+      _clearDropClasses();
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     });
 
-    // drop-into 시각화 CSS 뒱롑이감 — 기존 CSS 뒤에 추가
+    // drop-into 시각화 CSS
     try {
       var _st = document.createElement('style');
       _st.textContent = '[data-block-container="true"].drop-into { outline: 2px dashed var(--point, #FF9A76); outline-offset: -2px; background: rgba(255,154,118,0.06); }';
@@ -2908,7 +2971,7 @@
     box.className = 'callout-box';
     // p20g: 콜아웃 여백을 잡아도 드래그 가능하도록 box 자체를 draggable=true.
     //         body 편집은 dragstart 리스너의 contenteditable 검사로 보호됨.
-    box.setAttribute('draggable', 'true');
+    // p20h: native draggable 제거 - 커스텀 mouse-based drag 사용
     box.setAttribute('data-icon-type', 'emoji');
     box.setAttribute('data-icon-value', '💡');
     box.setAttribute('data-bg', 'rgba(203,145,47,0.14)');
@@ -2925,7 +2988,7 @@
     iconEl.textContent = '💡';
     iconEl.setAttribute('contenteditable', 'false');
     // p20g: 콜아웃 아이콘을 잡으면 부모 바깥 이동 가능
-    iconEl.setAttribute('draggable', 'true');
+    // p20h: native draggable 제거 - 커스텀 mouse-based drag 사용
 
     var bodyEl = document.createElement('div');
     bodyEl.className = 'callout-body';
@@ -7208,14 +7271,14 @@
     var handle = document.createElement('div');
     handle.className = 'block-handle';
     handle.setAttribute('contenteditable', 'false');
-    handle.setAttribute('draggable', 'true');
+    // p20h: native draggable 제거 - 커스텀 mouse-based drag 사용
     handle.innerHTML = '⋮⋮';
     block.appendChild(handle);
 
     var wrap = document.createElement('div');
     wrap.className = 'ep-divider-wrap';
     wrap.setAttribute('contenteditable', 'false');
-    wrap.setAttribute('draggable', 'true'); // p20f: 노션식 — 요소 자체를 잡아도 드래그
+    // p20h: native draggable 제거 - 커스텀 mouse-based drag 사용
     wrap.innerHTML = renderDividerInner({
       presetId:'style5', color:'#555555', opacity:1, stroke:1,
       shapeMode:'unified', shapeFill:'empty', shapeStroke:'#555555'
@@ -7236,7 +7299,7 @@
     var nextHandle = document.createElement('div');
     nextHandle.className = 'block-handle';
     nextHandle.setAttribute('contenteditable', 'false');
-    nextHandle.setAttribute('draggable', 'true');
+    // p20h: native draggable 제거 - 커스텀 mouse-based drag 사용
     nextHandle.innerHTML = '⋮⋮';
     next.appendChild(nextHandle);
     // 실제 <p> 자식
@@ -11641,7 +11704,7 @@
     var handle = document.createElement('div');
     handle.className = 'block-handle';
     handle.setAttribute('contenteditable', 'false');
-    handle.setAttribute('draggable', 'true');
+    // p20h: native draggable 제거 - 커스텀 mouse-based drag 사용
     handle.innerHTML = '⋮⋮';
     block.appendChild(handle);
 
