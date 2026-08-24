@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p20a
+ * 2vvena Editor Core - v2.0-β-p20b
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p20a';
+  var VERSION = 'v2.0-β-p20b';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -3916,7 +3916,7 @@
         + '</div>';
     }
 
-    // p20a: 폰트 라이브러리 통합
+    // p20a: 폰트 라이브러리 통합 → p20b: 카드 선택 버튼 추가
     var _fontOpts = (window.__DDL_EDITOR && window.__DDL_EDITOR.buildFontSelectOptions)
       ? window.__DDL_EDITOR.buildFontSelectOptions(fontFamily, { value: '', label: '기본 (사이트 폰트)' }, escapeAttr, escapeHtml)
       : '<option value="">기본 (사이트 폰트)</option>';
@@ -3924,7 +3924,10 @@
       + '<span>폰트</span>'
       + '<button type="button" data-btn="open-font-library" style="background:transparent; border:none; color:var(--point, #FF9A76); font-size:0.72em; cursor:pointer; padding:0;">→ 라이브러리 관리</button>'
       + '</div>'
-      + '<select id="pop-font">' + _fontOpts + '</select></div>';
+      + '<div style="display:flex; gap:4px;">'
+      + '<select id="pop-font" style="flex:1;">' + _fontOpts + '</select>'
+      + '<button type="button" data-btn="open-font-picker" title="카드로 고르기 (미리보기 · 즐겨찾기 · 이 글에서)" style="width:32px; background:transparent; border:1px solid rgba(15,58,58,0.2); border-radius:3px; cursor:pointer; color:var(--color,#0F3A3A);">가</button>'
+      + '</div></div>';
 
     // p13b: 텍스트 투명도 슬라이더
     var textOpacity = box.getAttribute('data-text-opacity') || '100';
@@ -3968,6 +3971,36 @@
         try {
           if (window.__DDL_EDITOR && window.__DDL_EDITOR.openFontLibraryManager){
             window.__DDL_EDITOR.openFontLibraryManager();
+          }
+        } catch(_){}
+        return;
+      }
+
+      // p20b: 폰트 카드 픽커 팝오버 열기
+      var pickerBtn = e.target.closest('[data-btn="open-font-picker"]');
+      if (pickerBtn){
+        e.stopPropagation();
+        var fontSel = body.querySelector('#pop-font');
+        var currentVal = fontSel ? fontSel.value : '';
+        try {
+          if (window.__DDL_EDITOR && window.__DDL_EDITOR.openFontPicker){
+            window.__DDL_EDITOR.openFontPicker(pickerBtn, currentVal, function(value, font){
+              // select 값 동기화 + change 이벤트 발생 (기존 저장 로직 재사용)
+              if (fontSel){
+                // 목록에 없으면 새 option 추가
+                var found = false;
+                for (var i = 0; i < fontSel.options.length; i++){
+                  if (fontSel.options[i].value === value){ fontSel.selectedIndex = i; found = true; break; }
+                }
+                if (!found){
+                  var opt = document.createElement('option');
+                  opt.value = value; opt.textContent = font.name || font.cssName || value;
+                  opt.selected = true;
+                  fontSel.appendChild(opt);
+                }
+                fontSel.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+            });
           }
         } catch(_){}
         return;
@@ -10333,6 +10366,190 @@
     document.body.appendChild(overlay);
   }
 
+  // ===================================================================
+  // p20b: 공용 폰트 픽커 팝오버 (콜아웃/버튼/조합 프리셋에서 공용)
+  //   - 사이트 톤 준수: 흰 배경 + 열은 그림자 + 6px 반지름 + 3색 원칙
+  //   - 3-way 뷰 스위처 (전체/★/이 글에서)
+  //   - 2-열 카드 그리드 — 각 카드가 그 폰트로 “가나다 ABC” 렉더링
+  //   - anchor 옆에 띄우며, 바깥 클릭 · ESC 시 닫힘
+  //
+  // 사용법:
+  //   openFontPicker(anchor, currentValue, onSelect)
+  //     - anchor: 기준 요소 (그 옆에 팝오버 띘움)
+  //     - currentValue: 현재 선택된 fontFamily (예: '"Pretendard",sans-serif' 또는 '')
+  //     - onSelect(value, font): 사용자가 카드 클릭해 선택하면 호출
+  var _fontPickerCurrent = null;   // 닫힘 재사용
+  function openFontPicker(anchor, currentValue, onSelect){
+    _closeFontPicker();
+    var pop = document.createElement('div');
+    pop.className = 'ddl-editor-popup ddl-font-picker';
+    pop.style.cssText = 'position: fixed; z-index: 100010; width: 320px; max-width: 90vw;'
+      + ' background: #fff; border: 1px solid rgba(15,58,58,0.25); border-radius: 6px;'
+      + ' box-shadow: 0 10px 30px rgba(0,0,0,0.15);'
+      + ' font-family: "Pretendard Variable","Pretendard",sans-serif; color: var(--color, #0F3A3A);'
+      + ' overflow: hidden; display: flex; flex-direction: column;';
+    pop.addEventListener('click', function(e){ e.stopPropagation(); });
+    pop.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+
+    // 헤더 (뷰 스위처)
+    var head = document.createElement('div');
+    head.style.cssText = 'display: flex; gap: 4px; padding: 8px 10px; background: rgba(15,58,58,0.04); border-bottom: 1px solid rgba(15,58,58,0.08);';
+    var currentView = 'all';
+    var views = [
+      { k: 'all',       l: '전체' },
+      { k: 'favorite',  l: '★' },
+      { k: 'inContent', l: '이 글에서' }
+    ];
+    var switchWrap = document.createElement('div');
+    switchWrap.style.cssText = 'display: inline-flex; border: 1px solid rgba(15,58,58,0.12); border-radius: 4px; overflow: hidden; flex: 1;';
+    views.forEach(function(v, i){
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = v.l; b.dataset.vkey = v.k;
+      b.style.cssText = 'flex:1; padding: 3px 6px; font-size: 10px; cursor: pointer; font-family: inherit; border: none;'
+        + (i > 0 ? ' border-left: 1px solid rgba(15,58,58,0.08);' : '');
+      b.addEventListener('click', function(){ currentView = v.k; _refresh(); });
+      switchWrap.appendChild(b);
+    });
+    head.appendChild(switchWrap);
+
+    var manageBtn = document.createElement('button');
+    manageBtn.type = 'button'; manageBtn.textContent = '⚙';
+    manageBtn.title = '전체 라이브러리 관리';
+    manageBtn.style.cssText = 'width: 24px; padding: 0; margin-left: 6px; background: transparent; border: 1px solid rgba(15,58,58,0.15); border-radius: 4px; cursor: pointer; color: rgba(15,58,58,0.6); font-size: 12px;';
+    manageBtn.addEventListener('click', function(){
+      _closeFontPicker();
+      try { if (window.__DDL_EDITOR && window.__DDL_EDITOR.openFontLibraryManager) window.__DDL_EDITOR.openFontLibraryManager(); } catch(_){}
+    });
+    head.appendChild(manageBtn);
+    pop.appendChild(head);
+
+    // 그리드 컨테이너
+    var gridWrap = document.createElement('div');
+    gridWrap.className = 'ddl-scroll-invisible';
+    gridWrap.style.cssText = 'padding: 8px; max-height: 320px; overflow-y: auto;';
+    pop.appendChild(gridWrap);
+
+    function _selectValue(font){
+      // font: {name, cssName, fallback, isFavorite, weightUrls?}
+      var famStr = (font.cssName || font.name || '').trim();
+      if (famStr && famStr.indexOf(',') === -1 && famStr.indexOf('"') === -1 && famStr.indexOf("'") === -1){
+        famStr = '"' + famStr + '"';
+      }
+      return famStr + ',' + (font.fallback || 'sans-serif');
+    }
+
+    function _refresh(){
+      // 뷰 스위처 상태 갱신
+      var kids = switchWrap.querySelectorAll('button[data-vkey]');
+      for (var i = 0; i < kids.length; i++){
+        var isActive = kids[i].dataset.vkey === currentView;
+        kids[i].style.background = isActive ? 'rgba(255,154,118,0.12)' : 'transparent';
+        kids[i].style.color = isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.55)';
+      }
+
+      // 그리드 재렜더링
+      gridWrap.innerHTML = '';
+      var fonts = [];
+      try {
+        if (window.__DDL_EDITOR && window.__DDL_EDITOR.getFontLibraryFiltered){
+          fonts = window.__DDL_EDITOR.getFontLibraryFiltered(currentView) || [];
+        }
+      } catch(_){ fonts = []; }
+
+      if (fonts.length === 0){
+        var empty = document.createElement('div');
+        empty.style.cssText = 'padding: 20px 12px; text-align: center; font-size: 11px; color: rgba(15,58,58,0.45); border: 1px dashed rgba(15,58,58,0.12); border-radius: 6px;';
+        if (currentView === 'favorite') empty.textContent = '★ 즐겨찾기한 폰트가 없어요';
+        else if (currentView === 'inContent') empty.textContent = '이 글에서 사용된 라이브러리 폰트가 없어요';
+        else empty.textContent = '등록된 폰트가 없어요';
+        gridWrap.appendChild(empty);
+        return;
+      }
+
+      var grid = document.createElement('div');
+      grid.style.cssText = 'display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;';
+
+      fonts.forEach(function(f){
+        var value = _selectValue(f);
+        var isActive = (currentValue === value);
+        var card = document.createElement('button');
+        card.type = 'button';
+        card.style.cssText = 'position: relative; padding: 10px 8px; border-radius: 6px; cursor: pointer; text-align: left;'
+          + ' background: ' + (isActive ? 'rgba(255,154,118,0.08)' : '#fff') + ';'
+          + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';'
+          + ' transition: background 120ms, border-color 120ms; font-family: inherit;';
+        var sample = document.createElement('div');
+        sample.textContent = '가나다 ABC';
+        sample.style.cssText = 'font-family: ' + value + '; font-size: 15px; color: var(--color, #0F3A3A); margin-bottom: 3px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+        card.appendChild(sample);
+        var lbl = document.createElement('div');
+        lbl.textContent = f.name || f.cssName || '무명';
+        lbl.style.cssText = 'font-size: 10px; opacity: 0.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+        card.appendChild(lbl);
+        // 즐겨찾기 별표
+        if (f.isFavorite){
+          var favMark = document.createElement('span');
+          favMark.textContent = '★';
+          favMark.style.cssText = 'position: absolute; top: 3px; right: 5px; font-size: 8px; color: var(--point, #FF9A76); line-height: 1;';
+          card.appendChild(favMark);
+        }
+        // 다중 굵기 마커
+        if (f.weightUrls && Object.keys(f.weightUrls).length >= 2){
+          var wMark = document.createElement('span');
+          wMark.textContent = Object.keys(f.weightUrls).length + 'w';
+          wMark.style.cssText = 'position: absolute; bottom: 3px; right: 5px; font-size: 8px; color: rgba(15,58,58,0.4); line-height: 1;';
+          card.appendChild(wMark);
+        }
+        card.addEventListener('mouseenter', function(){ if (!isActive) card.style.borderColor = 'rgba(15,58,58,0.35)'; });
+        card.addEventListener('mouseleave', function(){ if (!isActive) card.style.borderColor = 'rgba(15,58,58,0.15)'; });
+        card.addEventListener('click', function(){
+          if (typeof onSelect === 'function') onSelect(value, f);
+          _closeFontPicker();
+        });
+        grid.appendChild(card);
+      });
+      gridWrap.appendChild(grid);
+    }
+
+    // 위치 계산 (anchor 수직 아래, 화면 경계 보정)
+    document.body.appendChild(pop);
+    _refresh();
+    var rect = anchor.getBoundingClientRect();
+    var popW = pop.offsetWidth;
+    var popH = pop.offsetHeight;
+    var top = rect.bottom + 6;
+    var left = rect.left;
+    if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
+    if (left < 8) left = 8;
+    if (top + popH > window.innerHeight - 8) top = Math.max(8, rect.top - popH - 6);
+    pop.style.top = top + 'px';
+    pop.style.left = left + 'px';
+
+    _fontPickerCurrent = pop;
+    // 바깥 클릭 닫힘 (setTimeout 으로 지금 클릭 무시)
+    setTimeout(function(){
+      document.addEventListener('mousedown', _onOutsideClick, true);
+      document.addEventListener('keydown', _onEsc);
+    }, 10);
+  }
+
+  function _onOutsideClick(e){
+    if (!_fontPickerCurrent) return;
+    if (_fontPickerCurrent.contains(e.target)) return;
+    _closeFontPicker();
+  }
+  function _onEsc(e){
+    if (e.key === 'Escape') _closeFontPicker();
+  }
+  function _closeFontPicker(){
+    if (_fontPickerCurrent && _fontPickerCurrent.parentNode){
+      _fontPickerCurrent.parentNode.removeChild(_fontPickerCurrent);
+    }
+    _fontPickerCurrent = null;
+    document.removeEventListener('mousedown', _onOutsideClick, true);
+    document.removeEventListener('keydown', _onEsc);
+  }
+
   // API 노출
   try {
     window.__DDL_EDITOR = window.__DDL_EDITOR || {};
@@ -10345,6 +10562,7 @@
     window.__DDL_EDITOR.reloadFontLibraryCSS  = _injectFontFaceCSS;
     window.__DDL_EDITOR.generateSiteFontCSS   = _generateSiteFontCSS;
     window.__DDL_EDITOR.buildFontSelectOptions = _buildFontSelectOptions;   // p20a
+    window.__DDL_EDITOR.openFontPicker         = openFontPicker;             // p20b
   } catch(_){}
 
   // 부팅 시 자동 로드 (편집기 페이지)
@@ -11461,9 +11679,12 @@
         + '<span>폰트</span>'
         + '<button type="button" data-btn-open-font-library="1" style="background:transparent; border:none; color:var(--point, #FF9A76); font-size:0.72em; cursor:pointer; padding:0;">→ 라이브러리 관리</button>'
         + '</div>'
-        + '<select data-btn-set="fontFamily" style="width:100%; padding:0.4em; border:1px solid rgba(15,58,58,0.2); border-radius:4px; background:#fafafa;">'
+        + '<div style="display:flex; gap:4px;">'
+        + '<select data-btn-set="fontFamily" style="flex:1; padding:0.4em; border:1px solid rgba(15,58,58,0.2); border-radius:4px; background:#fafafa;">'
         + _btnFontOpts
-        + '</select></div>';
+        + '</select>'
+        + '<button type="button" data-btn-open-font-picker="1" title="카드로 고르기" style="width:36px; background:transparent; border:1px solid rgba(15,58,58,0.2); border-radius:4px; cursor:pointer; color:var(--color,#0F3A3A);">가</button>'
+        + '</div></div>';
       // p17e: 사용자 폰트 추가/관리 버튼
       html += '<div class="row" style="display:flex; gap:6px;">'
         + '<button type="button" class="pop-btn" data-btn-font-add="1" style="flex:1;">폰트 추가</button>'
@@ -11594,6 +11815,35 @@
         try {
           if (window.__DDL_EDITOR && window.__DDL_EDITOR.openFontLibraryManager){
             window.__DDL_EDITOR.openFontLibraryManager();
+          }
+        } catch(_){}
+        return;
+      }
+
+      // p20b: 버튼 편집 — 폰트 카드 픽커
+      var btnPicker = t.closest('[data-btn-open-font-picker]');
+      if (btnPicker){
+        e.stopPropagation();
+        if (!selectedButton) return;
+        var fontSel = btnPopupEl.querySelector('[data-btn-set="fontFamily"]');
+        var currentVal = fontSel ? fontSel.value : '';
+        try {
+          if (window.__DDL_EDITOR && window.__DDL_EDITOR.openFontPicker){
+            window.__DDL_EDITOR.openFontPicker(btnPicker, currentVal, function(value, font){
+              if (fontSel){
+                var found = false;
+                for (var i = 0; i < fontSel.options.length; i++){
+                  if (fontSel.options[i].value === value){ fontSel.selectedIndex = i; found = true; break; }
+                }
+                if (!found){
+                  var opt = document.createElement('option');
+                  opt.value = value; opt.textContent = font.name || font.cssName || value;
+                  opt.selected = true;
+                  fontSel.appendChild(opt);
+                }
+                fontSel.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+            });
           }
         } catch(_){}
         return;
@@ -13874,9 +14124,46 @@
     _refreshBg();
     body.appendChild(_row('배경색', bgRow));
 
-    // 글자색
+    // 글자색 — p20b: 프리셋 + 자유 color picker + 투명도
+    // 현재 값을 hex + alpha 로 분리 파싱하는 유틸
+    function _parseColor(str){
+      if (!str) return { hex: '#0F3A3A', alpha: 100 };
+      str = String(str).trim();
+      // rgba(r,g,b,a)
+      var m = str.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)/i);
+      if (m){
+        var r = parseInt(m[1],10), g = parseInt(m[2],10), b = parseInt(m[3],10);
+        var a = m[4] !== undefined ? parseFloat(m[4]) : 1;
+        var hex = '#' + [r,g,b].map(function(n){ var s = n.toString(16); return s.length === 1 ? '0'+s : s; }).join('');
+        return { hex: hex, alpha: Math.round(a * 100) };
+      }
+      // #rrggbb / #rgb
+      var h = str.match(/#([0-9a-f]{3,6})/i);
+      if (h){
+        var hh = h[1];
+        if (hh.length === 3) hh = hh[0]+hh[0]+hh[1]+hh[1]+hh[2]+hh[2];
+        return { hex: '#' + hh.toLowerCase(), alpha: 100 };
+      }
+      // var(--color, #xxxxxx) 또는 이름색
+      var v = str.match(/#([0-9a-f]{6})/i);
+      if (v) return { hex: '#' + v[1].toLowerCase(), alpha: 100 };
+      return { hex: '#0F3A3A', alpha: 100 };
+    }
+    function _makeRgba(hex, alpha){
+      var m = hex.match(/#([0-9a-f]{6})/i);
+      if (!m) return hex;
+      var r = parseInt(m[1].slice(0,2), 16);
+      var g = parseInt(m[1].slice(2,4), 16);
+      var b = parseInt(m[1].slice(4,6), 16);
+      var a = Math.max(0, Math.min(100, alpha)) / 100;
+      return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+    }
+
+    var colorState = _parseColor(current.color);
+
+    // 프리셋 줄
     var colorRow = document.createElement('div');
-    colorRow.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap;';
+    colorRow.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center;';
     var colorOpts = [
       { v: 'var(--color, #0F3A3A)', l: '기본', hex: '#0F3A3A' },
       { v: 'var(--point, #FF9A76)', l: '살구', hex: '#FF9A76' },
@@ -13891,12 +14178,52 @@
         var isActive = current.color === opt.v;
         b.style.cssText = 'padding: 5px 8px; font-size: 11px; border-radius: 3px; cursor: pointer; font-family: inherit; background: #fff; color: ' + opt.hex + ';'
           + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';';
-        b.addEventListener('click', function(){ current.color = opt.v; _refreshColor(); _renderPreview(); });
+        b.addEventListener('click', function(){
+          current.color = opt.v;
+          colorState = _parseColor(current.color);
+          picker.value = colorState.hex;
+          alphaSlider.value = colorState.alpha;
+          alphaLabel.textContent = colorState.alpha + '%';
+          _refreshColor(); _renderPreview();
+        });
         colorRow.appendChild(b);
       });
     }
     _refreshColor();
-    body.appendChild(_row('글자색', colorRow));
+    body.appendChild(_row('글자색 프리셋', colorRow));
+
+    // 자유 색 + 투명도 (p20b 신규)
+    var customWrap = document.createElement('div');
+    customWrap.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+    var picker = document.createElement('input');
+    picker.type = 'color'; picker.value = colorState.hex;
+    picker.style.cssText = 'width: 42px; height: 30px; padding: 2px; border: 1px solid rgba(15,58,58,0.15); border-radius: 3px; cursor: pointer; background: #fff;';
+    picker.addEventListener('input', function(){
+      colorState.hex = picker.value;
+      current.color = _makeRgba(colorState.hex, colorState.alpha);
+      _refreshColor(); _renderPreview();
+    });
+    customWrap.appendChild(picker);
+
+    var alphaWrap = document.createElement('div');
+    alphaWrap.style.cssText = 'flex:1; display: flex; gap: 6px; align-items: center;';
+    var alphaSlider = document.createElement('input');
+    alphaSlider.type = 'range'; alphaSlider.min = '0'; alphaSlider.max = '100'; alphaSlider.step = '5';
+    alphaSlider.value = colorState.alpha;
+    alphaSlider.style.cssText = 'flex:1; accent-color: var(--point, #FF9A76);';
+    var alphaLabel = document.createElement('span');
+    alphaLabel.textContent = colorState.alpha + '%';
+    alphaLabel.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.6); min-width: 30px; text-align: right;';
+    alphaSlider.addEventListener('input', function(){
+      colorState.alpha = parseInt(alphaSlider.value, 10);
+      alphaLabel.textContent = colorState.alpha + '%';
+      current.color = _makeRgba(colorState.hex, colorState.alpha);
+      _refreshColor(); _renderPreview();
+    });
+    alphaWrap.appendChild(alphaSlider);
+    alphaWrap.appendChild(alphaLabel);
+    customWrap.appendChild(alphaWrap);
+    body.appendChild(_row('자유 색 · 투명도', customWrap, '칼러 픽커로 색 선택 · 슬라이더로 투명도 조절'));
 
     // 테두리
     var borderRow = document.createElement('div');
@@ -13961,6 +14288,10 @@
           borderRadius: '3px',
           border: '1px solid rgba(15,58,58,0.1)'
         };
+        colorState = _parseColor(current.color);
+        picker.value = colorState.hex;
+        alphaSlider.value = colorState.alpha;
+        alphaLabel.textContent = colorState.alpha + '%';
         _refreshBg(); _refreshColor(); _refreshBorder(); _renderPreview();
       } catch(_){}
     });
@@ -14215,7 +14546,7 @@
       '</div>' +
       // 4. 버전
       '<div style="margin-top:20px;padding-top:12px;border-top:1px solid rgba(15,58,58,0.06);font-size:11px;color:rgba(15,58,58,0.4);text-align:center;">' +
-        'v2.0-β-p20a' +
+        'v2.0-β-p20b' +
       '</div>';
 
     mask.appendChild(box);
