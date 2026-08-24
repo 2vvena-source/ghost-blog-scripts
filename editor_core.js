@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p19x
+ * 2vvena Editor Core - v2.0-β-p19z
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19x';
+  var VERSION = 'v2.0-β-p19z';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -8509,14 +8509,38 @@
     body.innerHTML = '';
     body.style.padding = '0';
 
-    var FONTS = [
-      { label: '본문 (Pretendard)', value: '"Pretendard Variable","Pretendard",sans-serif' },
-      { label: '헤더 (카페단정해)', value: '"Cafe24Danjunghae","Gowun Batang",serif' },
-      { label: '고운바탕', value: '"Gowun Batang",serif' },
-      { label: '나눔명조', value: '"Nanum Myeongjo",serif' },
-      { label: '손글씨', value: '"NanumURiDdarSonGeurSsi",cursive' },
-      { label: '코드 (모노)', value: '"JetBrains Mono","Menlo",monospace' }
-    ];
+    // p19y: FONTS 가 이제 라이브러리에서 동적 로드됨.
+    //   currentFontView: 'all' | 'favorite' | 'inContent'
+    //   사용자가 등록한 모든 폰트 (내장 + 사용자 추가 카페24오스퀘어 등)이 여기서 보임
+    var currentFontView = 'all';
+    function _getFonts(){
+      var libFonts = [];
+      try {
+        if (window.__DDL_EDITOR && window.__DDL_EDITOR.getFontLibraryFiltered){
+          libFonts = window.__DDL_EDITOR.getFontLibraryFiltered(currentFontView) || [];
+        }
+      } catch(_){ libFonts = []; }
+      // 헤더 프리셋 스키마({label,value})로 변환
+      // value 는 CSS font-family 전체 스택 (폴백 포함)
+      return libFonts.map(function(f){
+        var famStr = (f.cssName || f.name || '').trim();
+        // 따옴표 없는 cssName 이면 따옴표 감싸기 (다중 단어를 위해)
+        if (famStr && famStr.indexOf(',') === -1 && famStr.indexOf('"') === -1 && famStr.indexOf("'") === -1){
+          famStr = '"' + famStr + '"';
+        }
+        var fb = f.fallback || 'sans-serif';
+        var value = famStr ? (famStr + ',' + fb) : fb;
+        return {
+          label: f.name || f.cssName || '무명',
+          value: value,
+          isFavorite: !!f.isFavorite,
+          isBuiltin: !!f.isBuiltin,
+          _raw: f
+        };
+      });
+    }
+    // 하위 호환용 이름 유지 (기존 renderPropsTab 코드가 FONTS 참조)
+    var FONTS = _getFonts();
     var WEIGHTS = [
       { label: '얇게 300', value: 300 },
       { label: '기본 400',   value: 400 },
@@ -8678,40 +8702,109 @@
     //   - 굵기: 5개 "가" 미니 버튼 (각 굵기로 렌더)
     //   - 자간/줄간격/여백: 시각 아이콘 + 값 프리셋 버튼
     function renderPropsTab(){
-      // === 폰트 카드 갤러리 ===
-      var fontLabel = document.createElement('div');
-      fontLabel.style.cssText = 'font-size: 12px; color: rgba(15,58,58,0.6); margin: 4px 0 8px;';
-      fontLabel.textContent = '폰트';
-      tabContent.appendChild(fontLabel);
+      // === 폰트 섹션 (p19y: 라이브러리 동적 참조 + 3-way 뷰 스위처) ===
+      var fontHeader = document.createElement('div');
+      fontHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin: 4px 0 8px;';
 
-      var fontGrid = document.createElement('div');
-      fontGrid.style.cssText = 'display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px;';
-      FONTS.forEach(function(f){
-        var card = document.createElement('button');
-        card.type = 'button';
-        var isActive = current.style.fontFamily === f.value;
-        card.style.cssText = 'padding: 10px 6px; border-radius: 6px; cursor: pointer; text-align: center;'
-          + ' background: ' + (isActive ? 'rgba(255,154,118,0.08)' : '#fff') + ';'
-          + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';'
-          + ' transition: background 120ms, border-color 120ms;';
-        var sample = document.createElement('div');
-        sample.textContent = '가나다';
-        sample.style.cssText = 'font-family: ' + f.value + '; font-size: 16px; color: var(--color, #0F3A3A); margin-bottom: 3px;';
-        var lbl = document.createElement('div');
-        lbl.textContent = f.label;
-        lbl.style.cssText = 'font-size: 10px; opacity: 0.55;';
-        card.appendChild(sample);
-        card.appendChild(lbl);
-        card.addEventListener('mouseenter', function(){ if (!isActive) card.style.borderColor = 'rgba(15,58,58,0.35)'; });
-        card.addEventListener('mouseleave', function(){ if (!isActive) card.style.borderColor = 'rgba(15,58,58,0.15)'; });
-        card.addEventListener('click', function(){
-          current.style.fontFamily = f.value;
-          renderPreview();
-          renderPropsTab.__rerender();  // 카드 상태 갱신
+      var fontLabel = document.createElement('div');
+      fontLabel.style.cssText = 'font-size: 12px; color: rgba(15,58,58,0.6);';
+      fontLabel.textContent = '폰트';
+      fontHeader.appendChild(fontLabel);
+
+      // 3-way 뷰 스위처: 전체 / ★ / 이 글에서
+      var viewSwitcher = document.createElement('div');
+      viewSwitcher.style.cssText = 'display: inline-flex; gap: 0; border: 1px solid rgba(15,58,58,0.12); border-radius: 4px; overflow: hidden;';
+      var viewOpts = [
+        { key: 'all',       label: '전체' },
+        { key: 'favorite',  label: '★' },
+        { key: 'inContent', label: '이 글에서' }
+      ];
+      viewOpts.forEach(function(opt, i){
+        var b = document.createElement('button');
+        b.type = 'button'; b.textContent = opt.label;
+        b.dataset.viewKey = opt.key;
+        var isActive = currentFontView === opt.key;
+        b.style.cssText = 'padding: 3px 8px; font-size: 10px; cursor: pointer; font-family: inherit; border: none;'
+          + (i > 0 ? ' border-left: 1px solid rgba(15,58,58,0.1);' : '')
+          + (isActive
+              ? ' background: rgba(255,154,118,0.12); color: var(--point, #FF9A76);'
+              : ' background: transparent; color: rgba(15,58,58,0.55);');
+        b.addEventListener('click', function(){
+          currentFontView = opt.key;
+          FONTS = _getFonts();
+          renderPropsTab.__rerender();
         });
-        fontGrid.appendChild(card);
+        viewSwitcher.appendChild(b);
       });
+      fontHeader.appendChild(viewSwitcher);
+
+      tabContent.appendChild(fontHeader);
+
+      // 카드 갤러리 (뷰에 따라 달라짐)
+      var fontGrid = document.createElement('div');
+      fontGrid.style.cssText = 'display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 6px;';
+
+      if (FONTS.length === 0){
+        // 빈 상태 안내
+        var empty = document.createElement('div');
+        empty.style.cssText = 'grid-column: 1 / -1; padding: 18px 12px; text-align: center; font-size: 11px; color: rgba(15,58,58,0.45); border: 1px dashed rgba(15,58,58,0.12); border-radius: 6px;';
+        if (currentFontView === 'favorite'){
+          empty.textContent = '즐겨찾기한 폰트가 없어요. 관리창에서 ☆ 을 눌러 보세요.';
+        } else if (currentFontView === 'inContent'){
+          empty.textContent = '이 글에 사용된 라이브러리 폰트가 없어요.';
+        } else {
+          empty.textContent = '등록된 폰트가 없어요. 아래 링크로 라이브러리를 열어주세요.';
+        }
+        fontGrid.appendChild(empty);
+      } else {
+        FONTS.forEach(function(f){
+          var card = document.createElement('button');
+          card.type = 'button';
+          var isActive = current.style.fontFamily === f.value;
+          card.style.cssText = 'position: relative; padding: 10px 6px; border-radius: 6px; cursor: pointer; text-align: center;'
+            + ' background: ' + (isActive ? 'rgba(255,154,118,0.08)' : '#fff') + ';'
+            + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';'
+            + ' transition: background 120ms, border-color 120ms;';
+          var sample = document.createElement('div');
+          sample.textContent = '가나다';
+          sample.style.cssText = 'font-family: ' + f.value + '; font-size: 16px; color: var(--color, #0F3A3A); margin-bottom: 3px; line-height: 1.2;';
+          var lbl = document.createElement('div');
+          lbl.textContent = f.label;
+          lbl.style.cssText = 'font-size: 10px; opacity: 0.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+          card.appendChild(sample);
+          card.appendChild(lbl);
+          // 즐겨찾기 별 (우상단 작게)
+          if (f.isFavorite){
+            var favMark = document.createElement('span');
+            favMark.textContent = '★';
+            favMark.style.cssText = 'position: absolute; top: 3px; right: 5px; font-size: 8px; color: var(--point, #FF9A76); line-height: 1;';
+            card.appendChild(favMark);
+          }
+          card.addEventListener('mouseenter', function(){ if (!isActive) card.style.borderColor = 'rgba(15,58,58,0.35)'; });
+          card.addEventListener('mouseleave', function(){ if (!isActive) card.style.borderColor = 'rgba(15,58,58,0.15)'; });
+          card.addEventListener('click', function(){
+            current.style.fontFamily = f.value;
+            renderPreview();
+            renderPropsTab.__rerender();
+          });
+          fontGrid.appendChild(card);
+        });
+      }
       tabContent.appendChild(fontGrid);
+
+      // → 라이브러리 관리 링크
+      var libLink = document.createElement('button');
+      libLink.type = 'button';
+      libLink.textContent = '→ 폰트 라이브러리 관리';
+      libLink.style.cssText = 'display: block; margin: 0 0 14px auto; padding: 3px 6px; background: transparent; border: none; color: var(--point, #FF9A76); font-size: 10px; cursor: pointer; font-family: inherit;';
+      libLink.addEventListener('click', function(){
+        try {
+          if (window.__DDL_EDITOR && window.__DDL_EDITOR.openFontLibraryManager){
+            window.__DDL_EDITOR.openFontLibraryManager();
+          }
+        } catch(_){}
+      });
+      tabContent.appendChild(libLink);
 
       // === 크기 (슬라이더 + 숫자) ===
       var sizeWrap = document.createElement('div');
@@ -9055,6 +9148,48 @@
     } catch(err){ console.warn('[font-lib] save fail', err); }
   }
 
+  // p19z: URL → format 추론 (공통 유틸)
+  function _urlToFormat(url){
+    if (/\.ttf(\?.*)?$/i.test(url)) return 'truetype';
+    if (/\.otf(\?.*)?$/i.test(url)) return 'opentype';
+    if (/\.woff2(\?.*)?$/i.test(url)) return 'woff2';
+    if (/\.woff(\?.*)?$/i.test(url)) return 'woff';
+    return 'woff2';   // 기본값
+  }
+
+  // p19z: 폰트 하나의 @font-face 규칙 배열 생성 (다중 굵기 지원)
+  //   반환: ['@font-face { … }', '@font-face { … }', …]
+  //   세 가지 모드 자동 분기:
+  //     1) f.weightUrls = { 400: 'url', 700: 'url', … } → 각 굵기별 정확한 파일 규칙
+  //     2) f.url 하나 + f.weights [400,700,…] → 이전 방식 (같은 URL을 여러 굵기에 예약)
+  //     3) 둘 다 없으면 skip
+  function _buildFontFaceRules(f){
+    var famStr = (f.cssName || f.name || '').split(',')[0].trim().replace(/^["']|["']$/g, '');
+    if (!famStr) return [];
+    var rules = [];
+
+    // 모드 1: 굵기별 개별 URL 매핑 (Pretendard 같은 다중 굵기 폰트)
+    if (f.weightUrls && typeof f.weightUrls === 'object'){
+      Object.keys(f.weightUrls).forEach(function(wKey){
+        var w = parseInt(wKey, 10);
+        var wUrl = f.weightUrls[wKey];
+        if (!wUrl || isNaN(w)) return;
+        rules.push('@font-face { font-family: "' + famStr + '"; src: url("' + wUrl + '") format("' + _urlToFormat(wUrl) + '"); font-weight: ' + w + '; font-display: swap; }');
+      });
+      // weightUrls 안에 항목이 있으면 단일 url 은 무시 (중복 방지)
+      if (rules.length > 0) return rules;
+    }
+
+    // 모드 2: 단일 URL (기존 방식)
+    if (f.url){
+      var format = _urlToFormat(f.url);
+      (f.weights && f.weights.length ? f.weights : [400]).forEach(function(w){
+        rules.push('@font-face { font-family: "' + famStr + '"; src: url("' + f.url + '") format("' + format + '"); font-weight: ' + w + '; font-display: swap; }');
+      });
+    }
+    return rules;
+  }
+
   // 등록된 폰트를 @font-face 로 페이지에 로드
   function _injectFontFaceCSS(){
     var lib = loadFontLibrary();
@@ -9062,16 +9197,9 @@
     if (oldStyle) oldStyle.remove();
     var css = '';
     lib.fonts.forEach(function(f){
-      if (f.isBuiltin || !f.url) return;   // 내장은 이미 로드됨 / URL 없으면 skip
-      // font-family 값에서 따옴표 벗김 (첫 이름만 사용)
-      var famStr = (f.cssName || f.name || '').split(',')[0].trim().replace(/^["']|["']$/g, '');
-      if (!famStr) return;
-      var format = 'woff2';
-      if (/\.ttf(\?.*)?$/i.test(f.url)) format = 'truetype';
-      else if (/\.otf(\?.*)?$/i.test(f.url)) format = 'opentype';
-      else if (/\.woff(\?.*)?$/i.test(f.url)) format = 'woff';
-      (f.weights && f.weights.length ? f.weights : [400]).forEach(function(w){
-        css += '@font-face { font-family: "' + famStr + '"; src: url("' + f.url + '") format("' + format + '"); font-weight: ' + w + '; font-display: swap; }\n';
+      if (f.isBuiltin) return;   // 내장은 이미 로드됨
+      _buildFontFaceRules(f).forEach(function(rule){
+        css += rule + '\n';
       });
     });
     if (!css) return;
@@ -9089,15 +9217,9 @@
     lines.push('<!-- font library start -->');
     lines.push('<style id="ddl-fonts-imported">');
     lib.fonts.forEach(function(f){
-      if (f.isBuiltin || !f.url) return;
-      var famStr = (f.cssName || f.name || '').split(',')[0].trim().replace(/^["']|["']$/g, '');
-      if (!famStr) return;
-      var format = 'woff2';
-      if (/\.ttf(\?.*)?$/i.test(f.url)) format = 'truetype';
-      else if (/\.otf(\?.*)?$/i.test(f.url)) format = 'opentype';
-      else if (/\.woff(\?.*)?$/i.test(f.url)) format = 'woff';
-      (f.weights && f.weights.length ? f.weights : [400]).forEach(function(w){
-        lines.push('  @font-face { font-family: "' + famStr + '"; src: url("' + f.url + '") format("' + format + '"); font-weight: ' + w + '; font-display: swap; }');
+      if (f.isBuiltin) return;
+      _buildFontFaceRules(f).forEach(function(rule){
+        lines.push('  ' + rule);
       });
     });
     lines.push('</style>');
@@ -9340,6 +9462,16 @@
       }
       card.appendChild(badge);
 
+      // p19z: 다중 굵기 배지 (Pretendard 등)
+      if (f.weightUrls && Object.keys(f.weightUrls).length >= 2){
+        var wBadge = document.createElement('div');
+        wBadge.textContent = Object.keys(f.weightUrls).length + '개 굵기';
+        wBadge.style.cssText = 'display: inline-block; margin-left: 4px; padding: 2px 6px; border-radius: 3px; font-size: 9px; line-height: 1.4; font-weight: 500;'
+          + ' background: rgba(15,58,58,0.06); color: var(--color, #0F3A3A);';
+        wBadge.title = '굵기: ' + Object.keys(f.weightUrls).sort(function(a,b){return a-b;}).join(', ');
+        card.appendChild(wBadge);
+      }
+
       // hover 시 액션 아이콘 (우상단)
       var actions = document.createElement('div');
       actions.className = 'card-actions';
@@ -9450,25 +9582,61 @@
     // 하위 호환: 기존 데이터에 commercial 없으면 기본값
     if (!current.commercial) current.commercial = 'unknown';
 
-    // ── @font-face 블록 파서 (p19x 신규) ─────────────────────────
-    // 사용자가 눈누 등에서 복사한 CSS 블록을 통째 붙여넣으면 name/url/weights 추출.
-    // 반환: { cssName, url, weights, weight, style } 또는 null
-    function _parseFontFaceBlock(text){
+    // ── @font-face 블록 파서 (p19x → p19z: 다중 블록 지원) ─────────────────
+    // 사용자가 눈누/Pretendard 등에서 복사한 CSS 블록을 통짜 붙여넣으면
+    //   - 단일: 1개 블록만 파싱
+    //   - 다중 (Pretendard 등 굵기별 파일이 있는 폰트): 모든 블록 배열
+    // 반환: { blocks: [{cssName,url,weight,style}, ...] } 또는 null
+    function _parseFontFaceBlocks(text){
       if (!text || typeof text !== 'string') return null;
       if (text.indexOf('@font-face') === -1) return null;
-      var out = {};
-      var mFam = text.match(/font-family\s*:\s*['"]([^'"]+)['"]/i);
-      if (mFam) out.cssName = mFam[1].trim();
-      // src 안의 첫 번째 http(s) URL — 확장자 상관 없이 폰트 자원으로 간주
-      var mUrl = text.match(/src\s*:[^;]*url\(\s*['"]?(https?:\/\/[^'"\)\s]+)['"]?\s*\)/i);
-      if (mUrl) out.url = mUrl[1].trim();
-      var mW = text.match(/font-weight\s*:\s*([0-9]{3})/i);
-      if (mW) out.weight = parseInt(mW[1], 10);
-      var mS = text.match(/font-style\s*:\s*(normal|italic|oblique)/i);
-      if (mS) out.style = mS[1];
-      // 최소 조건: cssName 또는 url 하나라도 있어야 유효
-      if (!out.cssName && !out.url) return null;
-      return out;
+
+      var blocks = [];
+      var re = /@font-face\s*\{([^}]*)\}/gi;
+      var m;
+      while ((m = re.exec(text)) !== null){
+        var body = m[1];
+        var b = {};
+        var mFam = body.match(/font-family\s*:\s*['"]([^'"]+)['"]/i);
+        if (mFam) b.cssName = mFam[1].trim();
+        var mUrl = body.match(/src\s*:[^;]*url\(\s*['"]?(https?:\/\/[^'"\)\s]+)['"]?\s*\)/i);
+        if (mUrl) b.url = mUrl[1].trim();
+        var mW = body.match(/font-weight\s*:\s*([0-9]{2,3}|normal|bold)/i);
+        if (mW){
+          var wRaw = mW[1].toLowerCase();
+          if (wRaw === 'normal') b.weight = 400;
+          else if (wRaw === 'bold') b.weight = 700;
+          else b.weight = parseInt(wRaw, 10);
+        }
+        var mS = body.match(/font-style\s*:\s*(normal|italic|oblique)/i);
+        if (mS) b.style = mS[1];
+        if (b.cssName || b.url) blocks.push(b);
+      }
+
+      // 정규식 실패 시 폴백 (구조 이상)
+      if (blocks.length === 0){
+        var fb = {};
+        var f1 = text.match(/font-family\s*:\s*['"]([^'"]+)['"]/i);
+        if (f1) fb.cssName = f1[1].trim();
+        var f2 = text.match(/src\s*:[^;]*url\(\s*['"]?(https?:\/\/[^'"\)\s]+)['"]?\s*\)/i);
+        if (f2) fb.url = f2[1].trim();
+        var f3 = text.match(/font-weight\s*:\s*([0-9]{2,3}|normal|bold)/i);
+        if (f3){
+          var v = f3[1].toLowerCase();
+          fb.weight = v === 'normal' ? 400 : v === 'bold' ? 700 : parseInt(v, 10);
+        }
+        if (fb.cssName || fb.url) blocks.push(fb);
+      }
+
+      return blocks.length > 0 ? { blocks: blocks } : null;
+    }
+
+    // 하위 호환 (p19x 이름 유지) — 첫 블록만 반환
+    function _parseFontFaceBlock(text){
+      var res = _parseFontFaceBlocks(text);
+      if (!res || !res.blocks.length) return null;
+      var b = res.blocks[0];
+      return { cssName: b.cssName, url: b.url, weight: b.weight, style: b.style };
     }
 
     // URL 파일명에서 font-family 후보 추출 (p19x 신규)
@@ -9569,11 +9737,11 @@
 
       var pasteHint = document.createElement('div');
       pasteHint.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.55); margin-bottom: 6px; line-height: 1.5;';
-      pasteHint.textContent = '눈누 상세 페이지 → “웹폰트로 사용하기” @font-face { … } 블록 전체를 복사해서 이곳에 붙여넣으세요. 자동으로 이름 · URL · 굵기가 채워집니다.';
+      pasteHint.textContent = '눈누/Pretendard 등의 “웹폰트로 사용하기” @font-face { … } 블록을 통째 복사해 붙여넣으세요. 여러 개(굵기별) 붙여넣으면 자동으로 일괄 등록됩니다.';
       pasteWrap.appendChild(pasteHint);
 
       var pasteTA = document.createElement('textarea');
-      pasteTA.placeholder = '@font-face {\n  font-family: \'Cafe24Ohsquare\';\n  src: url(\'https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/Cafe24Ohsquare.woff\') format(\'woff\');\n  font-weight: normal;\n  font-style: normal;\n}';
+      pasteTA.placeholder = '@font-face {\n  font-family: \'Pretendard\';\n  font-weight: 400;\n  src: url(\'https://.../Pretendard-Regular.woff2\') format(\'woff2\');\n}\n@font-face {\n  font-family: \'Pretendard\';\n  font-weight: 700;\n  src: url(\'https://.../Pretendard-Bold.woff2\') format(\'woff2\');\n}\n… (여러 굵기 통째로 붙여넣기 가능)';
       pasteTA.rows = 3;
       pasteTA.style.cssText = 'width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1px solid rgba(15,58,58,0.2); border-radius: 4px; background: #fff; color: var(--color, #0F3A3A); font-family: Menlo,Consolas,monospace; font-size: 11px; line-height: 1.45; outline: none; resize: vertical; min-height: 60px;';
       pasteWrap.appendChild(pasteTA);
@@ -9585,31 +9753,66 @@
       pasteTA.addEventListener('input', function(){
         var val = pasteTA.value.trim();
         if (!val){ pasteMsg.textContent = ''; pasteMsg.style.color = 'rgba(15,58,58,0.5)'; return; }
-        var parsed = _parseFontFaceBlock(val);
-        if (!parsed){
+        var parsed = _parseFontFaceBlocks(val);
+        if (!parsed || !parsed.blocks.length){
           pasteMsg.style.color = '#d33';
           pasteMsg.textContent = '⚠ @font-face 본문에서 font-family 또는 src url 을 찾지 못했어요.';
           return;
         }
-        // 적용
-        if (parsed.cssName){
-          current.cssName = parsed.cssName;
-          famInput.value = parsed.cssName;
-          if (!current.name){ current.name = parsed.cssName; nameInput.value = parsed.cssName; }
+        var blocks = parsed.blocks;
+
+        // 공통 cssName 추출 (첫 블록 기준)
+        var famName = '';
+        for (var i = 0; i < blocks.length; i++){
+          if (blocks[i].cssName){ famName = blocks[i].cssName; break; }
         }
-        if (parsed.url){
-          current.url = parsed.url;
-          urlInput.value = parsed.url;
+        if (famName){
+          current.cssName = famName;
+          famInput.value = famName;
+          if (!current.name){ current.name = famName; nameInput.value = famName; }
         }
-        if (parsed.weight && current.weights.indexOf(parsed.weight) === -1){
-          current.weights.push(parsed.weight);
+
+        // 모드 1: 다중 블록 (Pretendard 등 굵기별 파일)
+        if (blocks.length >= 2){
+          var wUrls = {};
+          var newWeights = [];
+          blocks.forEach(function(b){
+            if (b.url && b.weight){
+              wUrls[b.weight] = b.url;
+              if (newWeights.indexOf(b.weight) === -1) newWeights.push(b.weight);
+            }
+          });
+          if (Object.keys(wUrls).length >= 2){
+            current.weightUrls = wUrls;
+            current.weights = newWeights.sort(function(a,b){ return a-b; });
+            // 단일 URL 필드에는 대표값 (400 우선, 없으면 중간)
+            var mid = wUrls[400] ? 400 : newWeights[Math.floor(newWeights.length/2)];
+            current.url = wUrls[mid] || wUrls[newWeights[0]];
+            urlInput.value = current.url;
+            _refreshWeights();
+            pasteMsg.style.color = 'var(--point, #FF9A76)';
+            pasteMsg.innerHTML = '✓ <b>' + Object.keys(wUrls).length + '개 굵기 발견 · 일괄 등록</b> · ' + famName + ' — 굵기: ' + newWeights.join(', ');
+            _updatePreview();
+            return;
+          }
+        }
+
+        // 모드 2: 단일 블록 (기존 동작)
+        var b0 = blocks[0];
+        if (b0.url){
+          current.url = b0.url;
+          urlInput.value = b0.url;
+          current.weightUrls = null;   // 다중 URL 필드 초기화
+        }
+        if (b0.weight && current.weights.indexOf(b0.weight) === -1){
+          current.weights.push(b0.weight);
           _refreshWeights();
         }
         pasteMsg.style.color = 'var(--point, #FF9A76)';
         var bits = [];
-        if (parsed.cssName) bits.push('이름 → ' + parsed.cssName);
-        if (parsed.url) bits.push('URL → 채움');
-        if (parsed.weight) bits.push('굵기 → ' + parsed.weight);
+        if (b0.cssName) bits.push('이름 → ' + b0.cssName);
+        if (b0.url) bits.push('URL → 채움');
+        if (b0.weight) bits.push('굵기 → ' + b0.weight);
         pasteMsg.textContent = '✓ ' + bits.join(' · ');
         _updatePreview();
       });
@@ -9661,8 +9864,17 @@
         }
       }
     });
-    var urlRow = _row('폰트 파일 URL', urlInput, current.isBuiltin ? '내장 폰트는 URL 변경 불가' : '.woff2 / .ttf / .otf / .woff 파일의 공개 URL — 붙여넣으면 이름 자동 추출');
+    var urlHint = current.isBuiltin ? '내장 폰트는 URL 변경 불가' : '.woff2 / .ttf / .otf / .woff 파일의 공개 URL — 붙여넣으면 이름 자동 추출';
+    var urlRow = _row('폰트 파일 URL', urlInput, urlHint);
     body.appendChild(urlRow);
+
+    // p19z: 다중 굵기 폰트었다면 안내 배너 표시
+    if (current.weightUrls && Object.keys(current.weightUrls).length >= 2){
+      var multiInfo = document.createElement('div');
+      multiInfo.style.cssText = 'margin-top: -8px; margin-bottom: 12px; padding: 6px 10px; background: rgba(255,154,118,0.06); border-left: 3px solid var(--point, #FF9A76); border-radius: 3px; font-size: 10px; line-height: 1.5; color: rgba(15,58,58,0.7);';
+      multiInfo.innerHTML = '⚡ <b>' + Object.keys(current.weightUrls).length + '개 굵기 매핑 등록됨</b><br>굵기 ' + Object.keys(current.weightUrls).sort(function(a,b){return a-b;}).join(', ') + ' 각각이 자기 파일로 로드됨. 위 URL 은 대표값이며, 수정하려면 새로 붙여넣어야 합니다.';
+      body.appendChild(multiInfo);
+    }
 
     // 도움말 버튼 (URL 얻는 법)
     var howBtn = document.createElement('button');
@@ -13704,7 +13916,7 @@
       '</div>' +
       // 4. 버전
       '<div style="margin-top:20px;padding-top:12px;border-top:1px solid rgba(15,58,58,0.06);font-size:11px;color:rgba(15,58,58,0.4);text-align:center;">' +
-        'v2.0-β-p19x' +
+        'v2.0-β-p19z' +
       '</div>';
 
     mask.appendChild(box);
