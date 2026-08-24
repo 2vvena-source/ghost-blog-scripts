@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p19s
+ * 2vvena Editor Core - v2.0-β-p19t
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -8342,60 +8342,165 @@
   //   - 「속성」/「색깔」 세그먼트 탭
   //   - 라벨-값 한 줄 (Figma 스타일)
   //   - 이 편집 다이얼로그 구조는 향후 하이라이터/코드/색상/크기/폰트 편집창의 표준
+  // p19t: ⭐ 편집 다이얼로그 = 완전 독립 오버레이 시스템 (createBlockPopup 팩토리 미사용)
+  //   이유: 팩토리는 원래 콜아웃/구분선용으로 설계됨. 관리창과 z-index 충돌·이벤트 캡처 문제 발생.
+  //   해결: fixed inset:0 마스크 안에 중앙 배치된 자체 다이얼로그.
+  //         마우스 이벤트가 다른 어떤 팝업/편집기 요소와도 충돌 안 함.
+  //   구조:
+  //     .ddl-edit-overlay (fixed inset:0, z-index 100000, mask 겸 클릭 캐처)
+  //       └ .ddl-edit-dialog (중앙 배치, 실제 UI)
+  //           ├ header (제목 + 닫기)
+  //           ├ body (nameArea + heroWrap + segWrap + tabContent)
+  //           └ footer (초기화 / 취소 / 저장)
+
   function openHeaderPresetEditor(preset, onSave){
-    // preset 은 { id, name, isDefault, style: {...} }
     var current = JSON.parse(JSON.stringify(preset || {}));
     if (!current.style) current.style = _headerDefaults('p');
-    var initialSnapshot = JSON.parse(JSON.stringify(current));  // 초기화용
-    var currentTab = 'props';   // 'props' | 'color'
+    var initialSnapshot = JSON.parse(JSON.stringify(current));
+    var currentTab = 'props';
 
-    // p19s: ⭐ 관리창과 편집창이 동시 개방되면 마우스 이벤트 충돌 발생.
-    //   편집창 열 때 관리창을 잠시 숫기고, 편집창 닫힐 때 다시 보이게 함.
-    //   + 배경 반투명 마스크로 편집창 외 클릭 방지 → 및단 블록에 이벤트 안 감.
+    // 열려있는 관리창 잠시 숨김
     var hiddenManagers = [];
-    Array.prototype.forEach.call(document.querySelectorAll('.ep-popup-v2'), function(el){
+    Array.prototype.forEach.call(document.querySelectorAll('.ep-popup-v2, .ddl-edit-overlay'), function(el){
       if (el.style.display !== 'none'){
         hiddenManagers.push({ el: el, prevDisplay: el.style.display });
         el.style.display = 'none';
       }
     });
 
-    // 배경 마스크 (클릭하면 아무 일 안 일어난 → 아래 블록에 안 감)
-    var mask = document.createElement('div');
-    mask.className = 'ddl-edit-mask';
-    mask.style.cssText = 'position:fixed; inset:0; z-index:99998; background:rgba(15,58,58,0.15);';
-    // 마스크 클릭 = 아무도 먹지 못하도록 이벤트 캐칭 + 기본 동작 사전에 차단
-    ['mousedown','click'].forEach(function(ev){
-      mask.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); });
-    });
-    document.body.appendChild(mask);
+    // === 오버레이 (마스크 + 다이얼로그 중앙 배치) ===
+    var overlay = document.createElement('div');
+    overlay.className = 'ddl-edit-overlay';
+    overlay.style.cssText = 'position: fixed; inset: 0; z-index: 100000;'
+      + ' background: rgba(15,58,58,0.18);'
+      + ' display: flex; align-items: center; justify-content: center;'
+      + ' font-family: "Pretendard Variable","Pretendard",sans-serif;'
+      + ' color: var(--color, #0F3A3A);';
 
-    var popup = window.__DDL_EDITOR.createBlockPopup({
-      title: '프리셋 편집',
-      width: '520px',
-      draggable: true,
-      footer: [
-        { label: '초기화', secondary: true, onClick: function(pp){
-            // 편집 시작 시점 값으로 복원
-            current = JSON.parse(JSON.stringify(initialSnapshot));
-            _renderPresetEditorBody(pp, current, currentTab, function(newTab){ currentTab = newTab; });
-          } },
-        { label: '취소', onClick: function(pp){ pp.close(); } },
-        { label: '저장', primary: true, onClick: function(pp){
-            if (typeof onSave === 'function') onSave(current);
-            pp.close();
-          } }
-      ],
-      onOpen: function(pp){
-        _renderPresetEditorBody(pp, current, currentTab, function(newTab){ currentTab = newTab; });
-      },
-      onClose: function(){
-        // 마스크 제거 + 숫겼던 관리창들 다시 보이게
-        try { if (mask.parentNode) mask.parentNode.removeChild(mask); } catch(_){}
-        hiddenManagers.forEach(function(h){ try { h.el.style.display = h.prevDisplay || ''; } catch(_){} });
+    // === 다이얼로그 컨테이너 ===
+    var dialog = document.createElement('div');
+    dialog.className = 'ddl-edit-dialog';
+    dialog.style.cssText = 'width: 520px; max-width: 92vw; max-height: 88vh;'
+      + ' background: #fff; border: 1px solid rgba(15,58,58,0.25);'
+      + ' border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);'
+      + ' display: flex; flex-direction: column;'
+      + ' overflow: hidden;';
+    // 다이얼로그 안 클릭이 오버레이로 버블링되지 않게 (다이얼로그 밖 클릭 = 아무 일 안 함)
+    dialog.addEventListener('click', function(e){ e.stopPropagation(); });
+    dialog.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+
+    // === 헤더 ===
+    var dHeader = document.createElement('div');
+    dHeader.style.cssText = 'padding: 0.7em 1em;'
+      + ' background: rgba(15,58,58,0.06);'
+      + ' border-bottom: 1px solid rgba(15,58,58,0.15);'
+      + ' font-family: "Cafe24Danjunghae","Gowun Batang",serif;'
+      + ' font-size: 1.05em;'
+      + ' cursor: move; user-select: none;'
+      + ' display: flex; align-items: center; justify-content: space-between;';
+    var dTitle = document.createElement('span');
+    dTitle.textContent = '프리셋 편집';
+    var dClose = document.createElement('button');
+    dClose.type = 'button';
+    dClose.textContent = '×';
+    dClose.style.cssText = 'background: transparent; border: none; cursor: pointer;'
+      + ' font-size: 1.3em; color: rgba(15,58,58,0.6); line-height: 1; padding: 0 0.2em;';
+    dClose.addEventListener('mouseenter', function(){ dClose.style.color = 'var(--color, #0F3A3A)'; });
+    dClose.addEventListener('mouseleave', function(){ dClose.style.color = 'rgba(15,58,58,0.6)'; });
+    dClose.addEventListener('click', function(){ closeDialog(); });
+    dHeader.appendChild(dTitle);
+    dHeader.appendChild(dClose);
+    dialog.appendChild(dHeader);
+
+    // === 바디 (컨테이너만; 실제 내용은 _renderPresetEditorBody 가 채움) ===
+    var dBody = document.createElement('div');
+    dBody.style.cssText = 'flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column;';
+    dialog.appendChild(dBody);
+
+    // === 푸터 ===
+    var dFooter = document.createElement('div');
+    dFooter.style.cssText = 'padding: 0.7em 1em; border-top: 1px solid rgba(15,58,58,0.1);'
+      + ' display: flex; justify-content: flex-end; gap: 0.5em; background: #fff;';
+
+    function makeBtn(label, opts){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      opts = opts || {};
+      var base = 'padding: 0.4em 0.8em; border-radius: 3px; cursor: pointer;'
+        + ' font-family: inherit; font-size: 0.85em;';
+      if (opts.primary){
+        b.style.cssText = base + ' background: var(--point, #FF9A76); color: #fff; border: 1px solid var(--point, #FF9A76);';
+        b.addEventListener('mouseenter', function(){ b.style.background = 'var(--color, #0F3A3A)'; b.style.borderColor = 'var(--color, #0F3A3A)'; });
+        b.addEventListener('mouseleave', function(){ b.style.background = 'var(--point, #FF9A76)'; b.style.borderColor = 'var(--point, #FF9A76)'; });
+      } else if (opts.secondary){
+        b.style.cssText = base + ' background: transparent; border: 1px solid transparent; color: rgba(15,58,58,0.55); margin-right: auto; padding: 0.4em 0.6em;';
+        b.addEventListener('mouseenter', function(){ b.style.background = 'rgba(15,58,58,0.04)'; b.style.color = 'var(--color, #0F3A3A)'; });
+        b.addEventListener('mouseleave', function(){ b.style.background = 'transparent'; b.style.color = 'rgba(15,58,58,0.55)'; });
+      } else {
+        b.style.cssText = base + ' background: transparent; border: 1px solid rgba(15,58,58,0.25); color: var(--color, #0F3A3A);';
+        b.addEventListener('mouseenter', function(){ b.style.background = 'rgba(15,58,58,0.06)'; b.style.borderColor = 'rgba(15,58,58,0.4)'; });
+        b.addEventListener('mouseleave', function(){ b.style.background = 'transparent'; b.style.borderColor = 'rgba(15,58,58,0.25)'; });
       }
-    });
-    popup.show();
+      b.addEventListener('click', opts.onClick || function(){});
+      return b;
+    }
+
+    var pseudoPP = { body: dBody };  // _renderPresetEditorBody 는 pp.body 를 사용
+    dFooter.appendChild(makeBtn('초기화', { secondary: true, onClick: function(){
+      current = JSON.parse(JSON.stringify(initialSnapshot));
+      _renderPresetEditorBody(pseudoPP, current, currentTab, function(nt){ currentTab = nt; });
+    }}));
+    dFooter.appendChild(makeBtn('취소',   { onClick: function(){ closeDialog(); } }));
+    dFooter.appendChild(makeBtn('저장',   { primary: true, onClick: function(){
+      if (typeof onSave === 'function') onSave(current);
+      closeDialog();
+    }}));
+    dialog.appendChild(dFooter);
+
+    // === 드래그 이동 ===
+    (function(){
+      var drag = null;
+      dHeader.addEventListener('mousedown', function(e){
+        if (e.target === dClose) return;
+        var rect = dialog.getBoundingClientRect();
+        drag = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+        // 드래그 시작하면 dialog 는 flex-center 에서 벗어나 absolute 배치로 전환
+        dialog.style.position = 'absolute';
+        dialog.style.left = rect.left + 'px';
+        dialog.style.top = rect.top + 'px';
+        overlay.style.alignItems = 'flex-start';
+        overlay.style.justifyContent = 'flex-start';
+        e.preventDefault();
+      });
+      document.addEventListener('mousemove', function(e){
+        if (!drag) return;
+        var x = Math.max(0, Math.min(window.innerWidth - 40, e.clientX - drag.dx));
+        var y = Math.max(0, Math.min(window.innerHeight - 40, e.clientY - drag.dy));
+        dialog.style.left = x + 'px';
+        dialog.style.top = y + 'px';
+      });
+      document.addEventListener('mouseup', function(){ drag = null; });
+    })();
+
+    // === 닫기 함수 ===
+    function closeDialog(){
+      try { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch(_){}
+      hiddenManagers.forEach(function(h){ try { h.el.style.display = h.prevDisplay || ''; } catch(_){} });
+    }
+
+    // ESC 로 닫기
+    var escHandler = function(e){
+      if (e.key === 'Escape'){ closeDialog(); document.removeEventListener('keydown', escHandler); }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    // === 조립 & 마운트 ===
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // 바디 내용 렌더
+    _renderPresetEditorBody(pseudoPP, current, currentTab, function(nt){ currentTab = nt; });
   }
 
   function _renderPresetEditorBody(pp, current, activeTab, onTabChange){
