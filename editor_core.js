@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p20b
+ * 2vvena Editor Core - v2.0-β-p20d
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -2720,8 +2720,13 @@
     box.appendChild(resizer);
     block.appendChild(box);
 
-    if (afterBlock && afterBlock.nextSibling) contentEl.insertBefore(block, afterBlock.nextSibling);
-    else contentEl.appendChild(block);
+    // p20d: afterBlock 이 콜아웃 body(또는 다른 중첩 컨테이너) 안에 있으면
+    //       그 부모에 삽입 — 노션 스타일 중첩 지원.
+    if (afterBlock && afterBlock.parentNode) {
+      afterBlock.parentNode.insertBefore(block, afterBlock.nextSibling);
+    } else if (contentEl) {
+      contentEl.appendChild(block);
+    }
 
     // p11.2: 커서 이동 확실히
     setTimeout(function(){
@@ -2868,17 +2873,92 @@
   var slashCommands = [];
   var slashOriginBlock = null;
   var slashOriginRange = null;
+  // p20d: 슬래시 감지한 실제 editable 을 별도 저장 (콜아웃 body 안 삽입 지원)
+  //   콜아웃 body 안에서 `/` 를 치면 slashOriginBlock 은 body 안의 <p> · <div.editor-block>
+  //   등이 되고, slashOriginEditable 은 그 안의 contenteditable=true 요소.
+  //   콜아웃 body 자체가 곧 editable 이라 origin block == editable 인 경우도 있음.
+  var slashOriginEditable = null;
+  var slashInCalloutBody = null;  // 콜아웃 body 안에서 열렸다면 그 callout-body 참조
+
+  // p20d: 콜아웃 body 안에서 슬래시를 실행할 때 사용할 anchor(참조 노드) 계산.
+  //   전달된 originBlock 이 콜아웃 body 자체이거나 body 안의 sentinel <br> 뿐인 경우,
+  //   body 마지막 자식(또는 body 자체)을 반환해 새 블록이 body 안쪽으로 삽입되게 한다.
+  //   originBlock 이 body 안의 실제 자식(예: <p>)이면 그대로 반환.
+  function _slashAnchorForCalloutBody(originBlock){
+    if (!slashInCalloutBody) return originBlock;
+    var body = slashInCalloutBody;
+    // originBlock 이 body 안의 자식이면 그대로
+    if (originBlock && originBlock !== body && body.contains(originBlock) && originBlock.parentNode === body) {
+      return originBlock;
+    }
+    // originBlock 이 body 안의 손자면 body 안의 직속 자식까지 올라가기
+    var cur = originBlock;
+    while (cur && cur.parentNode && cur.parentNode !== body) cur = cur.parentNode;
+    if (cur && cur.parentNode === body) return cur;
+    // 그 외: body 안의 마지막 자식, 없으면 body 자체를 반환하고 호출측에서 처리
+    var last = body.lastElementChild;
+    return last || body;
+  }
+
+  // p20d: 콜아웃 body 안에서 슬래시로 새 블록 삽입 시 준비 작업
+  //   - body 안이 완전 비어있거나 <br> 하나뿐이면 그걸 지우고 새 블록만 남게 함
+  //   - anchor 가 body 자체면 body 에 직접 append 하도록 특수 처리
+  function _prepareCalloutBodyForInsert(){
+    if (!slashInCalloutBody) return null;
+    var body = slashInCalloutBody;
+    // body 안이 <br> 뿐이거나 완전히 빈 텍스트만 있으면 정리
+    var hasReal = false;
+    for (var i = 0; i < body.childNodes.length; i++){
+      var n = body.childNodes[i];
+      if (n.nodeType === 1 && n.tagName !== 'BR') { hasReal = true; break; }
+      if (n.nodeType === 3 && (n.textContent || '').trim().length > 0) { hasReal = true; break; }
+    }
+    if (!hasReal) {
+      // 완전히 비운다 — appendChild 로 새 블록이 body 안 첫 자식이 됨
+      while (body.firstChild) body.removeChild(body.firstChild);
+    }
+    return body;
+  }
 
   function getSlashCommands(){
     return [
-      { id:'callout', label:'콜아웃', desc:'강조 박스. 색상·아이콘 커스텀', icon:'💡',
+      { id:'callout', label:'콜아웃', desc:'강조 박스. 색상·아이콘 커스텀 · 콜아웃 안에도 삽입 가능', icon:'💡',
         keywords:['콜아웃','callout','call'],
         exec:function(originBlock){
+          if (slashInCalloutBody) {
+            var body = _prepareCalloutBodyForInsert();
+            var anchor = _slashAnchorForCalloutBody(originBlock);
+            if (anchor === body) {
+              // body 가 비어 있어 앵커가 body 자체 → 임시 자식을 만들어 anchor 삼음
+              var tmp = document.createElement('div');
+              tmp.className = 'editor-block';
+              tmp.setAttribute('data-block-type', 'p');
+              var tp = document.createElement('p');
+              tp.setAttribute('contenteditable', 'true');
+              tp.innerHTML = '<br>';
+              tmp.appendChild(makeBlockHandle());
+              tmp.appendChild(tp);
+              body.appendChild(tmp);
+              insertCalloutBlock(tmp);
+              // 임시 자식이 비어있으면 제거
+              if ((tp.textContent || '').trim() === '') { try { tmp.remove(); } catch(_){} }
+            } else {
+              // anchor 뒤에 새 콜아웃 삽입 (insertCalloutBlock 이 anchor.parentNode 로 삽입하도록 p20d 에서 이미 수정됨)
+              insertCalloutBlock(anchor);
+              // anchor 가 빈 <p> · data-block-type='p' 라면 제거
+              if (anchor && anchor.tagName === 'DIV' && anchor.getAttribute && anchor.getAttribute('data-block-type') === 'p' && (anchor.textContent || '').trim() === '') {
+                try { anchor.remove(); } catch(_){}
+              } else if (anchor && anchor.tagName === 'P' && (anchor.textContent || '').trim() === '') {
+                try { anchor.remove(); } catch(_){}
+              }
+            }
+            return;
+          }
           // originBlock 텍스트가 슬래시 명령 외에 없으면 그 자리 교체, 아니면 뒤에 추가
           var b = originBlock;
-          if (b && (b.textContent || '').trim() === '' && b.getAttribute('data-block-type') === 'p') {
+          if (b && (b.textContent || '').trim() === '' && b.getAttribute && b.getAttribute('data-block-type') === 'p') {
             insertCalloutBlock(b);
-            b.remove();
+            try { b.remove(); } catch(_){}
           } else {
             insertCalloutBlock(b);
           }
@@ -2888,20 +2968,64 @@
       { id:'image', label:'이미지', desc:'사진·그림 삽입. Ghost 서버 업로드 또는 URL', icon:'🖼',
         keywords:['이미지','image','img','사진','포토','photo','picture'],
         exec:function(originBlock){
+          if (slashInCalloutBody) {
+            var body = _prepareCalloutBodyForInsert();
+            var anchor = _slashAnchorForCalloutBody(originBlock);
+            if (anchor === body) {
+              var tmp = document.createElement('div');
+              tmp.className = 'editor-block';
+              tmp.setAttribute('data-block-type', 'p');
+              var tp = document.createElement('p');
+              tp.setAttribute('contenteditable', 'true');
+              tp.innerHTML = '<br>';
+              tmp.appendChild(makeBlockHandle());
+              tmp.appendChild(tp);
+              body.appendChild(tmp);
+              insertImageBlock(tmp, null, true);
+              if ((tp.textContent || '').trim() === '') { try { tmp.remove(); } catch(_){} }
+            } else {
+              var wasEmpty = anchor && (anchor.textContent || '').trim() === '' && anchor.getAttribute && anchor.getAttribute('data-block-type') === 'p';
+              insertImageBlock(anchor, null, true);
+              if (wasEmpty && anchor.parentNode) { try { anchor.remove(); } catch(_){} }
+            }
+            return;
+          }
           var b = originBlock;
-          var isEmpty = b && (b.textContent || '').trim() === '' && b.getAttribute('data-block-type') === 'p';
-          var newBlock = insertImageBlock(b, null, true); // p15b: 명시적 다이얼로그
-          if (isEmpty && b.parentNode) b.remove();
+          var isEmpty = b && (b.textContent || '').trim() === '' && b.getAttribute && b.getAttribute('data-block-type') === 'p';
+          insertImageBlock(b, null, true); // p15b: 명시적 다이얼로그
+          if (isEmpty && b.parentNode) { try { b.remove(); } catch(_){} }
         }
       },
       // p16a: 구분선
       { id:'divider', label:'구분선', desc:'티스토리 원본 8종 프리셋. 색상·굵기·불투명도 편집', icon:'╌',
         keywords:['구분선','divider','hr','선','line','디바이더','separator'],
         exec:function(originBlock){
+          if (slashInCalloutBody) {
+            var body = _prepareCalloutBodyForInsert();
+            var anchor = _slashAnchorForCalloutBody(originBlock);
+            if (anchor === body) {
+              var tmp = document.createElement('div');
+              tmp.className = 'editor-block';
+              tmp.setAttribute('data-block-type', 'p');
+              var tp = document.createElement('p');
+              tp.setAttribute('contenteditable', 'true');
+              tp.innerHTML = '<br>';
+              tmp.appendChild(makeBlockHandle());
+              tmp.appendChild(tp);
+              body.appendChild(tmp);
+              insertDividerBlock(tmp);
+              if ((tp.textContent || '').trim() === '') { try { tmp.remove(); } catch(_){} }
+            } else {
+              var wasEmpty = anchor && (anchor.textContent || '').trim() === '' && anchor.getAttribute && anchor.getAttribute('data-block-type') === 'p';
+              insertDividerBlock(anchor);
+              if (wasEmpty && anchor.parentNode) { try { anchor.remove(); } catch(_){} }
+            }
+            return;
+          }
           var b = originBlock;
-          if (b && (b.textContent || '').trim() === '' && b.getAttribute('data-block-type') === 'p') {
+          if (b && (b.textContent || '').trim() === '' && b.getAttribute && b.getAttribute('data-block-type') === 'p') {
             insertDividerBlock(b);
-            b.remove();
+            try { b.remove(); } catch(_){}
           } else {
             insertDividerBlock(b);
           }
@@ -2911,10 +3035,32 @@
       { id:'button', label:'버튼', desc:'클릭 가능한 버튼. 색상·모서리·크기·컷아웃', icon:'▭',
         keywords:['버튼','button','btn','링크','link'],
         exec:function(originBlock){
+          if (slashInCalloutBody) {
+            var body = _prepareCalloutBodyForInsert();
+            var anchor = _slashAnchorForCalloutBody(originBlock);
+            if (anchor === body) {
+              var tmp = document.createElement('div');
+              tmp.className = 'editor-block';
+              tmp.setAttribute('data-block-type', 'p');
+              var tp = document.createElement('p');
+              tp.setAttribute('contenteditable', 'true');
+              tp.innerHTML = '<br>';
+              tmp.appendChild(makeBlockHandle());
+              tmp.appendChild(tp);
+              body.appendChild(tmp);
+              insertButtonBlock(tmp);
+              if ((tp.textContent || '').trim() === '') { try { tmp.remove(); } catch(_){} }
+            } else {
+              var wasEmpty = anchor && (anchor.textContent || '').trim() === '' && anchor.getAttribute && anchor.getAttribute('data-block-type') === 'p';
+              insertButtonBlock(anchor);
+              if (wasEmpty && anchor.parentNode) { try { anchor.remove(); } catch(_){} }
+            }
+            return;
+          }
           var b = originBlock;
-          if (b && (b.textContent || '').trim() === '' && b.getAttribute('data-block-type') === 'p') {
+          if (b && (b.textContent || '').trim() === '' && b.getAttribute && b.getAttribute('data-block-type') === 'p') {
             insertButtonBlock(b);
-            b.remove();
+            try { b.remove(); } catch(_){}
           } else {
             insertButtonBlock(b);
           }
@@ -3028,11 +3174,10 @@
       var el = node.nodeType === 3 ? node.parentElement : node;
       var editable = el && el.closest ? el.closest('[contenteditable="true"]') : null;
       if (!editable || !contentEl.contains(editable)) { if (slashMenuEl) closeSlashMenu(); return; }
-      var block = editable.closest('.editor-block');
-      if (!block) return;
-      // 슬래시 메뉴가 열려있는 동안 원래 블록이 유지되어야 함
-      if (slashMenuEl && slashOriginBlock && block !== slashOriginBlock) {
-        // 커서가 다른 블록으로 이동 → 종료
+      // p20d: block 은 editor-block 이 있으면 그것, 없으면 editable 자체 (콜아웃 body 지원)
+      var block = editable.closest('.editor-block') || editable;
+      // p20d: 슬래시 메뉴가 열려있는 동안 원래 editable 이 유지되어야 함
+      if (slashMenuEl && slashOriginEditable && editable !== slashOriginEditable) {
         closeSlashMenu();
         return;
       }
@@ -3050,15 +3195,24 @@
         if (slashMenuEl) { log('slash close: whitespace in filter:', JSON.stringify(filter)); closeSlashMenu(); }
         return;
       }
-      if (!slashMenuEl) openSlashMenu(block, range);
+      if (!slashMenuEl) openSlashMenu(block, range, editable);
       else renderSlashMenu(filter);
+    }
+
+    // p20d: 콜아웃 편집 팝업 안 입력은 슬래시 스킵. 콜아웃 body 자체 입력은 감지 유지.
+    function _isInsideCalloutPopup(target){
+      try {
+        if (!target) return false;
+        if (target.closest && target.closest('#ep-cal-popup, .ep-popup, .ep-popup-v2')) return true;
+      } catch(_){}
+      return false;
     }
 
     // p12.2: 렉 방지 - IME 관련 이벤트만 최소한. MutationObserver·폴링 제거.
     ['compositionend','input','keyup'].forEach(function(ev){
       contentEl.addEventListener(ev, function(e){
-        // 팝업 잠금 중이면 슬래시 체크 스킵 (렉 방지)
-        if (calPopupLock) return;
+        // p20d: 팝업 잠금 + 팝업 안 입력이면만 스킵. 콜아웃 body 자체 입력은 감지 유지.
+        if (calPopupLock && _isInsideCalloutPopup(e.target)) return;
         if (ev === 'keyup' && e.key && (e.key.indexOf('Arrow') === 0 || e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta' || e.key === 'Tab' || e.key === 'Enter' || e.key === 'Escape')) return;
         setTimeout(checkSlashState, 0);
       });
@@ -3075,8 +3229,8 @@
       var el = node.nodeType === 3 ? node.parentElement : node;
       editable = el.closest ? el.closest('[contenteditable="true"]') : null;
       if (!editable || !contentEl.contains(editable)) return;
-      var block = editable.closest('.editor-block');
-      if (!block) return;
+      // p20d: block 은 editor-block 이 있으면 그것, 없으면 editable 자체 (콜아웃 body 지원)
+      var block = editable.closest('.editor-block') || editable;
 
       var text = editable.textContent || '';
       // 마지막 '/' 이후 문자열 = 슬래시 필터
@@ -3098,7 +3252,7 @@
         return;
       }
       if (!slashMenuEl) {
-        openSlashMenu(block, range);
+        openSlashMenu(block, range, editable);
       } else {
         renderSlashMenu(filter);
       }
@@ -12385,6 +12539,9 @@
     //       - base64 오염 이미지 필터링
     var parts = [];
     contentEl.querySelectorAll('.editor-block').forEach(function(b){
+      // p20d: 콜아웃 body 안에 중첩된 editor-block 은 부모 콜아웃이 통째로 저장하므로 top-level 에서는 스킵
+      //         (이 가드 없으면 안에 있는 블록이 밖에도 또 한 번 저장되어 노션 스타일 중첩이 깨짐)
+      try { if (b.parentElement && b.parentElement.closest && b.parentElement.closest('.callout-body')) return; } catch(_){}
       var blockType = b.getAttribute('data-block-type') || '';
       var innerEls = Array.from(b.children).filter(function(c){ return !c.classList.contains('block-handle'); });
       // p13f: data-block-type 뿐 아니라 실제 .callout-box 존재 여부로도 판단 (더 견고)
@@ -14076,14 +14233,52 @@
       return r;
     }
 
-    // 폰트 (라이브러리 통합)
+    // 폰트 (라이브러리 통합) — p20d: <select> + 「가」 카드 팝오버 버튼
+    //   기존 <select> 는 저장 로직 재사용을 위해 유지 (숨기지 않고 나란히 노출).
+    //   버튼 클릭 시 openFontPicker 팝오버 → 선택하면 select 값 동기화 + change 발생.
+    var fontWrap = document.createElement('div');
+    fontWrap.style.cssText = 'display: flex; gap: 6px; align-items: stretch;';
     var fontSel = document.createElement('select');
-    fontSel.style.cssText = _inputCss() + ' cursor: pointer;';
+    fontSel.style.cssText = _inputCss() + ' cursor: pointer; flex: 1; min-width: 0;';
     fontSel.innerHTML = (window.__DDL_EDITOR && window.__DDL_EDITOR.buildFontSelectOptions)
       ? window.__DDL_EDITOR.buildFontSelectOptions(current.fontFamily, { value: '"JetBrains Mono","Menlo","Consolas",monospace', label: '기본 (모노 스택)' }, function(s){return String(s).replace(/["<>]/g,'');}, function(s){return String(s).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});})
       : '<option value="\'JetBrains Mono\',monospace">기본</option>';
     fontSel.addEventListener('change', function(){ current.fontFamily = fontSel.value; _renderPreview(); });
-    body.appendChild(_row('폰트', fontSel, '라이브러리에 등록된 폰트 사용 가능'));
+    fontWrap.appendChild(fontSel);
+    var fontPickBtn = document.createElement('button');
+    fontPickBtn.type = 'button';
+    fontPickBtn.title = '폰트 라이브러리에서 카드로 고르기';
+    fontPickBtn.textContent = '가';
+    fontPickBtn.style.cssText = 'flex: 0 0 auto; padding: 0 12px; border-radius: 4px; cursor: pointer;'
+      + ' background: #fff; border: 1px solid rgba(15,58,58,0.2); color: var(--color, #0F3A3A);'
+      + ' font-family: "Cafe24Danjunghae","Gowun Batang",serif; font-size: 18px; line-height: 1;'
+      + ' transition: background 120ms, border-color 120ms;';
+    fontPickBtn.addEventListener('mouseenter', function(){ fontPickBtn.style.background = 'rgba(255,154,118,0.08)'; fontPickBtn.style.borderColor = 'var(--point, #FF9A76)'; });
+    fontPickBtn.addEventListener('mouseleave', function(){ fontPickBtn.style.background = '#fff'; fontPickBtn.style.borderColor = 'rgba(15,58,58,0.2)'; });
+    fontPickBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      try {
+        if (window.__DDL_EDITOR && window.__DDL_EDITOR.openFontPicker){
+          window.__DDL_EDITOR.openFontPicker(fontPickBtn, fontSel.value, function(value, font){
+            // select 목록에 있으면 그 인덱스 선택, 없으면 신규 옵션 추가
+            var found = false;
+            for (var i = 0; i < fontSel.options.length; i++){
+              if (fontSel.options[i].value === value){ fontSel.selectedIndex = i; found = true; break; }
+            }
+            if (!found){
+              var opt = document.createElement('option');
+              opt.value = value;
+              opt.textContent = (font && (font.name || font.cssName)) || value;
+              opt.selected = true;
+              fontSel.appendChild(opt);
+            }
+            fontSel.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+        }
+      } catch(_){}
+    });
+    fontWrap.appendChild(fontPickBtn);
+    body.appendChild(_row('폰트', fontWrap, '라이브러리에 등록된 폰트 사용 가능 · 「가」 클릭 시 카드 팝오버'));
 
     // 크기
     var sizeSel = document.createElement('select');
