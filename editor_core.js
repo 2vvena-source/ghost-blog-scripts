@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p20i
+ * 2vvena Editor Core - v2.0-β-p20j
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -1868,6 +1868,203 @@
     '  min-height: 2em;',
     '}',
 
+    /* p20j: 표(Table) 블록 */
+    '.ddl-table-block {',
+    '  position: relative;',
+    '  margin: 1em 0;',
+    '  padding: 0;',
+    '}',
+    '.ddl-table-wrap {',
+    '  overflow-x: auto;',
+    '  max-width: 100%;',
+    '  margin: 0;',
+    '}',
+    '.ddl-table {',
+    '  border-collapse: collapse;',
+    '  width: auto;',
+    '  min-width: 200px;',
+    '  font-size: 0.95em;',
+    '  color: #0F3A3A;',
+    '  background: #fff;',
+    '}',
+    '.ddl-table td, .ddl-table th {',
+    '  border: 1px solid rgba(15,58,58,0.3);',
+    '  padding: 6px 10px;',
+    '  min-width: 60px;',
+    '  min-height: 28px;',
+    '  vertical-align: top;',
+    '}',
+    '.ddl-table td:focus, .ddl-table th:focus {',
+    '  outline: 2px solid rgba(255,154,118,0.6);',
+    '  outline-offset: -2px;',
+    '}',
+    '/* 폭 모드 */',
+    '.ddl-table-block.is-t-narrow .ddl-table-wrap { max-width: 50%; margin: 0 auto; }',
+    '.ddl-table-block.is-t-content .ddl-table-wrap { max-width: 100%; }',
+    '.ddl-table-block.is-t-editor  .ddl-table-wrap { max-width: 100%; }',
+    '.ddl-table-block.is-t-editor  .ddl-table { width: 100%; }',
+    '.ddl-table-block.is-t-wide {',
+    '  margin-left: calc(-1 * ((100vw - 100%) / 2 - 200px));',
+    '  margin-right: calc(-1 * ((100vw - 100%) / 2 - 200px));',
+    '  max-width: none;',
+    '}',
+    '.ddl-table-block.is-t-wide .ddl-table { width: 100%; }',
+    /* 표 툴바 */
+    '.ddl-table-toolbar {',
+    '  position: absolute;',
+    '  background: #fff;',
+    '  border: 1px solid rgba(15,58,58,0.2);',
+    '  border-radius: 6px;',
+    '  padding: 6px;',
+    '  display: flex;',
+    '  flex-wrap: wrap;',
+    '  gap: 6px;',
+    '  box-shadow: 0 4px 14px rgba(15,58,58,0.15);',
+    '  z-index: 9994;',
+    '  font-size: 12px;',
+    '}',
+    '.ddl-tt-group { display: flex; gap: 4px; align-items: center; padding: 0 4px; border-right: 1px solid rgba(15,58,58,0.1); }',
+    '.ddl-tt-group:last-child { border-right: none; }',
+    '.ddl-table-toolbar button {',
+    '  background: #F5F5F5;',
+    '  border: 1px solid rgba(15,58,58,0.15);',
+    '  color: #0F3A3A;',
+    '  padding: 4px 8px;',
+    '  border-radius: 4px;',
+    '  cursor: pointer;',
+    '  font-size: 12px;',
+    '}',
+    '.ddl-table-toolbar button:hover { background: #fff; border-color: rgba(15,58,58,0.35); }',
+    '.ddl-table-toolbar select { padding: 4px 6px; border: 1px solid rgba(15,58,58,0.2); border-radius: 4px; font-size: 12px; background: #fff; color: #0F3A3A; }',
+    '.ddl-tt-color { display: flex; align-items: center; gap: 4px; }',
+    '.ddl-tt-color input[type="color"] { width: 24px; height: 24px; border: 1px solid rgba(15,58,58,0.2); border-radius: 4px; padding: 0; background: transparent; cursor: pointer; }',
+    '.ddl-table-fullview-overlay {',
+    '  position: fixed; inset: 0;',
+    '  background: rgba(15,58,58,0.6);',
+    '  z-index: 99998;',
+    '  display: flex;',
+    '  align-items: center;',
+    '  justify-content: center;',
+    '  padding: 40px;',
+    '}',
+    '.ddl-table-fullview-inner {',
+    '  background: #fff;',
+    '  border-radius: 8px;',
+    '  max-width: 95vw;',
+    '  max-height: 90vh;',
+    '  width: 95vw;',
+    '  display: flex;',
+    '  flex-direction: column;',
+    '  overflow: hidden;',
+    '}',
+    '.ddl-tf-head {',
+    '  display: flex;',
+    '  justify-content: space-between;',
+    '  align-items: center;',
+    '  padding: 12px 16px;',
+    '  border-bottom: 1px solid rgba(15,58,58,0.15);',
+    '  font-weight: 600;',
+    '  color: #0F3A3A;',
+    '}',
+    '.ddl-tf-close { background: transparent; border: none; font-size: 18px; cursor: pointer; color: #0F3A3A; }',
+    '.ddl-tf-body { flex: 1; overflow: auto; padding: 20px; }',
+    '.ddl-tf-body .ddl-table { font-size: 1em; }',
+
+    /* p20j: 접은글(Fold) 블록 */
+    '.ddl-fold-block {',
+    '  position: relative;',
+    '  margin: 1em 0;',
+    '  border-radius: 6px;',
+    '  overflow: hidden;',
+    '  border: 1px solid rgba(15,58,58,0.15);',
+    '}',
+    '.ddl-fold-head {',
+    '  position: relative;',
+    '  display: flex;',
+    '  align-items: center;',
+    '  gap: 8px;',
+    '  padding: 10px 14px;',
+    '  cursor: default;',
+    '  border-bottom: 1px solid rgba(15,58,58,0.08);',
+    '}',
+    '.ddl-fold-arrow {',
+    '  display: inline-block;',
+    '  cursor: pointer;',
+    '  transition: transform 0.15s ease;',
+    '  font-size: 10px;',
+    '  color: inherit;',
+    '  opacity: 0.7;',
+    '  user-select: none;',
+    '}',
+    '.ddl-fold-arrow:hover { opacity: 1; }',
+    '.ddl-fold-title {',
+    '  flex: 1;',
+    '  min-height: 1.4em;',
+    '  outline: none;',
+    '  color: inherit;',
+    '  font-weight: 600;',
+    '}',
+    '.ddl-fold-title:focus { outline: none; }',
+    '.ddl-fold-title:empty::before {',
+    '  content: "제목을 입력하세요";',
+    '  color: rgba(15,58,58,0.4);',
+    '}',
+    '.ddl-fold-gear {',
+    '  background: transparent;',
+    '  border: none;',
+    '  font-size: 14px;',
+    '  cursor: pointer;',
+    '  opacity: 0;',
+    '  color: inherit;',
+    '  padding: 2px 6px;',
+    '  border-radius: 4px;',
+    '  transition: opacity 0.15s ease, background 0.15s ease;',
+    '}',
+    '.ddl-fold-block:hover .ddl-fold-gear { opacity: 0.7; }',
+    '.ddl-fold-gear:hover { opacity: 1 !important; background: rgba(15,58,58,0.08); }',
+    '.ddl-fold-body {',
+    '  padding: 12px 16px;',
+    '  min-height: 2em;',
+    '}',
+    '.ddl-fold-block.is-fold-closed .ddl-fold-body { display: none; }',
+    '.ddl-fold-block.is-fold-closed .ddl-fold-head { border-bottom: none; }',
+    '.ddl-fold-settings-popup {',
+    '  background: #fff;',
+    '  border: 1px solid rgba(15,58,58,0.2);',
+    '  border-radius: 8px;',
+    '  padding: 12px;',
+    '  min-width: 280px;',
+    '  box-shadow: 0 8px 24px rgba(15,58,58,0.2);',
+    '  z-index: 9995;',
+    '  font-size: 13px;',
+    '  color: #0F3A3A;',
+    '}',
+    '.ddl-fold-set-head {',
+    '  display: flex;',
+    '  justify-content: space-between;',
+    '  align-items: center;',
+    '  padding-bottom: 8px;',
+    '  border-bottom: 1px solid rgba(15,58,58,0.1);',
+    '  margin-bottom: 10px;',
+    '  font-weight: 600;',
+    '}',
+    '.ddl-fold-set-close { background: transparent; border: none; font-size: 16px; cursor: pointer; color: #0F3A3A; }',
+    '.ddl-fold-set-body { display: flex; flex-direction: column; gap: 12px; }',
+    '.ddl-fold-set-row { display: flex; align-items: center; gap: 6px; cursor: pointer; }',
+    '.ddl-fold-set-section { display: flex; flex-direction: column; gap: 6px; }',
+    '.ddl-fold-set-label { font-size: 11px; color: rgba(15,58,58,0.7); margin-top: 4px; }',
+    '.ddl-fold-swatches { display: flex; flex-wrap: wrap; gap: 4px; }',
+    '.ddl-swatch {',
+    '  width: 22px; height: 22px;',
+    '  border-radius: 4px;',
+    '  border: 1px solid rgba(15,58,58,0.2);',
+    '  cursor: pointer;',
+    '  display: inline-block;',
+    '}',
+    '.ddl-swatch.is-active { outline: 2px solid #FF9A76; outline-offset: 1px; }',
+    '.ddl-swatch:hover { border-color: rgba(15,58,58,0.5); }',
+
+
     ''
   ].join('\n');
 
@@ -1965,6 +2162,43 @@
         }
       });
       // 향후 접은글 등: '.collapse-body' 같은 새 컬래스도 여기서 붙입었음.
+      // p20j: 접은글 body 도 컨테이너로 마킹
+      var foldBodies = root.querySelectorAll('.ddl-fold-body');
+      foldBodies.forEach(function(b){
+        if (b.getAttribute('data-block-container') !== 'true'){
+          b.setAttribute('data-block-container', 'true');
+        }
+      });
+      // p20j: 접은글 복원 시 제목은 contenteditable=true 보장
+      var foldTitles = root.querySelectorAll('.ddl-fold-title');
+      foldTitles.forEach(function(t){
+        if (t.getAttribute('contenteditable') !== 'true') t.setAttribute('contenteditable', 'true');
+      });
+      // p20j: 접은글 블록은 contenteditable=false 유지 + 스타일 재적용
+      var foldBlocks = root.querySelectorAll('.ddl-fold-block');
+      foldBlocks.forEach(function(fb){
+        if (fb.getAttribute('contenteditable') !== 'false') fb.setAttribute('contenteditable', 'false');
+        var arr = fb.querySelector('.ddl-fold-arrow');
+        if (arr && arr.getAttribute('contenteditable') !== 'false') arr.setAttribute('contenteditable', 'false');
+        var gr = fb.querySelector('.ddl-fold-gear');
+        if (gr && gr.getAttribute('contenteditable') !== 'false') gr.setAttribute('contenteditable', 'false');
+        try { if (typeof _applyFoldStyles === 'function') _applyFoldStyles(fb); } catch(_){}
+      });
+      // p20j: 표 셀 contenteditable=true 보장 + 저장된 배경색 복원
+      var tableCells = root.querySelectorAll('.ddl-table td, .ddl-table th');
+      tableCells.forEach(function(c){
+        if (c.getAttribute('contenteditable') !== 'true') c.setAttribute('contenteditable', 'true');
+        var cb = c.getAttribute('data-cell-bg');
+        if (cb) c.style.background = cb;
+      });
+      // p20j: 표 블록 폭 모드 클래스 복원
+      var tableBlocks = root.querySelectorAll('.ddl-table-block');
+      tableBlocks.forEach(function(tb){
+        if (tb.getAttribute('contenteditable') !== 'false') tb.setAttribute('contenteditable', 'false');
+        var m = tb.getAttribute('data-t-width-mode') || 'content';
+        tb.classList.remove('is-t-narrow','is-t-content','is-t-editor','is-t-wide');
+        tb.classList.add('is-t-' + m);
+      });
     } catch(_){}
   }
 
@@ -3400,6 +3634,76 @@
             try { b.remove(); } catch(_){}
           } else {
             insertButtonBlock(b);
+          }
+        }
+      },
+      // p20j: 표 (Table)
+      { id:'table', label:'표', desc:'기본 표. 셀 색상·행/열 추가·폭 조절·전체보기(팝업)', icon:'▦',
+        keywords:['표','table','tbl','시트','sheet','그리드','grid'],
+        exec:function(originBlock){
+          if (slashInCalloutBody) {
+            var body = _prepareCalloutBodyForInsert();
+            var anchor = _slashAnchorForCalloutBody(originBlock);
+            if (anchor === body) {
+              var tmp = document.createElement('div');
+              tmp.className = 'editor-block';
+              tmp.setAttribute('data-block-type', 'p');
+              var tp = document.createElement('p');
+              tp.setAttribute('contenteditable', 'true');
+              tp.innerHTML = '<br>';
+              tmp.appendChild(makeBlockHandle());
+              tmp.appendChild(tp);
+              body.appendChild(tmp);
+              insertTableBlock(tmp);
+              if ((tp.textContent || '').trim() === '') { try { tmp.remove(); } catch(_){} }
+            } else {
+              var wasEmpty = anchor && (anchor.textContent || '').trim() === '' && anchor.getAttribute && anchor.getAttribute('data-block-type') === 'p';
+              insertTableBlock(anchor);
+              if (wasEmpty && anchor.parentNode) { try { anchor.remove(); } catch(_){} }
+            }
+            return;
+          }
+          var b = originBlock;
+          if (b && (b.textContent || '').trim() === '' && b.getAttribute && b.getAttribute('data-block-type') === 'p') {
+            insertTableBlock(b);
+            try { b.remove(); } catch(_){}
+          } else {
+            insertTableBlock(b);
+          }
+        }
+      },
+      // p20j: 접은글 (Fold / Toggle)
+      { id:'fold', label:'접은글', desc:'제목 클릭으로 펼치기·접기. 제목/본문 색 개별·서식 편집·중첩 가능', icon:'▶',
+        keywords:['접은글','접기','toggle','fold','collapse','details','summary','아코디언','accordion'],
+        exec:function(originBlock){
+          if (slashInCalloutBody) {
+            var body = _prepareCalloutBodyForInsert();
+            var anchor = _slashAnchorForCalloutBody(originBlock);
+            if (anchor === body) {
+              var tmp = document.createElement('div');
+              tmp.className = 'editor-block';
+              tmp.setAttribute('data-block-type', 'p');
+              var tp = document.createElement('p');
+              tp.setAttribute('contenteditable', 'true');
+              tp.innerHTML = '<br>';
+              tmp.appendChild(makeBlockHandle());
+              tmp.appendChild(tp);
+              body.appendChild(tmp);
+              insertFoldBlock(tmp);
+              if ((tp.textContent || '').trim() === '') { try { tmp.remove(); } catch(_){} }
+            } else {
+              var wasEmpty = anchor && (anchor.textContent || '').trim() === '' && anchor.getAttribute && anchor.getAttribute('data-block-type') === 'p';
+              insertFoldBlock(anchor);
+              if (wasEmpty && anchor.parentNode) { try { anchor.remove(); } catch(_){} }
+            }
+            return;
+          }
+          var b = originBlock;
+          if (b && (b.textContent || '').trim() === '' && b.getAttribute && b.getAttribute('data-block-type') === 'p') {
+            insertFoldBlock(b);
+            try { b.remove(); } catch(_){}
+          } else {
+            insertFoldBlock(b);
           }
         }
       }
@@ -12912,7 +13216,7 @@
     contentEl.querySelectorAll('.editor-block').forEach(function(b){
       // p20d: 콜아웃 body 안에 중첩된 editor-block 은 부모 콜아웃이 통째로 저장하므로 top-level 에서는 스킵
       //         (이 가드 없으면 안에 있는 블록이 밖에도 또 한 번 저장되어 노션 스타일 중첩이 깨짐)
-      try { if (b.parentElement && b.parentElement.closest && b.parentElement.closest('.callout-body')) return; } catch(_){}
+      try { if (b.parentElement && b.parentElement.closest && b.parentElement.closest('.callout-body, .ddl-fold-body')) return; } catch(_){}
       var blockType = b.getAttribute('data-block-type') || '';
       var innerEls = Array.from(b.children).filter(function(c){ return !c.classList.contains('block-handle'); });
       // p13f: data-block-type 뿐 아니라 실제 .callout-box 존재 여부로도 판단 (더 견고)
@@ -12921,11 +13225,16 @@
       var hasImageFig = !!(b.querySelector && b.querySelector('figure.editor-image-figure'));
       var hasDivider = (b.classList && b.classList.contains('ep-divider-block'));
       var hasButton = (b.classList && b.classList.contains('ep-button-block'));
+      // p20j: 표/접은글 모두 블록 자체 통째로 저장
+      var hasTable = (b.classList && b.classList.contains('ddl-table-block'));
+      var hasFold  = (b.classList && b.classList.contains('ddl-fold-block'));
       // p16e: 구분선은 블록 자체(.ep-divider-block)를 통째로 저장
       if (hasDivider) innerEls = [b];
       // p17a: 버튼도 블록 자체
       if (hasButton) innerEls = [b];
-      var isCustom = (blockType === 'callout' || hasCalloutBox || blockType === 'image' || hasImageFig || blockType === 'divider' || hasDivider || blockType === 'button' || hasButton);
+      if (hasTable)  innerEls = [b];
+      if (hasFold)   innerEls = [b];
+      var isCustom = (blockType === 'callout' || hasCalloutBox || blockType === 'image' || hasImageFig || blockType === 'divider' || hasDivider || blockType === 'button' || hasButton || blockType === 'table' || hasTable || blockType === 'fold' || hasFold);
       // p13f: 감지 시 data-block-type 자동 교정
       if (hasCalloutBox && blockType !== 'callout') {
         log('[collectPostData] 콜아웃 감지, data-block-type 교정:', blockType, '→ callout');
@@ -12939,6 +13248,12 @@
       }
       if (hasButton && blockType !== 'button') {
         b.setAttribute('data-block-type', 'button');
+      }
+      if (hasTable && blockType !== 'table') {
+        b.setAttribute('data-block-type', 'table');
+      }
+      if (hasFold && blockType !== 'fold') {
+        b.setAttribute('data-block-type', 'fold');
       }
       if (isCustom) {
         var innerHtml = '';
@@ -13154,7 +13469,7 @@
     html = html.replace(/<mark\s[^>]*data-rt="([^"]*)"[^>]*class="ddl-ruby"[^>]*>([\s\S]*?)<\/mark>/g, _rubyMarker);
 
     // p13e: 저장 HTML 진단 로그
-    log('[SAVE-HTML] 길이:', html.length, '/ 콜아웃:', (html.match(/callout-box/g)||[]).length, '/ 구분선:', (html.match(/ddl-divider-block/g)||[]).length, '/ 버튼:', (html.match(/ddl-button-block/g)||[]).length, '/ kg-card:', (html.match(/kg-card-begin/g)||[]).length);
+    log('[SAVE-HTML] 길이:', html.length, '/ 콜아웃:', (html.match(/callout-box/g)||[]).length, '/ 구분선:', (html.match(/ddl-divider-block/g)||[]).length, '/ 버튼:', (html.match(/ddl-button-block/g)||[]).length, '/ 표:', (html.match(/ddl-table-block/g)||[]).length, '/ 접은글:', (html.match(/ddl-fold-block/g)||[]).length, '/ kg-card:', (html.match(/kg-card-begin/g)||[]).length);
     console.log('[2vvena-editor SAVE-HTML]\n' + html);
 
     var tags = [];
@@ -17048,6 +17363,515 @@
     } catch(_){}
   }
 
+
+  // ========================================================================
+  // p20j: 표(Table) 블록 — 기본 기능 (생성/셀 색/행열 추가·삭제/폭 모드/전체보기 팝업)
+  //   * 셀 병합/분할, 정렬, 테두리 세부는 다음 라운드에서 확장.
+  //   * 저장 규격: <div class="editor-block ddl-table-block" data-block-type="table"
+  //                  data-t-width-mode="content"><figure class="ddl-table-wrap"><table>...</table></figure></div>
+  // ========================================================================
+  function insertTableBlock(afterBlock){
+    var block = document.createElement('div');
+    block.className = 'editor-block ddl-table-block';
+    block.setAttribute('data-block-type', 'table');
+    block.setAttribute('data-t-width-mode', 'content'); // content | editor | wide | narrow
+    block.setAttribute('contenteditable', 'false');
+
+    // 드래그 핸들
+    var handle = document.createElement('div');
+    handle.className = 'block-handle';
+    handle.setAttribute('contenteditable', 'false');
+    handle.innerHTML = '⋮⋮';
+    block.appendChild(handle);
+
+    // 표 wrapper
+    var fig = document.createElement('figure');
+    fig.className = 'ddl-table-wrap';
+
+    // 초기 3행 3열
+    var tbl = document.createElement('table');
+    tbl.className = 'ddl-table';
+    var tbody = document.createElement('tbody');
+    var ROWS = 3, COLS = 3;
+    for (var r=0; r<ROWS; r++){
+      var tr = document.createElement('tr');
+      for (var c=0; c<COLS; c++){
+        var td = document.createElement('td');
+        td.setAttribute('contenteditable', 'true');
+        td.innerHTML = '<br>';
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    tbl.appendChild(tbody);
+    fig.appendChild(tbl);
+
+    // 오른쪽 아래 리사이저(호버 시만 노출)는 v2 (다음 라운드)
+    block.appendChild(fig);
+
+    if (afterBlock && afterBlock.parentNode) {
+      afterBlock.parentNode.insertBefore(block, afterBlock.nextSibling);
+    } else if (contentEl) {
+      contentEl.appendChild(block);
+    }
+
+    // 다음 편집 블록
+    var next = document.createElement('div');
+    next.className = 'editor-block';
+    next.setAttribute('data-block-type', 'p');
+    var nh = document.createElement('div');
+    nh.className = 'block-handle';
+    nh.setAttribute('contenteditable', 'false');
+    nh.innerHTML = '⋮⋮';
+    next.appendChild(nh);
+    var np = document.createElement('p');
+    np.setAttribute('contenteditable', 'true');
+    np.innerHTML = '<br>';
+    next.appendChild(np);
+    block.parentNode.insertBefore(next, block.nextSibling);
+    try {
+      var rng = document.createRange();
+      rng.selectNodeContents(tbl.querySelector('td'));
+      rng.collapse(true);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rng);
+    } catch(_){}
+    return block;
+  }
+
+  // 표 클릭 시 툴바 노출 (선택 셀 근처에 미니 툴바)
+  function setupTableClickHandler(){
+    if (!contentEl) return;
+    contentEl.addEventListener('click', function(e){
+      var block = e.target.closest('.ddl-table-block');
+      if (!block) { closeTableToolbar(); return; }
+      if (e.target.closest('.block-handle')) return;
+      var td = e.target.closest('td, th');
+      if (td) openTableToolbar(block, td);
+      else openTableToolbar(block, null);
+    });
+    // 표 밖 클릭 시 툴바 닫힘
+    document.addEventListener('mousedown', function(e){
+      if (!e.target.closest('.ddl-table-toolbar') && !e.target.closest('.ddl-table-block')) {
+        closeTableToolbar();
+      }
+    });
+  }
+
+  var _tableToolbarEl = null;
+  var _tableCurrentBlock = null;
+  var _tableCurrentCell = null;
+
+  function closeTableToolbar(){
+    if (_tableToolbarEl && _tableToolbarEl.parentNode) {
+      _tableToolbarEl.parentNode.removeChild(_tableToolbarEl);
+    }
+    _tableToolbarEl = null;
+    _tableCurrentBlock = null;
+    _tableCurrentCell = null;
+  }
+
+  function openTableToolbar(block, cell){
+    closeTableToolbar();
+    _tableCurrentBlock = block;
+    _tableCurrentCell = cell;
+    var bar = document.createElement('div');
+    bar.className = 'ddl-table-toolbar';
+    bar.setAttribute('contenteditable', 'false');
+    bar.innerHTML =
+        '<div class="ddl-tt-group">'
+      + '  <button type="button" data-t-act="row-above" title="위에 행 추가">↑행</button>'
+      + '  <button type="button" data-t-act="row-below" title="아래에 행 추가">↓행</button>'
+      + '  <button type="button" data-t-act="row-del" title="행 삭제">−행</button>'
+      + '</div>'
+      + '<div class="ddl-tt-group">'
+      + '  <button type="button" data-t-act="col-left" title="왼쪽에 열 추가">←열</button>'
+      + '  <button type="button" data-t-act="col-right" title="오른쪽에 열 추가">→열</button>'
+      + '  <button type="button" data-t-act="col-del" title="열 삭제">−열</button>'
+      + '</div>'
+      + '<div class="ddl-tt-group">'
+      + '  <label class="ddl-tt-color" title="셀 배경색">'
+      + '    <span>채우기</span>'
+      + '    <input type="color" data-t-act="cell-bg" value="#F5F5F5">'
+      + '  </label>'
+      + '  <button type="button" data-t-act="cell-clear" title="채우기 지우기">지우기</button>'
+      + '</div>'
+      + '<div class="ddl-tt-group">'
+      + '  <select data-t-act="width-mode" title="표 폭">'
+      + '    <option value="narrow">좁게</option>'
+      + '    <option value="content">본문 폭</option>'
+      + '    <option value="editor">편집기 꽉</option>'
+      + '    <option value="wide">사이드바 제외 전체</option>'
+      + '  </select>'
+      + '  <button type="button" data-t-act="fullview" title="전체 보기 팝업">🔍 전체보기</button>'
+      + '  <button type="button" data-t-act="close" title="닫기">✕</button>'
+      + '</div>';
+
+    document.body.appendChild(bar);
+    _tableToolbarEl = bar;
+
+    // 위치: 표 상단 왼쪽
+    var rc = block.getBoundingClientRect();
+    bar.style.position = 'absolute';
+    bar.style.top = (window.scrollY + rc.top - bar.offsetHeight - 6) + 'px';
+    bar.style.left = (window.scrollX + rc.left) + 'px';
+
+    // 폭 모드 셀렉트 현재값 반영
+    var wsel = bar.querySelector('[data-t-act="width-mode"]');
+    if (wsel) wsel.value = block.getAttribute('data-t-width-mode') || 'content';
+
+    // 클릭 위임
+    bar.addEventListener('click', function(ev){
+      var t = ev.target.closest('[data-t-act]');
+      if (!t) return;
+      var act = t.getAttribute('data-t-act');
+      _handleTableAction(act, block, cell);
+    });
+    bar.addEventListener('change', function(ev){
+      var t = ev.target.closest('[data-t-act]');
+      if (!t) return;
+      var act = t.getAttribute('data-t-act');
+      if (act === 'width-mode') {
+        block.setAttribute('data-t-width-mode', t.value);
+        _applyTableWidthMode(block);
+      } else if (act === 'cell-bg') {
+        _fillCellBg(block, cell, t.value);
+      }
+    });
+  }
+
+  function _handleTableAction(act, block, cell){
+    var tbl = block.querySelector('table');
+    if (!tbl) return;
+    var rows = Array.prototype.slice.call(tbl.querySelectorAll('tr'));
+    var trIdx = -1, tdIdx = -1;
+    if (cell) {
+      var tr = cell.parentNode;
+      trIdx = rows.indexOf(tr);
+      tdIdx = Array.prototype.indexOf.call(tr.children, cell);
+    }
+    if (act === 'row-above' || act === 'row-below') {
+      if (trIdx < 0) trIdx = rows.length - 1;
+      var newTr = document.createElement('tr');
+      var cols = rows[0] ? rows[0].children.length : 3;
+      for (var i=0;i<cols;i++){
+        var nt = document.createElement('td');
+        nt.setAttribute('contenteditable','true');
+        nt.innerHTML='<br>';
+        newTr.appendChild(nt);
+      }
+      var ref = rows[trIdx];
+      if (act === 'row-above') ref.parentNode.insertBefore(newTr, ref);
+      else ref.parentNode.insertBefore(newTr, ref.nextSibling);
+    } else if (act === 'row-del') {
+      if (rows.length <= 1) return;
+      if (trIdx >= 0) rows[trIdx].parentNode.removeChild(rows[trIdx]);
+    } else if (act === 'col-left' || act === 'col-right') {
+      if (tdIdx < 0) tdIdx = (rows[0]? rows[0].children.length - 1 : 0);
+      rows.forEach(function(r){
+        var nt = document.createElement('td');
+        nt.setAttribute('contenteditable','true');
+        nt.innerHTML='<br>';
+        var ref = r.children[tdIdx];
+        if (!ref) { r.appendChild(nt); return; }
+        if (act === 'col-left') r.insertBefore(nt, ref);
+        else r.insertBefore(nt, ref.nextSibling);
+      });
+    } else if (act === 'col-del') {
+      if (rows[0] && rows[0].children.length <= 1) return;
+      rows.forEach(function(r){
+        var ref = r.children[tdIdx];
+        if (ref) r.removeChild(ref);
+      });
+    } else if (act === 'cell-clear') {
+      if (cell) { cell.style.background = ''; cell.removeAttribute('data-cell-bg'); }
+    } else if (act === 'fullview') {
+      openTableFullview(block);
+    } else if (act === 'close') {
+      closeTableToolbar();
+    }
+  }
+
+  function _fillCellBg(block, cell, color){
+    if (!cell) return;
+    cell.style.background = color;
+    cell.setAttribute('data-cell-bg', color);
+  }
+
+  function _applyTableWidthMode(block){
+    // CSS 는 [data-t-width-mode]로 처리. JS 는 단순히 마커만.
+    block.classList.remove('is-t-narrow','is-t-content','is-t-editor','is-t-wide');
+    var m = block.getAttribute('data-t-width-mode') || 'content';
+    block.classList.add('is-t-' + m);
+  }
+
+  // 전체보기 팝업 — 편집이 아닌 확대 감상용. 좌우/상하 스크롤.
+  function openTableFullview(block){
+    var tbl = block.querySelector('table');
+    if (!tbl) return;
+    var ov = document.createElement('div');
+    ov.className = 'ddl-table-fullview-overlay';
+    ov.innerHTML =
+        '<div class="ddl-table-fullview-inner">'
+      + '  <div class="ddl-tf-head">'
+      + '    <span>표 전체보기</span>'
+      + '    <button type="button" class="ddl-tf-close">✕</button>'
+      + '  </div>'
+      + '  <div class="ddl-tf-body"></div>'
+      + '</div>';
+    document.body.appendChild(ov);
+    var body = ov.querySelector('.ddl-tf-body');
+    // 편집 반영: 실제 원본 노드 이동은 데이터 손실 위험 → clone
+    var clone = tbl.cloneNode(true);
+    // clone 안 td 는 편집 불가로 (감상용)
+    clone.querySelectorAll('td,th').forEach(function(c){ c.removeAttribute('contenteditable'); });
+    body.appendChild(clone);
+    ov.querySelector('.ddl-tf-close').addEventListener('click', function(){
+      if (ov.parentNode) ov.parentNode.removeChild(ov);
+    });
+    ov.addEventListener('click', function(e){
+      if (e.target === ov) { if (ov.parentNode) ov.parentNode.removeChild(ov); }
+    });
+    var escH = function(e){ if (e.key === 'Escape') { if (ov.parentNode) ov.parentNode.removeChild(ov); document.removeEventListener('keydown', escH); } };
+    document.addEventListener('keydown', escH);
+  }
+
+  // ========================================================================
+  // p20j: 접은글(Fold) 블록 — 노션식 토글
+  //   * 제목(summary) contenteditable, 서식 가능
+  //   * 본문(body) 은 다른 특수블록 컨테이너와 동일(data-block-container=true)
+  //   * 위/아래 색 개별 지정 (data-fold-head-bg / data-fold-body-bg)
+  //   * 위/아래 색 통일 옵션 (data-fold-sync-color = "1")
+  //   * 아이콘 없음(요구사항). 접힘 상태 표시는 회전 ▶
+  // ========================================================================
+  function insertFoldBlock(afterBlock){
+    var block = document.createElement('div');
+    block.className = 'editor-block ddl-fold-block';
+    block.setAttribute('data-block-type', 'fold');
+    block.setAttribute('contenteditable', 'false');
+    block.setAttribute('data-fold-open', '1');
+    block.setAttribute('data-fold-sync-color', '1');
+    block.setAttribute('data-fold-head-bg', 'rgba(15,58,58,0.06)');
+    block.setAttribute('data-fold-body-bg', 'rgba(15,58,58,0.03)');
+    block.setAttribute('data-fold-head-color', '#0F3A3A');
+    block.setAttribute('data-fold-body-color', '#0F3A3A');
+
+    // 드래그 핸들
+    var handle = document.createElement('div');
+    handle.className = 'block-handle';
+    handle.setAttribute('contenteditable', 'false');
+    handle.innerHTML = '⋮⋮';
+    block.appendChild(handle);
+
+    // 헤드(제목 + 화살표)
+    var head = document.createElement('div');
+    head.className = 'ddl-fold-head';
+    head.setAttribute('contenteditable', 'false');
+    var arrow = document.createElement('span');
+    arrow.className = 'ddl-fold-arrow';
+    arrow.setAttribute('contenteditable', 'false');
+    arrow.innerHTML = '▶';
+    var title = document.createElement('div');
+    title.className = 'ddl-fold-title';
+    title.setAttribute('contenteditable', 'true');
+    title.innerHTML = '제목을 입력하세요';
+    // 톱니(설정 버튼)
+    var gear = document.createElement('button');
+    gear.type = 'button';
+    gear.className = 'ddl-fold-gear';
+    gear.setAttribute('contenteditable', 'false');
+    gear.title = '접은글 설정';
+    gear.innerHTML = '⚙';
+    head.appendChild(arrow);
+    head.appendChild(title);
+    head.appendChild(gear);
+    block.appendChild(head);
+
+    // 본문(body) — 컨테이너 마커 부여 → 슬래시/드래그드랍이 통용됨
+    var body = document.createElement('div');
+    body.className = 'ddl-fold-body';
+    body.setAttribute('data-block-container', 'true');
+    body.setAttribute('contenteditable', 'false');
+    // 최소 편집 블록 하나
+    var inner = document.createElement('div');
+    inner.className = 'editor-block';
+    inner.setAttribute('data-block-type', 'p');
+    var ih = document.createElement('div');
+    ih.className = 'block-handle';
+    ih.setAttribute('contenteditable', 'false');
+    ih.innerHTML = '⋮⋮';
+    inner.appendChild(ih);
+    var ip = document.createElement('p');
+    ip.setAttribute('contenteditable', 'true');
+    ip.innerHTML = '<br>';
+    inner.appendChild(ip);
+    body.appendChild(inner);
+    block.appendChild(body);
+
+    // 스타일 적용
+    _applyFoldStyles(block);
+
+    if (afterBlock && afterBlock.parentNode) {
+      afterBlock.parentNode.insertBefore(block, afterBlock.nextSibling);
+    } else if (contentEl) {
+      contentEl.appendChild(block);
+    }
+    // 다음 블록
+    var next = document.createElement('div');
+    next.className = 'editor-block';
+    next.setAttribute('data-block-type', 'p');
+    var nh = document.createElement('div');
+    nh.className = 'block-handle';
+    nh.setAttribute('contenteditable', 'false');
+    nh.innerHTML = '⋮⋮';
+    next.appendChild(nh);
+    var np = document.createElement('p');
+    np.setAttribute('contenteditable', 'true');
+    np.innerHTML = '<br>';
+    next.appendChild(np);
+    block.parentNode.insertBefore(next, block.nextSibling);
+
+    // 제목에 포커스
+    try {
+      var rng = document.createRange();
+      rng.selectNodeContents(title);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rng);
+    } catch(_){}
+    return block;
+  }
+
+  function _applyFoldStyles(block){
+    var headBg = block.getAttribute('data-fold-head-bg') || 'rgba(15,58,58,0.06)';
+    var bodyBg = block.getAttribute('data-fold-body-bg') || 'rgba(15,58,58,0.03)';
+    var headColor = block.getAttribute('data-fold-head-color') || '#0F3A3A';
+    var bodyColor = block.getAttribute('data-fold-body-color') || '#0F3A3A';
+    var sync = block.getAttribute('data-fold-sync-color') === '1';
+    if (sync) { bodyBg = headBg; bodyColor = headColor; }
+    var head = block.querySelector('.ddl-fold-head');
+    var body = block.querySelector('.ddl-fold-body');
+    if (head) { head.style.background = headBg; head.style.color = headColor; }
+    if (body) { body.style.background = bodyBg; body.style.color = bodyColor; }
+    var open = block.getAttribute('data-fold-open') !== '0';
+    block.classList.toggle('is-fold-open', open);
+    block.classList.toggle('is-fold-closed', !open);
+    var arrow = block.querySelector('.ddl-fold-arrow');
+    if (arrow) arrow.style.transform = open ? 'rotate(90deg)' : 'rotate(0deg)';
+    if (body) body.style.display = open ? '' : 'none';
+  }
+
+  function setupFoldClickHandler(){
+    if (!contentEl) return;
+    contentEl.addEventListener('click', function(e){
+      var block = e.target.closest('.ddl-fold-block');
+      if (!block) return;
+      // 톱니 → 설정 팝업
+      if (e.target.closest('.ddl-fold-gear')) {
+        e.preventDefault(); e.stopPropagation();
+        openFoldSettings(block);
+        return;
+      }
+      // 화살표 클릭 → 접힘/펼침
+      if (e.target.closest('.ddl-fold-arrow')) {
+        e.preventDefault(); e.stopPropagation();
+        var open = block.getAttribute('data-fold-open') !== '0';
+        block.setAttribute('data-fold-open', open ? '0' : '1');
+        _applyFoldStyles(block);
+      }
+      // 제목/본문 클릭은 자연스러운 편집 흐름 유지
+    });
+  }
+
+  // 접은글 설정 팝업
+  function openFoldSettings(block){
+    // 기존 팝업 닫기
+    var prev = document.querySelector('.ddl-fold-settings-popup');
+    if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
+
+    var pop = document.createElement('div');
+    pop.className = 'ddl-fold-settings-popup';
+    pop.setAttribute('contenteditable', 'false');
+    var sync = block.getAttribute('data-fold-sync-color') === '1';
+    var hb = block.getAttribute('data-fold-head-bg') || 'rgba(15,58,58,0.06)';
+    var bb = block.getAttribute('data-fold-body-bg') || 'rgba(15,58,58,0.03)';
+    var hc = block.getAttribute('data-fold-head-color') || '#0F3A3A';
+    var bc = block.getAttribute('data-fold-body-color') || '#0F3A3A';
+    // rgba 는 color input 이 못 다룸 → 프리셋 팔레트 방식
+    var palette = ['#F5F5F5','rgba(15,58,58,0.06)','rgba(15,58,58,0.12)','rgba(255,154,118,0.08)','rgba(255,154,118,0.15)','#FFF7E6','#E6F5F1','#F0EBFF','#FFEDED'];
+    var textPalette = ['#0F3A3A','#333','#666','#FF9A76','#d33'];
+    function paletteHtml(name, current){
+      return palette.map(function(c){
+        return '<span class="ddl-swatch' + (c===current?' is-active':'') + '" data-fold-set="'+name+'" data-value="'+c+'" style="background:'+c+'"></span>';
+      }).join('');
+    }
+    function textPaletteHtml(name, current){
+      return textPalette.map(function(c){
+        return '<span class="ddl-swatch' + (c===current?' is-active':'') + '" data-fold-set="'+name+'" data-value="'+c+'" style="background:'+c+'"></span>';
+      }).join('');
+    }
+    pop.innerHTML =
+        '<div class="ddl-fold-set-head">'
+      + '  <span>접은글 설정</span>'
+      + '  <button type="button" class="ddl-fold-set-close">✕</button>'
+      + '</div>'
+      + '<div class="ddl-fold-set-body">'
+      + '  <label class="ddl-fold-set-row">'
+      + '    <input type="checkbox" data-fold-set="sync" ' + (sync?'checked':'') + '>'
+      + '    <span>제목/본문 색 통일</span>'
+      + '  </label>'
+      + '  <div class="ddl-fold-set-section">'
+      + '    <div class="ddl-fold-set-label">제목 배경</div>'
+      + '    <div class="ddl-fold-swatches">' + paletteHtml('head-bg', hb) + '</div>'
+      + '    <div class="ddl-fold-set-label">제목 글자색</div>'
+      + '    <div class="ddl-fold-swatches">' + textPaletteHtml('head-color', hc) + '</div>'
+      + '  </div>'
+      + '  <div class="ddl-fold-set-section ddl-fold-body-section"' + (sync?' style="display:none"':'') + '>'
+      + '    <div class="ddl-fold-set-label">본문 배경</div>'
+      + '    <div class="ddl-fold-swatches">' + paletteHtml('body-bg', bb) + '</div>'
+      + '    <div class="ddl-fold-set-label">본문 글자색</div>'
+      + '    <div class="ddl-fold-swatches">' + textPaletteHtml('body-color', bc) + '</div>'
+      + '  </div>'
+      + '</div>';
+
+    document.body.appendChild(pop);
+    // 위치: 톱니 근처
+    var gear = block.querySelector('.ddl-fold-gear');
+    if (gear) {
+      var gr = gear.getBoundingClientRect();
+      pop.style.position = 'absolute';
+      pop.style.top = (window.scrollY + gr.bottom + 6) + 'px';
+      pop.style.left = Math.max(8, window.scrollX + gr.right - pop.offsetWidth) + 'px';
+    }
+
+    pop.addEventListener('click', function(e){
+      if (e.target.closest('.ddl-fold-set-close')) {
+        if (pop.parentNode) pop.parentNode.removeChild(pop);
+        return;
+      }
+      var sw = e.target.closest('[data-fold-set]');
+      if (!sw) return;
+      var key = sw.getAttribute('data-fold-set');
+      if (key === 'sync') {
+        block.setAttribute('data-fold-sync-color', sw.checked ? '1' : '0');
+        var bodySec = pop.querySelector('.ddl-fold-body-section');
+        if (bodySec) bodySec.style.display = sw.checked ? 'none' : '';
+      } else {
+        var val = sw.getAttribute('data-value');
+        block.setAttribute('data-fold-' + key, val);
+        // 팝업 안 active 갱신
+        var group = pop.querySelectorAll('[data-fold-set="'+key+'"]');
+        group.forEach(function(x){ x.classList.remove('is-active'); });
+        sw.classList.add('is-active');
+      }
+      _applyFoldStyles(block);
+    });
+    // 밖 클릭 시 닫힘
+    var outsideH = function(ev){
+      if (!ev.target.closest('.ddl-fold-settings-popup') && !ev.target.closest('.ddl-fold-gear')) {
+        if (pop.parentNode) pop.parentNode.removeChild(pop);
+        document.removeEventListener('mousedown', outsideH);
+      }
+    };
+    setTimeout(function(){ document.addEventListener('mousedown', outsideH); }, 50);
+  }
   function boot(){
     // 편집기 페이지 아니면 접근 매크로만 설치하고 종료
     if (!isEditorPage()) {
@@ -17112,6 +17936,8 @@
       setupImageClickHandler();
     setupDividerClickHandler();  // p16a
     setupButtonClickHandler();   // p17a
+    setupTableClickHandler();    // p20j
+    setupFoldClickHandler();     // p20j
       setupCopyModes();
       setupPasteHandler();
 
