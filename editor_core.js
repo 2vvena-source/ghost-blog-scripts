@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p20h
+ * 2vvena Editor Core - v2.0-β-p20i
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -2545,6 +2545,9 @@
   //   이유: native drag 는 여러 이벤트 리스너(다중선택 등)와 서로 간섭해 mouseup 전에 무효화되는 이슈 발생.
   //   mouse-based 로 변경 → 완전 독립적 제어, 다른 리스너와 충돌 없이 안정적으로 동작.
   //   사용자 경험은 동일: 핸들 또는 특수블록 자체를 잡고 드래그 → 다른 바깥으로 이동.
+  // p20i: 드래그 상태를 모듈 스코프에 노출 — 다중선택 리스너가 이걸 보고 자질하도록
+  var _blockDragState = null;
+
   function setupBlockDragOrder(){
     var dragging = null;      // { block, startX, startY, moved, dropTarget, dropSide, dropContainer, ghostEl }
     var DRAG_THRESHOLD = 5;   // px 이상 이동해야 드래그 개시
@@ -2582,25 +2585,59 @@
     }
 
     // dropTarget 계산 (마우스 위치 아래 element 기준)
+    //   우선순위:
+    //     1) container 가 있고 mouse 가 container 안에 있으면 → container 안으로 삽입 (콜아웃 안 등)
+    //     2) container 안의 직속 블록이 있으면 → 그 블록 위/아래로
+    //     3) container 안에 블록이 없으면 → container 마지막에 append
+    //     4) 밖이면 일반 top-level 블록 위/아래로
     function _computeDropZone(clientX, clientY){
-      // 고스트 요소가 아래에 있으면 방해되므로 잠시 pointer-events: none 상태 유지 (이미 설정됨)
       var el = document.elementFromPoint(clientX, clientY);
       if (!el) return { target: null, side: null, container: null };
-      var block = el.closest && el.closest('.editor-block');
       var container = el.closest && el.closest('[data-block-container="true"]');
-      // 드래그 중인 블록 자체와 그 자손은 드랍 대상 불가
-      if (block && dragging && (block === dragging.block || dragging.block.contains(block))) {
-        block = null;
-      }
+      // 드래그 중인 블록 자체/자손 container 는 불가
       if (container && dragging && (container === dragging.block || dragging.block.contains(container))) {
         container = null;
       }
-      var side = null;
+
+      // container 가 있다면 그 안 블록을 우선으로 찾기
+      if (container){
+        // container 직속 editor-block 자식 중 mouse 위치와 제일 가까운 것
+        var childBlocks = Array.prototype.slice.call(container.children).filter(function(c){
+          return c.classList && c.classList.contains('editor-block');
+        });
+        // 드래그 중 자신/자손은 제외
+        childBlocks = childBlocks.filter(function(b){ return !dragging || (b !== dragging.block && !dragging.block.contains(b)); });
+        if (childBlocks.length === 0){
+          // container 안에 보이는 블록 없음 → container 마지막에 append 모드
+          return { target: null, side: null, container: container };
+        }
+        // childBlocks 중 mouse Y 기준 가장 가까운 블록 찾기
+        var best = null, bestDist = Infinity;
+        for (var i = 0; i < childBlocks.length; i++){
+          var r = childBlocks[i].getBoundingClientRect();
+          var mid = r.top + r.height / 2;
+          var dist = Math.abs(clientY - mid);
+          if (dist < bestDist){ bestDist = dist; best = childBlocks[i]; }
+        }
+        if (best){
+          var br = best.getBoundingClientRect();
+          var side = clientY < br.top + br.height / 2 ? 'before' : 'after';
+          return { target: best, side: side, container: container };
+        }
+        return { target: null, side: null, container: container };
+      }
+
+      // container 없으면 일반 top-level 블록 처리
+      var block = el.closest && el.closest('.editor-block');
+      if (block && dragging && (block === dragging.block || dragging.block.contains(block))) {
+        block = null;
+      }
+      var side2 = null;
       if (block){
         var rect = block.getBoundingClientRect();
-        side = clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+        side2 = clientY < rect.top + rect.height / 2 ? 'before' : 'after';
       }
-      return { target: block, side: side, container: container };
+      return { target: block, side: side2, container: null };
     }
 
     // 고스트 생성 (드래그 중 보이는 반투명 미리보기)
@@ -2625,7 +2662,7 @@
       if (!contentEl || !contentEl.contains(e.target)) return;
       var block = _shouldStartDrag(e);
       if (!block) return;
-      dragging = { block: block, startX: e.clientX, startY: e.clientY, moved: false, ghostEl: null, dropTarget: null, dropSide: null, dropContainer: null };
+      _blockDragState = dragging = { block: block, startX: e.clientX, startY: e.clientY, moved: false, ghostEl: null, dropTarget: null, dropSide: null, dropContainer: null };
       // 중요: preventDefault/stopPropagation 미호출 — click 흐름과 다중선택 모두 살려둔.
       //   다중선택은 리스너를 허용하되, mousemove 에서 우리가 실제 드래그 시작하면
       //   그 시점에 다중선택을 취소함.
@@ -2679,6 +2716,7 @@
       if (!dragging) return;
       var d = dragging;
       dragging = null;
+      _blockDragState = null;
       if (d.ghostEl && d.ghostEl.parentNode) d.ghostEl.parentNode.removeChild(d.ghostEl);
       d.block.classList.remove('is-dragging');
       _clearDropClasses();
@@ -2713,6 +2751,7 @@
       if (!dragging) return;
       var d = dragging;
       dragging = null;
+      _blockDragState = null;
       if (d.ghostEl && d.ghostEl.parentNode) d.ghostEl.parentNode.removeChild(d.ghostEl);
       d.block.classList.remove('is-dragging');
       _clearDropClasses();
@@ -12174,11 +12213,8 @@
         + '</select>'
         + '<button type="button" data-btn-open-font-picker="1" title="카드로 고르기" style="width:36px; background:transparent; border:1px solid rgba(15,58,58,0.2); border-radius:4px; cursor:pointer; color:var(--color,#0F3A3A);">가</button>'
         + '</div></div>';
-      // p17e: 사용자 폰트 추가/관리 버튼
-      html += '<div class="row" style="display:flex; gap:6px;">'
-        + '<button type="button" class="pop-btn" data-btn-font-add="1" style="flex:1;">폰트 추가</button>'
-        + (userFonts.length > 0 ? '<button type="button" class="pop-btn" data-btn-font-manage="1" style="flex:1;">폰트 관리</button>' : '')
-        + '</div>';
+      // p20i: userFonts 변수 제거된 잩재 로직 삭제 — 폰트 라이브러리 시스템으로 통일되어 관리 버튼 불필요.
+      //   (버튼 편집창 자체가 이 오류 명령으로 예외 나면서 탭 전업 및 X 버튼 등이 다 마비 불가)
       // p17b: 크기 (em 단위)
       html += '<div class="row"><div class="row-label">글자 크기 (' + opts.fontSize + 'em)</div>'
         + '<input type="range" data-btn-set="fontSize" min="0.6" max="2.5" step="0.05" value="' + opts.fontSize + '" style="width:100%;"></div>';
@@ -16452,6 +16488,8 @@
 
     // p3: document.mousedown - 편집기 근처면 어디든 감시 시작
     document.addEventListener('mousedown', function(e){
+      // p20i: 드래그 후보 상태면 다중선택 발동 안 함
+      if (_blockDragState) return;
       // 사이드바/툴바/핸들 제외
       if (e.target.closest('.block-handle')) return;
       if (e.target.closest('.ep-float-toolbar')) return;
