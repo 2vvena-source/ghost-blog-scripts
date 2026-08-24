@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p19o
+ * 2vvena Editor Core - v2.0-β-p19q
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -999,9 +999,10 @@
     '  --ep-popup-body-color:      var(--color, #0F3A3A);',
     '}',
     /* p19a: .ep-popup-v2 팩토리 전용 클래스 (기존 .ep-popup 과 병존) */
+    /* p19q: z-index 재정의 — 툴바(9990)/모던툴바(9990) 위로 올려서 편집창이 툴바에 가려지지 않도록 */
     '.ep-popup-v2 {',
     '  position: fixed;',
-    '  z-index: 1005;',
+    '  z-index: 99999;',
     '  background: var(--ep-popup-bg);',
     '  border: 1px solid var(--ep-popup-border);',
     '  border-radius: var(--ep-popup-radius);',
@@ -8302,16 +8303,29 @@
   }
 
   // ---- 프리셋 편집 다이얼로그 ----
+  // p19q: 편집 다이얼로그 Step 1 개편
+  //   - 이름 인풋을 히어로 위쪽으로 승격
+  //   - 상단 40% 를 「히어로 미리보기」 캔버스로 확장
+  //   - 「속성」/「색깔」 세그먼트 탭
+  //   - 라벨-값 한 줄 (Figma 스타일)
+  //   - 이 편집 다이얼로그 구조는 향후 하이라이터/코드/색상/크기/폰트 편집창의 표준
   function openHeaderPresetEditor(preset, onSave){
     // preset 은 { id, name, isDefault, style: {...} }
     var current = JSON.parse(JSON.stringify(preset || {}));
     if (!current.style) current.style = _headerDefaults('p');
+    var initialSnapshot = JSON.parse(JSON.stringify(current));  // 초기화용
+    var currentTab = 'props';   // 'props' | 'color'
 
     var popup = window.__DDL_EDITOR.createBlockPopup({
       title: '프리셋 편집',
-      width: '480px',
+      width: '520px',
       draggable: true,
       footer: [
+        { label: '초기화', onClick: function(pp){
+            // 편집 시작 시점 값으로 복원
+            current = JSON.parse(JSON.stringify(initialSnapshot));
+            _renderPresetEditorBody(pp, current, currentTab, function(newTab){ currentTab = newTab; });
+          } },
         { label: '취소', onClick: function(pp){ pp.close(); } },
         { label: '저장', primary: true, onClick: function(pp){
             if (typeof onSave === 'function') onSave(current);
@@ -8319,194 +8333,386 @@
           } }
       ],
       onOpen: function(pp){
-        _renderPresetEditorBody(pp, current);
+        _renderPresetEditorBody(pp, current, currentTab, function(newTab){ currentTab = newTab; });
       }
     });
     popup.show();
   }
 
-  function _renderPresetEditorBody(pp, current){
+  function _renderPresetEditorBody(pp, current, activeTab, onTabChange){
     var body = pp.body || pp.getBody('__single');
     if (!body) return;
     body.innerHTML = '';
-    body.style.padding = '14px 18px';
+    body.style.padding = '0';
 
     var FONTS = [
       { label: '본문 (Pretendard)', value: '"Pretendard Variable","Pretendard",sans-serif' },
       { label: '헤더 (카페단정해)', value: '"Cafe24Danjunghae","Gowun Batang",serif' },
       { label: '고운바탕', value: '"Gowun Batang",serif' },
-      { label: '나눈명조', value: '"Nanum Myeongjo",serif' },
+      { label: '나눔명조', value: '"Nanum Myeongjo",serif' },
       { label: '손글씨', value: '"NanumURiDdarSonGeurSsi",cursive' },
       { label: '코드 (모노)', value: '"JetBrains Mono","Menlo",monospace' }
     ];
     var WEIGHTS = [
-      { label: '얰하게 300', value: 300 },
+      { label: '얇게 300', value: 300 },
       { label: '기본 400',   value: 400 },
       { label: '중간 500',   value: 500 },
       { label: '굵게 700',   value: 700 },
       { label: '매우 굵게 900', value: 900 }
     ];
 
-    function row(label, control){
-      var r = document.createElement('div');
-      r.style.cssText = 'margin-bottom: 12px;';
-      var l = document.createElement('div');
-      l.style.cssText = 'font-size: 11px; opacity: 0.55; letter-spacing: 0.04em; margin-bottom: 4px;';
-      l.textContent = label;
-      r.appendChild(l);
-      r.appendChild(control);
-      return r;
-    }
+    // 미리보기용 샘플 텍스트 세트
+    var SAMPLE_TEXTS = [
+      { key: 'short',  label: '짧은 제목',   text: '블로그 새 글' },
+      { key: 'long',   label: '긴 제목',     text: '블로그를 시작하는 사람들이 반드시 알아야 할 10가지' },
+      { key: 'number', label: '숫자 포함',   text: '2026년 상반기 결산 리포트' }
+    ];
+    var currentSampleKey = 'short';
 
-    function _inputCss(){
-      return 'width:100%; box-sizing:border-box; padding: 7px 10px; border: 1px solid rgba(15,58,58,0.2); border-radius: 4px;'
-        + ' background: #fafafa; color: var(--color, #0F3A3A); font-family: inherit; font-size: 13px; outline:none;';
-    }
-
-    // 이름
+    // ============================
+    // 1. 이름 인풋 (히어로 위쪽)
+    // ============================
+    var nameArea = document.createElement('div');
+    nameArea.style.cssText = 'padding: 14px 18px 8px; border-bottom: 1px solid rgba(15,58,58,0.06);';
+    var nameLabel = document.createElement('div');
+    nameLabel.style.cssText = 'font-size: 10px; opacity: 0.5; letter-spacing: 0.06em; margin-bottom: 4px; text-transform: uppercase;';
+    nameLabel.textContent = '이름';
+    nameArea.appendChild(nameLabel);
     var nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.value = current.name || '';
-    nameInput.style.cssText = _inputCss();
+    nameInput.placeholder = '예: 고딕 진한 대제목';
+    nameInput.style.cssText = 'width: 100%; box-sizing: border-box; padding: 6px 0; border: none; background: transparent;'
+      + ' font-family: "Cafe24Danjunghae","Gowun Batang",serif; font-size: 18px; color: var(--color, #0F3A3A); outline: none;';
     nameInput.addEventListener('input', function(){ current.name = nameInput.value; renderPreview(); });
-    body.appendChild(row('프리셋 이름', nameInput));
+    // 이름 인풋 자동 포커스
+    setTimeout(function(){ try { nameInput.focus(); nameInput.select(); } catch(_){} }, 50);
+    nameArea.appendChild(nameInput);
+    body.appendChild(nameArea);
 
-    // 폰트
-    var fontSelect = document.createElement('select');
-    fontSelect.style.cssText = _inputCss() + ' cursor:pointer;';
-    FONTS.forEach(function(f){
-      var o = document.createElement('option');
-      o.value = f.value; o.textContent = f.label;
-      if (current.style.fontFamily === f.value) o.selected = true;
-      fontSelect.appendChild(o);
+    // ============================
+    // 2. 히어로 미리보기 캔버스
+    // ============================
+    var heroWrap = document.createElement('div');
+    heroWrap.style.cssText = 'background: #F5F5F5; padding: 22px 18px; border-bottom: 1px solid rgba(15,58,58,0.06); position: relative;';
+    var previewBox = document.createElement('div');
+    previewBox.style.cssText = 'min-height: 60px; display: flex; align-items: center; justify-content: center; text-align: center;';
+    heroWrap.appendChild(previewBox);
+
+    // 샘플 텍스트 스위치 (우상단 작게)
+    var sampleSwitch = document.createElement('div');
+    sampleSwitch.style.cssText = 'position: absolute; top: 6px; right: 8px; display: flex; gap: 2px;';
+    SAMPLE_TEXTS.forEach(function(s){
+      var pill = document.createElement('button');
+      pill.type = 'button';
+      pill.textContent = s.label;
+      pill.dataset.key = s.key;
+      pill.style.cssText = 'font-size: 10px; padding: 3px 7px; border-radius: 8px; cursor: pointer; border: 1px solid transparent;'
+        + ' background: ' + (s.key === currentSampleKey ? 'rgba(15,58,58,0.85)' : 'transparent') + ';'
+        + ' color: ' + (s.key === currentSampleKey ? '#F5F5F5' : 'rgba(15,58,58,0.55)') + ';';
+      pill.addEventListener('click', function(){
+        currentSampleKey = s.key;
+        Array.prototype.forEach.call(sampleSwitch.children, function(el){
+          var active = el.dataset.key === currentSampleKey;
+          el.style.background = active ? 'rgba(15,58,58,0.85)' : 'transparent';
+          el.style.color      = active ? '#F5F5F5' : 'rgba(15,58,58,0.55)';
+        });
+        renderPreview();
+      });
+      sampleSwitch.appendChild(pill);
     });
-    fontSelect.addEventListener('change', function(){ current.style.fontFamily = fontSelect.value; renderPreview(); });
-    body.appendChild(row('폰트', fontSelect));
+    heroWrap.appendChild(sampleSwitch);
+    body.appendChild(heroWrap);
 
-    // 폰트 크기
-    var sizeWrap = document.createElement('div');
-    sizeWrap.style.cssText = 'display: flex; gap: 8px; align-items: center;';
-    var sizeInput = document.createElement('input');
-    sizeInput.type = 'number';
-    sizeInput.min = '8'; sizeInput.max = '96'; sizeInput.step = '1';
-    sizeInput.value = parseInt(current.style.fontSize, 10) || 16;
-    sizeInput.style.cssText = _inputCss() + ' width: 90px; flex: 0 0 90px;';
-    sizeInput.addEventListener('input', function(){
-      var v = parseInt(sizeInput.value, 10);
-      if (isNaN(v)) return;
-      if (v < 8) v = 8; if (v > 96) v = 96;
-      current.style.fontSize = v + 'px';
-      renderPreview();
-    });
-    sizeWrap.appendChild(sizeInput);
-    var unitTxt = document.createElement('span');
-    unitTxt.textContent = 'px';
-    unitTxt.style.cssText = 'opacity:0.5; font-size:12px;';
-    sizeWrap.appendChild(unitTxt);
-    body.appendChild(row('크기', sizeWrap));
-
-    // 굵기
-    var weightSelect = document.createElement('select');
-    weightSelect.style.cssText = _inputCss() + ' cursor:pointer;';
-    WEIGHTS.forEach(function(w){
-      var o = document.createElement('option');
-      o.value = w.value; o.textContent = w.label;
-      if (String(current.style.fontWeight) === String(w.value)) o.selected = true;
-      weightSelect.appendChild(o);
-    });
-    weightSelect.addEventListener('change', function(){ current.style.fontWeight = parseInt(weightSelect.value, 10) || 400; renderPreview(); });
-    body.appendChild(row('굵기', weightSelect));
-
-    // 색
-    var colorWrap = document.createElement('div');
-    colorWrap.style.cssText = 'display: flex; gap: 8px; align-items: center;';
-    var swatches = [
-      { label: '기본', value: 'var(--color, #0F3A3A)', bg: '#0F3A3A' },
-      { label: '포인트', value: 'var(--point, #FF9A76)', bg: '#FF9A76' },
-      { label: '흐림', value: 'rgba(15,58,58,0.5)', bg: 'rgba(15,58,58,0.5)' },
-      { label: '밝혀', value: 'rgba(15,58,58,0.25)', bg: 'rgba(15,58,58,0.25)' }
+    // ============================
+    // 3. 세그먼트 컨트롤 (탭)
+    // ============================
+    var segWrap = document.createElement('div');
+    segWrap.style.cssText = 'padding: 10px 18px 0; display: flex; justify-content: center;';
+    var segInner = document.createElement('div');
+    segInner.style.cssText = 'display: inline-flex; background: rgba(15,58,58,0.06); border-radius: 8px; padding: 3px; gap: 2px;';
+    var segTabs = [
+      { key: 'props', label: '속성' },
+      { key: 'color', label: '색깔' }
     ];
-    swatches.forEach(function(sw){
+    segTabs.forEach(function(t){
       var b = document.createElement('button');
       b.type = 'button';
-      b.title = sw.label;
-      b.style.cssText = 'width: 26px; height: 26px; border-radius: 4px; padding: 0; cursor: pointer;'
-        + ' background:' + sw.bg + ';'
-        + ' border: 1px solid ' + (current.style.color === sw.value ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.2)') + ';'
-        + ' box-shadow: ' + (current.style.color === sw.value ? '0 0 0 2px rgba(255,154,118,0.3)' : 'none') + ';';
+      b.textContent = t.label;
+      b.dataset.tab = t.key;
+      b.style.cssText = 'padding: 5px 22px; border-radius: 6px; cursor: pointer; font-size: 12px; letter-spacing: 0.03em;'
+        + ' background: ' + (t.key === activeTab ? '#fff' : 'transparent') + ';'
+        + ' color: ' + (t.key === activeTab ? 'var(--color, #0F3A3A)' : 'rgba(15,58,58,0.55)') + ';'
+        + ' border: 1px solid ' + (t.key === activeTab ? 'rgba(15,58,58,0.1)' : 'transparent') + ';'
+        + ' box-shadow: ' + (t.key === activeTab ? '0 1px 2px rgba(0,0,0,0.03)' : 'none') + ';'
+        + ' font-weight: ' + (t.key === activeTab ? '600' : '400') + ';';
       b.addEventListener('click', function(){
-        current.style.color = sw.value;
-        renderPreview();
-        // 스와치 상태 갱신
-        colorWrap.querySelectorAll('button').forEach(function(x){
-          x.style.border = '1px solid rgba(15,58,58,0.2)';
-          x.style.boxShadow = 'none';
+        activeTab = t.key;
+        if (typeof onTabChange === 'function') onTabChange(activeTab);
+        Array.prototype.forEach.call(segInner.children, function(el){
+          var a = el.dataset.tab === activeTab;
+          el.style.background = a ? '#fff' : 'transparent';
+          el.style.color      = a ? 'var(--color, #0F3A3A)' : 'rgba(15,58,58,0.55)';
+          el.style.border     = '1px solid ' + (a ? 'rgba(15,58,58,0.1)' : 'transparent');
+          el.style.boxShadow  = a ? '0 1px 2px rgba(0,0,0,0.03)' : 'none';
+          el.style.fontWeight = a ? '600' : '400';
         });
-        b.style.border = '1px solid var(--point, #FF9A76)';
-        b.style.boxShadow = '0 0 0 2px rgba(255,154,118,0.3)';
+        renderTabContent();
       });
-      colorWrap.appendChild(b);
+      segInner.appendChild(b);
     });
-    body.appendChild(row('색깔', colorWrap));
+    segWrap.appendChild(segInner);
+    body.appendChild(segWrap);
 
-    // 자간
-    var trackSelect = document.createElement('select');
-    trackSelect.style.cssText = _inputCss() + ' cursor:pointer;';
-    [
-      { label: '좀게 -0.04em', value: '-0.04em' },
-      { label: '다소 좀게 -0.02em', value: '-0.02em' },
-      { label: '약간 좀게 -0.01em', value: '-0.01em' },
-      { label: '기본 0em', value: '0em' },
-      { label: '약간 넘게 0.02em', value: '0.02em' },
-      { label: '넘게 0.05em', value: '0.05em' }
-    ].forEach(function(t){
-      var o = document.createElement('option');
-      o.value = t.value; o.textContent = t.label;
-      if (current.style.letterSpacing === t.value) o.selected = true;
-      trackSelect.appendChild(o);
-    });
-    trackSelect.addEventListener('change', function(){ current.style.letterSpacing = trackSelect.value; renderPreview(); });
-    body.appendChild(row('자간', trackSelect));
+    // ============================
+    // 4. 탭 컨텐츠 컨테이너
+    // ============================
+    var tabContent = document.createElement('div');
+    tabContent.className = 'ddl-scroll-invisible';
+    tabContent.style.cssText = 'padding: 14px 18px 4px; max-height: 46vh; overflow-y: auto;';
+    body.appendChild(tabContent);
 
-    // 줄간격
-    var lhSelect = document.createElement('select');
-    lhSelect.style.cssText = _inputCss() + ' cursor:pointer;';
-    [1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.0].forEach(function(v){
-      var o = document.createElement('option');
-      o.value = v; o.textContent = String(v);
-      if (parseFloat(current.style.lineHeight) === v) o.selected = true;
-      lhSelect.appendChild(o);
-    });
-    lhSelect.addEventListener('change', function(){ current.style.lineHeight = parseFloat(lhSelect.value); renderPreview(); });
-    body.appendChild(row('줄간격', lhSelect));
+    // ─── 헬퍼: 라벨-값 한 줄 (Figma 스타일) ───
+    // 라벨은 왼쪽 96px, 값은 오른쪽 flex
+    function rowInline(label, control){
+      var r = document.createElement('div');
+      r.style.cssText = 'display: flex; align-items: center; min-height: 30px; padding: 5px 0; border-bottom: 1px solid rgba(15,58,58,0.04);';
+      var l = document.createElement('div');
+      l.style.cssText = 'width: 96px; flex-shrink: 0; font-size: 12px; color: rgba(15,58,58,0.6);';
+      l.textContent = label;
+      r.appendChild(l);
+      var vc = document.createElement('div');
+      vc.style.cssText = 'flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-end;';
+      vc.appendChild(control);
+      r.appendChild(vc);
+      return r;
+    }
 
-    // 아래 여백
-    var mbSelect = document.createElement('select');
-    mbSelect.style.cssText = _inputCss() + ' cursor:pointer;';
-    ['0em', '0.2em', '0.3em', '0.4em', '0.5em', '0.6em', '0.8em', '1em', '1.2em'].forEach(function(v){
-      var o = document.createElement('option');
-      o.value = v; o.textContent = v;
-      if (current.style.marginBottom === v) o.selected = true;
-      mbSelect.appendChild(o);
-    });
-    mbSelect.addEventListener('change', function(){ current.style.marginBottom = mbSelect.value; renderPreview(); });
-    body.appendChild(row('아래 여백', mbSelect));
+    function _selCss(){
+      return 'padding: 4px 8px; border: 1px solid transparent; border-radius: 4px; background: transparent;'
+        + ' color: var(--color, #0F3A3A); font-family: inherit; font-size: 13px; outline: none; cursor: pointer;'
+        + ' text-align: right; min-width: 160px;';
+    }
+    function _selHover(sel){
+      sel.addEventListener('mouseenter', function(){ sel.style.background = 'rgba(15,58,58,0.04)'; });
+      sel.addEventListener('mouseleave', function(){ sel.style.background = 'transparent'; });
+    }
 
-    // 미리보기
-    var previewBox = document.createElement('div');
-    previewBox.style.cssText = 'padding: 16px; margin-top: 6px; border: 1px dashed rgba(15,58,58,0.2); border-radius: 6px; background: #fff;';
-    body.appendChild(row('미리보기', previewBox));
+    // ============================
+    // 탭 렌더러
+    // ============================
+    function renderTabContent(){
+      tabContent.innerHTML = '';
+      if (activeTab === 'props') renderPropsTab();
+      else if (activeTab === 'color') renderColorTab();
+    }
 
+    function renderPropsTab(){
+      // 폰트
+      var fontSelect = document.createElement('select');
+      fontSelect.style.cssText = _selCss();
+      FONTS.forEach(function(f){
+        var o = document.createElement('option');
+        o.value = f.value; o.textContent = f.label;
+        if (current.style.fontFamily === f.value) o.selected = true;
+        fontSelect.appendChild(o);
+      });
+      _selHover(fontSelect);
+      fontSelect.addEventListener('change', function(){ current.style.fontFamily = fontSelect.value; renderPreview(); });
+      tabContent.appendChild(rowInline('폰트', fontSelect));
+
+      // 크기 (숫자 인풋 + 슬라이더)
+      var sizeWrap = document.createElement('div');
+      sizeWrap.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+      var sizeSlider = document.createElement('input');
+      sizeSlider.type = 'range';
+      sizeSlider.min = '8'; sizeSlider.max = '96'; sizeSlider.step = '1';
+      sizeSlider.value = parseInt(current.style.fontSize, 10) || 16;
+      sizeSlider.style.cssText = 'width: 120px; accent-color: var(--point, #FF9A76);';
+      var sizeInput = document.createElement('input');
+      sizeInput.type = 'number';
+      sizeInput.min = '8'; sizeInput.max = '96'; sizeInput.step = '1';
+      sizeInput.value = parseInt(current.style.fontSize, 10) || 16;
+      sizeInput.style.cssText = 'width: 52px; padding: 3px 6px; border: 1px solid rgba(15,58,58,0.15); border-radius: 4px;'
+        + ' background: transparent; color: var(--color, #0F3A3A); font-family: inherit; font-size: 13px; outline: none; text-align: right;';
+      function _applySize(v){
+        var n = parseInt(v, 10);
+        if (isNaN(n)) return;
+        if (n < 8) n = 8; if (n > 96) n = 96;
+        current.style.fontSize = n + 'px';
+        sizeSlider.value = n;
+        sizeInput.value = n;
+        renderPreview();
+      }
+      sizeSlider.addEventListener('input', function(){ _applySize(sizeSlider.value); });
+      sizeInput.addEventListener('input', function(){ _applySize(sizeInput.value); });
+      sizeWrap.appendChild(sizeSlider);
+      sizeWrap.appendChild(sizeInput);
+      var pxTxt = document.createElement('span');
+      pxTxt.textContent = 'px'; pxTxt.style.cssText = 'font-size: 11px; opacity: 0.5;';
+      sizeWrap.appendChild(pxTxt);
+      tabContent.appendChild(rowInline('크기', sizeWrap));
+
+      // 굵기
+      var weightSelect = document.createElement('select');
+      weightSelect.style.cssText = _selCss();
+      WEIGHTS.forEach(function(w){
+        var o = document.createElement('option');
+        o.value = w.value; o.textContent = w.label;
+        if (String(current.style.fontWeight) === String(w.value)) o.selected = true;
+        weightSelect.appendChild(o);
+      });
+      _selHover(weightSelect);
+      weightSelect.addEventListener('change', function(){ current.style.fontWeight = parseInt(weightSelect.value, 10) || 400; renderPreview(); });
+      tabContent.appendChild(rowInline('굵기', weightSelect));
+
+      // 자간
+      var trackSelect = document.createElement('select');
+      trackSelect.style.cssText = _selCss();
+      [
+        { label: '좁게 -0.04em', value: '-0.04em' },
+        { label: '다소 좁게 -0.02em', value: '-0.02em' },
+        { label: '약간 좁게 -0.01em', value: '-0.01em' },
+        { label: '기본 0em', value: '0em' },
+        { label: '약간 넓게 0.02em', value: '0.02em' },
+        { label: '넓게 0.05em', value: '0.05em' }
+      ].forEach(function(t){
+        var o = document.createElement('option');
+        o.value = t.value; o.textContent = t.label;
+        if (current.style.letterSpacing === t.value) o.selected = true;
+        trackSelect.appendChild(o);
+      });
+      _selHover(trackSelect);
+      trackSelect.addEventListener('change', function(){ current.style.letterSpacing = trackSelect.value; renderPreview(); });
+      tabContent.appendChild(rowInline('자간', trackSelect));
+
+      // 줄간격
+      var lhSelect = document.createElement('select');
+      lhSelect.style.cssText = _selCss();
+      [1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.0].forEach(function(v){
+        var o = document.createElement('option');
+        o.value = v; o.textContent = String(v);
+        if (parseFloat(current.style.lineHeight) === v) o.selected = true;
+        lhSelect.appendChild(o);
+      });
+      _selHover(lhSelect);
+      lhSelect.addEventListener('change', function(){ current.style.lineHeight = parseFloat(lhSelect.value); renderPreview(); });
+      tabContent.appendChild(rowInline('줄간격', lhSelect));
+
+      // 아래 여백
+      var mbSelect = document.createElement('select');
+      mbSelect.style.cssText = _selCss();
+      ['0em', '0.2em', '0.3em', '0.4em', '0.5em', '0.6em', '0.8em', '1em', '1.2em'].forEach(function(v){
+        var o = document.createElement('option');
+        o.value = v; o.textContent = v;
+        if (current.style.marginBottom === v) o.selected = true;
+        mbSelect.appendChild(o);
+      });
+      _selHover(mbSelect);
+      mbSelect.addEventListener('change', function(){ current.style.marginBottom = mbSelect.value; renderPreview(); });
+      tabContent.appendChild(rowInline('아래 여백', mbSelect));
+    }
+
+    function renderColorTab(){
+      // 현재 색 표시
+      var current_color = current.style.color || 'var(--color, #0F3A3A)';
+      var big = document.createElement('div');
+      big.style.cssText = 'width: 80px; height: 80px; border-radius: 50%; margin: 8px auto 12px;'
+        + ' background: ' + current_color + '; border: 1px solid rgba(15,58,58,0.15);';
+      tabContent.appendChild(big);
+
+      var caption = document.createElement('div');
+      caption.style.cssText = 'text-align: center; font-size: 11px; opacity: 0.55; margin-bottom: 14px;';
+      caption.textContent = '현재 글자색';
+      tabContent.appendChild(caption);
+
+      // 팔레트 (4색 스와치, 크게)
+      var palLabel = document.createElement('div');
+      palLabel.style.cssText = 'font-size: 10px; opacity: 0.5; letter-spacing: 0.06em; margin-bottom: 8px; text-transform: uppercase;';
+      palLabel.textContent = '기본 팔레트';
+      tabContent.appendChild(palLabel);
+
+      var palRow = document.createElement('div');
+      palRow.style.cssText = 'display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap;';
+      var swatches = [
+        { label: '기본 (딥그린)', value: 'var(--color, #0F3A3A)', bg: '#0F3A3A' },
+        { label: '포인트 (살구)',  value: 'var(--point, #FF9A76)', bg: '#FF9A76' },
+        { label: '흐림 50%',        value: 'rgba(15,58,58,0.5)',     bg: 'rgba(15,58,58,0.5)' },
+        { label: '흐림 25%',        value: 'rgba(15,58,58,0.25)',    bg: 'rgba(15,58,58,0.25)' }
+      ];
+      swatches.forEach(function(sw){
+        var wrap = document.createElement('div');
+        wrap.style.cssText = 'display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;';
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.title = sw.label;
+        var isActive = (current.style.color === sw.value);
+        b.style.cssText = 'width: 36px; height: 36px; border-radius: 50%; padding: 0; cursor: pointer;'
+          + ' background:' + sw.bg + ';'
+          + ' border: 2px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';'
+          + ' box-shadow: ' + (isActive ? '0 0 0 2px rgba(255,154,118,0.25)' : 'none') + ';'
+          + ' transition: transform 120ms;';
+        b.addEventListener('mouseenter', function(){ b.style.transform = 'scale(1.08)'; });
+        b.addEventListener('mouseleave', function(){ b.style.transform = 'scale(1)'; });
+        b.addEventListener('click', function(){
+          current.style.color = sw.value;
+          big.style.background = sw.bg;
+          renderPreview();
+          renderColorTab();  // 스와치 상태 갱신
+        });
+        var cap = document.createElement('div');
+        cap.textContent = sw.label;
+        cap.style.cssText = 'font-size: 10px; opacity: 0.55; text-align: center;';
+        wrap.appendChild(b);
+        wrap.appendChild(cap);
+        palRow.appendChild(wrap);
+      });
+      tabContent.appendChild(palRow);
+
+      // 직접 색 선택 (color picker)
+      var pickerRow = document.createElement('div');
+      pickerRow.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(15,58,58,0.06);';
+      var pickerLabel = document.createElement('div');
+      pickerLabel.style.cssText = 'font-size: 12px; color: rgba(15,58,58,0.6); flex: 1;';
+      pickerLabel.textContent = '직접 색 선택';
+      pickerRow.appendChild(pickerLabel);
+      var picker = document.createElement('input');
+      picker.type = 'color';
+      picker.value = '#0F3A3A';
+      picker.style.cssText = 'width: 32px; height: 32px; border: 1px solid rgba(15,58,58,0.15); border-radius: 4px; cursor: pointer; padding: 2px;';
+      picker.addEventListener('input', function(){
+        current.style.color = picker.value;
+        big.style.background = picker.value;
+        renderPreview();
+      });
+      pickerRow.appendChild(picker);
+      tabContent.appendChild(pickerRow);
+
+      // 안내: 향후 다음 라운드에 콜아웃 팔레트 시스템 이식 예정
+      var hint = document.createElement('div');
+      hint.style.cssText = 'margin-top: 14px; padding: 10px; background: rgba(15,58,58,0.04); border-radius: 6px; font-size: 11px; opacity: 0.6; line-height: 1.5;';
+      hint.textContent = '💡 다음 라운드에 콜아웃/구분선의 팔레트 시스템(노션 연한색 · 사이트 연한색 등)이 이 탭에 이식될 예정입니다.';
+      tabContent.appendChild(hint);
+    }
+
+    // ============================
+    // 미리보기 렌더러
+    // ============================
     function renderPreview(){
-      var s = current.style;
+      var s = current.style || {};
       previewBox.style.fontFamily    = s.fontFamily || 'inherit';
       previewBox.style.fontSize      = s.fontSize || '16px';
       previewBox.style.color         = s.color || 'inherit';
       previewBox.style.fontWeight    = s.fontWeight || 400;
       previewBox.style.letterSpacing = s.letterSpacing || '0';
       previewBox.style.lineHeight    = s.lineHeight || 1.5;
-      previewBox.textContent = current.name || '가나다라마바사아자차카타파하';
+      // 샘플 텍스트
+      var sample = SAMPLE_TEXTS.filter(function(x){ return x.key === currentSampleKey; })[0];
+      previewBox.textContent = sample ? sample.text : (current.name || '가나다라마바사아자차카타파하');
     }
+
+    // 초기 렌더
+    renderTabContent();
     renderPreview();
   }
 
