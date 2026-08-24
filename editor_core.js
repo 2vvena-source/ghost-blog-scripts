@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p19z
+ * 2vvena Editor Core - v2.0-β-p20a
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p19z';
+  var VERSION = 'v2.0-β-p20a';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -3916,14 +3916,15 @@
         + '</div>';
     }
 
-    html += '<div class="row"><div class="row-label">폰트</div>'
-      + '<select id="pop-font">'
-      + '<option value=""'+(fontFamily===''?' selected':'')+'>기본 (사이트 폰트)</option>'
-      + '<option value="Cafe24Danjunghae, serif"'+(fontFamily.indexOf("Cafe24")>=0?' selected':'')+'>Cafe24 단정해 (제목체)</option>'
-      + '<option value="\'NanumURiDdarSonGeurSsi\', serif"'+(fontFamily.indexOf("Nanum")>=0?' selected':'')+'>손글씨</option>'
-      + '<option value="\'Gowun Batang\', serif"'+(fontFamily.indexOf("Gowun")>=0?' selected':'')+'>고운 바탕 (명조)</option>'
-      + '<option value="\'Pretendard Variable\', sans-serif"'+(fontFamily.indexOf("Pretendard")>=0?' selected':'')+'>Pretendard (본문)</option>'
-      + '</select></div>';
+    // p20a: 폰트 라이브러리 통합
+    var _fontOpts = (window.__DDL_EDITOR && window.__DDL_EDITOR.buildFontSelectOptions)
+      ? window.__DDL_EDITOR.buildFontSelectOptions(fontFamily, { value: '', label: '기본 (사이트 폰트)' }, escapeAttr, escapeHtml)
+      : '<option value="">기본 (사이트 폰트)</option>';
+    html += '<div class="row"><div class="row-label" style="display:flex; justify-content:space-between; align-items:center;">'
+      + '<span>폰트</span>'
+      + '<button type="button" data-btn="open-font-library" style="background:transparent; border:none; color:var(--point, #FF9A76); font-size:0.72em; cursor:pointer; padding:0;">→ 라이브러리 관리</button>'
+      + '</div>'
+      + '<select id="pop-font">' + _fontOpts + '</select></div>';
 
     // p13b: 텍스트 투명도 슬라이더
     var textOpacity = box.getAttribute('data-text-opacity') || '100';
@@ -3959,6 +3960,18 @@
     body.addEventListener('click', function(e){
       var box = calPopupLock || selectedCallout;
       if (!box) return;
+
+      // p20a: 라이브러리 관리 직접 진입 (콜아웃 폰트 필드 옆)
+      var libBtn = e.target.closest('[data-btn="open-font-library"]');
+      if (libBtn){
+        e.stopPropagation();
+        try {
+          if (window.__DDL_EDITOR && window.__DDL_EDITOR.openFontLibraryManager){
+            window.__DDL_EDITOR.openFontLibraryManager();
+          }
+        } catch(_){}
+        return;
+      }
 
       var iconBtn = e.target.closest('[data-icon-set]');
       if (iconBtn) {
@@ -9227,6 +9240,57 @@
     return lines.join('\n');
   }
 
+  // p20a: 다른 편집창의 <select> 용 라이브러리 폰트 옵션 HTML 생성기
+  //   콜아웃/버튼/조합 프리셋 등 select 드롭다운이 안전하게 사용 가능한 옵션 문자열
+  //   currentValue: 현재 선택된 fontFamily (예: '"Pretendard", sans-serif')
+  //   basicFirstOption: 가장 첫 옵션을 뭔로 할지 ({value: '', label: '기본 (사이트 폰트)'})
+  //   escape: HTML 이스케이프 함수 (호출자 직접 제공, 사이트 공통 escapeHtml/escapeAttr 사용)
+  function _buildFontSelectOptions(currentValue, basicFirstOption, escapeAttrFn, escapeHtmlFn){
+    currentValue = currentValue || '';
+    var esc = escapeAttrFn || function(s){ return String(s).replace(/["'&<>]/g, ''); };
+    var escH = escapeHtmlFn || function(s){ return String(s).replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); };
+    var html = '';
+
+    // 첫 옵션 (기본값/상속)
+    if (basicFirstOption){
+      var isFirstSel = (currentValue === basicFirstOption.value);
+      html += '<option value="' + esc(basicFirstOption.value) + '"' + (isFirstSel ? ' selected' : '') + '>' + escH(basicFirstOption.label) + '</option>';
+    }
+
+    // 라이브러리 폰트들
+    var lib = loadFontLibrary();
+    var fonts = (lib && lib.fonts) ? lib.fonts : [];
+    // 즐겨찾기 먼저 노출
+    var favs = fonts.filter(function(f){ return f.isFavorite; });
+    var others = fonts.filter(function(f){ return !f.isFavorite; });
+
+    function _opt(f){
+      var famStr = (f.cssName || f.name || '').trim();
+      if (famStr && famStr.indexOf(',') === -1 && famStr.indexOf('"') === -1 && famStr.indexOf("'") === -1){
+        famStr = '"' + famStr + '"';
+      }
+      var value = famStr + ',' + (f.fallback || 'sans-serif');
+      var isSel = (currentValue === value);
+      var label = f.name || f.cssName || '무명';
+      if (f.weightUrls && Object.keys(f.weightUrls).length >= 2){
+        label += ' (' + Object.keys(f.weightUrls).length + '개 굵기)';
+      }
+      return '<option value="' + esc(value) + '"' + (isSel ? ' selected' : '') + '>' + escH(label) + '</option>';
+    }
+
+    if (favs.length > 0){
+      html += '<optgroup label="★ 즐겨찾기">';
+      favs.forEach(function(f){ html += _opt(f); });
+      html += '</optgroup>';
+    }
+    if (others.length > 0){
+      html += '<optgroup label="라이브러리">';
+      others.forEach(function(f){ html += _opt(f); });
+      html += '</optgroup>';
+    }
+    return html;
+  }
+
   // 라이브러리 안 폰트를 뷰별로 반환
   function _getFontLibraryFiltered(view){
     var lib = loadFontLibrary();
@@ -10280,6 +10344,7 @@
     window.__DDL_EDITOR.getFontLibraryFiltered = _getFontLibraryFiltered;
     window.__DDL_EDITOR.reloadFontLibraryCSS  = _injectFontFaceCSS;
     window.__DDL_EDITOR.generateSiteFontCSS   = _generateSiteFontCSS;
+    window.__DDL_EDITOR.buildFontSelectOptions = _buildFontSelectOptions;   // p20a
   } catch(_){}
 
   // 부팅 시 자동 로드 (편집기 페이지)
@@ -11388,35 +11453,17 @@
         + '<input type="text" data-btn-set="url" value="' + escapeAttr(opts.url) + '" placeholder="https://..." style="width:100%;"></div>';
       html += '<div class="row"><div class="row-label">글자색</div>'
         + '<div class="ep-color-row"><input type="color" data-btn-set="color" value="' + escapeAttr(opts.color) + '"></div></div>';
-      // p17e: 폰트 (확장 + 사용자 폰트)
-      var userFonts = loadUserFonts().fonts || [];
-      html += '<div class="row"><div class="row-label">폰트</div>'
+      // p20a: 폰트 라이브러리 통합 (기존 p17e loadUserFonts 시스템 대체)
+      var _btnFontOpts = (window.__DDL_EDITOR && window.__DDL_EDITOR.buildFontSelectOptions)
+        ? window.__DDL_EDITOR.buildFontSelectOptions(opts.fontFamily, { value: 'inherit', label: '기본 (본문)' }, escapeAttr, escapeHtml)
+        : '<option value="inherit">기본 (본문)</option>';
+      html += '<div class="row"><div class="row-label" style="display:flex; justify-content:space-between; align-items:center;">'
+        + '<span>폰트</span>'
+        + '<button type="button" data-btn-open-font-library="1" style="background:transparent; border:none; color:var(--point, #FF9A76); font-size:0.72em; cursor:pointer; padding:0;">→ 라이브러리 관리</button>'
+        + '</div>'
         + '<select data-btn-set="fontFamily" style="width:100%; padding:0.4em; border:1px solid rgba(15,58,58,0.2); border-radius:4px; background:#fafafa;">'
-        + '<option value="inherit"' + (opts.fontFamily==='inherit'?' selected':'') + '>기본 (본문)</option>'
-        + '<optgroup label="기본 폰트">'
-        + '<option value="\'Pretendard Variable\',\'Pretendard\',sans-serif"' + (opts.fontFamily.indexOf('Pretendard')>-1?' selected':'') + '>Pretendard</option>'
-        + '<option value="\'Cafe24Danjunghae\',\'Gowun Batang\',serif"' + (opts.fontFamily.indexOf('Cafe24')>-1?' selected':'') + '>Cafe24 단정해 (제목체)</option>'
-        + '<option value="\'Gowun Batang\',serif"' + (opts.fontFamily.indexOf('Gowun')>-1&&opts.fontFamily.indexOf('Cafe24')<0?' selected':'') + '>Gowun Batang (명조)</option>'
-        + '<option value="\'Nanum Myeongjo\',serif"' + (opts.fontFamily.indexOf('Nanum Myeongjo')>-1?' selected':'') + '>Nanum Myeongjo</option>'
-        + '<option value="\'Nanum Gothic\',sans-serif"' + (opts.fontFamily.indexOf('Nanum Gothic')>-1?' selected':'') + '>Nanum Gothic</option>'
-        + '<option value="\'Noto Sans KR\',sans-serif"' + (opts.fontFamily.indexOf('Noto Sans KR')>-1?' selected':'') + '>Noto Sans KR</option>'
-        + '<option value="\'Noto Serif KR\',serif"' + (opts.fontFamily.indexOf('Noto Serif KR')>-1?' selected':'') + '>Noto Serif KR</option>'
-        + '<option value="\'NanumURiDdarSonGeurSsi\',serif"' + (opts.fontFamily.indexOf('NanumURi')>-1?' selected':'') + '>손글씨 (Nanum 우리딸)</option>'
-        + '<option value="Georgia,serif"' + (opts.fontFamily==='Georgia,serif'?' selected':'') + '>Georgia (영문 명조)</option>'
-        + '<option value="\'Times New Roman\',serif"' + (opts.fontFamily.indexOf('Times')>-1?' selected':'') + '>Times New Roman</option>'
-        + '<option value="Arial,sans-serif"' + (opts.fontFamily==='Arial,sans-serif'?' selected':'') + '>Arial</option>'
-        + '<option value="Helvetica,sans-serif"' + (opts.fontFamily==='Helvetica,sans-serif'?' selected':'') + '>Helvetica</option>'
-        + '<option value="\'Courier New\',monospace"' + (opts.fontFamily.indexOf('Courier')>-1?' selected':'') + '>Courier New (고정폭)</option>'
-        + '</optgroup>';
-      if (userFonts.length > 0) {
-        html += '<optgroup label="내 폰트">';
-        userFonts.forEach(function(f){
-          var val = "'" + f.cssFamily + "',sans-serif";
-          html += '<option value="' + escapeAttr(val) + '"' + (opts.fontFamily.indexOf(f.cssFamily)>-1?' selected':'') + '>' + escapeHtml(f.name) + '</option>';
-        });
-        html += '</optgroup>';
-      }
-      html += '</select></div>';
+        + _btnFontOpts
+        + '</select></div>';
       // p17e: 사용자 폰트 추가/관리 버튼
       html += '<div class="row" style="display:flex; gap:6px;">'
         + '<button type="button" class="pop-btn" data-btn-font-add="1" style="flex:1;">폰트 추가</button>'
@@ -11540,6 +11587,18 @@
     btnPopupEl.addEventListener('click', function(e){
       var t = e.target;
       if (t.closest('[data-btn-pop="close"]')) { closeButtonPopup(); return; }
+
+      // p20a: 버튼 편집 다이얼로그 안 “라이브러리 관리 →” 버튼
+      if (t.closest('[data-btn-open-font-library]')){
+        e.stopPropagation();
+        try {
+          if (window.__DDL_EDITOR && window.__DDL_EDITOR.openFontLibraryManager){
+            window.__DDL_EDITOR.openFontLibraryManager();
+          }
+        } catch(_){}
+        return;
+      }
+
       var tabBtn = t.closest('[data-btn-pop-tab]');
       if (tabBtn) {
         btnPopupEl.querySelectorAll('.ep-popup-tab').forEach(function(x){ x.classList.remove('is-active'); });
@@ -13699,7 +13758,247 @@
     } catch(_){}
   }
 
-  // 인라인 코드 기본 스타일 (사용자님 다음 라운드에서 편집 가능해질 예정)
+  // p20a: 인라인 코드 스타일 편집 다이얼로그 (설정 → 인라인 코드 카드 클릭)
+  //   독립 오버레이 구조 · EDIT_DIALOG_SPEC 표준 준수 · 마커 .ddl-editor-popup
+  function openInlineCodeStyleEditor(){
+    var current = JSON.parse(JSON.stringify(_getInlineCodeStyle()));
+    var initial  = JSON.parse(JSON.stringify(current));   // 초기값 (초기화용)
+
+    var overlay = document.createElement('div');
+    overlay.className = 'ddl-edit-overlay ddl-editor-popup';
+    overlay.style.cssText = 'position: fixed; inset: 0; z-index: 100001;'
+      + ' background: rgba(15,58,58,0.18);'
+      + ' display: flex; align-items: center; justify-content: center;'
+      + ' font-family: "Pretendard Variable","Pretendard",sans-serif;'
+      + ' color: var(--color, #0F3A3A);';
+
+    var dialog = document.createElement('div');
+    dialog.className = 'ddl-edit-dialog';
+    dialog.style.cssText = 'width: 520px; max-width: 92vw; max-height: 88vh;'
+      + ' background: #fff; border: 1px solid rgba(15,58,58,0.25); border-radius: 6px;'
+      + ' box-shadow: 0 10px 30px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden;';
+    dialog.addEventListener('click', function(e){ e.stopPropagation(); });
+    dialog.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+
+    var dHeader = document.createElement('div');
+    dHeader.style.cssText = 'padding: 0.7em 1em; background: rgba(15,58,58,0.06); border-bottom: 1px solid rgba(15,58,58,0.15); font-family: "Cafe24Danjunghae","Gowun Batang",serif; font-size: 1.05em; display: flex; justify-content: space-between; align-items: center;';
+    dHeader.innerHTML = '<span>인라인 코드 스타일 편집</span>';
+    var dClose = document.createElement('button');
+    dClose.type = 'button'; dClose.textContent = '×';
+    dClose.style.cssText = 'background: transparent; border: none; cursor: pointer; font-size: 1.3em; color: rgba(15,58,58,0.6); padding: 0 0.2em;';
+    dClose.addEventListener('click', function(){ close(); });
+    dHeader.appendChild(dClose);
+    dialog.appendChild(dHeader);
+
+    // 미리보기 히어로
+    var hero = document.createElement('div');
+    hero.style.cssText = 'background: #F5F5F5; padding: 26px 18px; border-bottom: 1px solid rgba(15,58,58,0.06); text-align: center;';
+    var heroTxt = document.createElement('div');
+    heroTxt.style.cssText = 'font-size: 15px; color: var(--color, #0F3A3A);';
+    heroTxt.innerHTML = 'console.log(<code id="ic-preview">Hello World</code>);';
+    hero.appendChild(heroTxt);
+    dialog.appendChild(hero);
+
+    function _renderPreview(){
+      var pv = dialog.querySelector('#ic-preview');
+      if (!pv) return;
+      pv.style.cssText = 'background:' + current.background + ';'
+        + ' color:' + current.color + ';'
+        + ' font-family:' + current.fontFamily + ';'
+        + ' font-size:' + current.fontSize + ';'
+        + ' padding:' + current.padding + ';'
+        + ' border-radius:' + current.borderRadius + ';'
+        + ' border:' + current.border + ';';
+    }
+
+    // 바디 (스크롤)
+    var body = document.createElement('div');
+    body.className = 'ddl-scroll-invisible';
+    body.style.cssText = 'flex: 1; min-height: 0; overflow-y: auto; padding: 14px 18px;';
+    dialog.appendChild(body);
+
+    function _inputCss(){ return 'width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1px solid rgba(15,58,58,0.2); border-radius: 4px; background: #fafafa; color: var(--color, #0F3A3A); font-family: inherit; font-size: 13px; outline: none;'; }
+    function _row(label, control, hint){
+      var r = document.createElement('div'); r.style.cssText = 'margin-bottom: 12px;';
+      var l = document.createElement('div'); l.style.cssText = 'font-size: 11px; color: rgba(15,58,58,0.55); margin-bottom: 4px;';
+      l.textContent = label; r.appendChild(l); r.appendChild(control);
+      if (hint){ var h = document.createElement('div'); h.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.4); margin-top: 3px;'; h.textContent = hint; r.appendChild(h); }
+      return r;
+    }
+
+    // 폰트 (라이브러리 통합)
+    var fontSel = document.createElement('select');
+    fontSel.style.cssText = _inputCss() + ' cursor: pointer;';
+    fontSel.innerHTML = (window.__DDL_EDITOR && window.__DDL_EDITOR.buildFontSelectOptions)
+      ? window.__DDL_EDITOR.buildFontSelectOptions(current.fontFamily, { value: '"JetBrains Mono","Menlo","Consolas",monospace', label: '기본 (모노 스택)' }, function(s){return String(s).replace(/["<>]/g,'');}, function(s){return String(s).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});})
+      : '<option value="\'JetBrains Mono\',monospace">기본</option>';
+    fontSel.addEventListener('change', function(){ current.fontFamily = fontSel.value; _renderPreview(); });
+    body.appendChild(_row('폰트', fontSel, '라이브러리에 등록된 폰트 사용 가능'));
+
+    // 크기
+    var sizeSel = document.createElement('select');
+    sizeSel.style.cssText = _inputCss() + ' cursor: pointer;';
+    var sizes = [{v:'0.8em',l:'작게 (0.8em)'},{v:'0.85em',l:'약간 작게 (0.85em)'},{v:'0.9em',l:'기본 (0.9em)'},{v:'0.95em',l:'약간 크게 (0.95em)'},{v:'1em',l:'본문과 동일 (1em)'}];
+    sizes.forEach(function(s){
+      var o = document.createElement('option'); o.value = s.v; o.textContent = s.l;
+      if (current.fontSize === s.v) o.selected = true;
+      sizeSel.appendChild(o);
+    });
+    sizeSel.addEventListener('change', function(){ current.fontSize = sizeSel.value; _renderPreview(); });
+    body.appendChild(_row('글자 크기', sizeSel));
+
+    // 배경색
+    var bgRow = document.createElement('div');
+    bgRow.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap;';
+    var bgOpts = [
+      { v: 'rgba(15,58,58,0.08)', l: '열은 회색 (기본)' },
+      { v: 'rgba(15,58,58,0.14)', l: '진한 회색' },
+      { v: 'rgba(255,154,118,0.10)', l: '연한 살구' },
+      { v: 'rgba(255,154,118,0.20)', l: '진한 살구' },
+      { v: '#F5F5F5', l: '사이트 배경' },
+      { v: 'transparent', l: '투명' }
+    ];
+    function _refreshBg(){
+      bgRow.innerHTML = '';
+      bgOpts.forEach(function(opt){
+        var b = document.createElement('button');
+        b.type = 'button'; b.textContent = opt.l;
+        var isActive = current.background === opt.v;
+        b.style.cssText = 'padding: 5px 8px; font-size: 11px; border-radius: 3px; cursor: pointer; font-family: inherit; background: ' + (opt.v === 'transparent' ? '#fff' : opt.v) + ';'
+          + ' color: var(--color, #0F3A3A);'
+          + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';';
+        b.addEventListener('click', function(){ current.background = opt.v; _refreshBg(); _renderPreview(); });
+        bgRow.appendChild(b);
+      });
+    }
+    _refreshBg();
+    body.appendChild(_row('배경색', bgRow));
+
+    // 글자색
+    var colorRow = document.createElement('div');
+    colorRow.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap;';
+    var colorOpts = [
+      { v: 'var(--color, #0F3A3A)', l: '기본', hex: '#0F3A3A' },
+      { v: 'var(--point, #FF9A76)', l: '살구', hex: '#FF9A76' },
+      { v: 'rgba(15,58,58,0.7)', l: '흐림', hex: 'rgba(15,58,58,0.7)' },
+      { v: '#d33', l: '위험/오류', hex: '#d33' }
+    ];
+    function _refreshColor(){
+      colorRow.innerHTML = '';
+      colorOpts.forEach(function(opt){
+        var b = document.createElement('button');
+        b.type = 'button'; b.textContent = opt.l;
+        var isActive = current.color === opt.v;
+        b.style.cssText = 'padding: 5px 8px; font-size: 11px; border-radius: 3px; cursor: pointer; font-family: inherit; background: #fff; color: ' + opt.hex + ';'
+          + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';';
+        b.addEventListener('click', function(){ current.color = opt.v; _refreshColor(); _renderPreview(); });
+        colorRow.appendChild(b);
+      });
+    }
+    _refreshColor();
+    body.appendChild(_row('글자색', colorRow));
+
+    // 테두리
+    var borderRow = document.createElement('div');
+    borderRow.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap;';
+    var borderOpts = [
+      { v: 'none', l: '없음' },
+      { v: '1px solid rgba(15,58,58,0.1)', l: '열은 실선 (기본)' },
+      { v: '1px solid rgba(15,58,58,0.25)', l: '진한 실선' },
+      { v: '1px dashed rgba(15,58,58,0.25)', l: '점선' }
+    ];
+    function _refreshBorder(){
+      borderRow.innerHTML = '';
+      borderOpts.forEach(function(opt){
+        var b = document.createElement('button');
+        b.type = 'button'; b.textContent = opt.l;
+        var isActive = current.border === opt.v;
+        b.style.cssText = 'padding: 5px 8px; font-size: 11px; border-radius: 3px; cursor: pointer; font-family: inherit; background: #fff; color: var(--color, #0F3A3A);'
+          + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';';
+        b.addEventListener('click', function(){ current.border = opt.v; _refreshBorder(); _renderPreview(); });
+        borderRow.appendChild(b);
+      });
+    }
+    _refreshBorder();
+    body.appendChild(_row('테두리', borderRow));
+
+    // 파당(padding) · 반지름
+    var padSel = document.createElement('select');
+    padSel.style.cssText = _inputCss() + ' cursor: pointer;';
+    [{v:'0em 0.2em',l:'없음'},{v:'0.1em 0.35em',l:'기본'},{v:'0.2em 0.5em',l:'넘넘'},{v:'0.3em 0.7em',l:'넘은 패딩'}].forEach(function(o){
+      var op = document.createElement('option'); op.value = o.v; op.textContent = o.l;
+      if (current.padding === o.v) op.selected = true;
+      padSel.appendChild(op);
+    });
+    padSel.addEventListener('change', function(){ current.padding = padSel.value; _renderPreview(); });
+    body.appendChild(_row('안쪽 여백 (padding)', padSel));
+
+    var radSel = document.createElement('select');
+    radSel.style.cssText = _inputCss() + ' cursor: pointer;';
+    [{v:'0',l:'각진 모서리'},{v:'2px',l:'약간 둥글게'},{v:'3px',l:'기본'},{v:'6px',l:'둥글게'},{v:'999px',l:'알약형'}].forEach(function(o){
+      var op = document.createElement('option'); op.value = o.v; op.textContent = o.l;
+      if (current.borderRadius === o.v) op.selected = true;
+      radSel.appendChild(op);
+    });
+    radSel.addEventListener('change', function(){ current.borderRadius = radSel.value; _renderPreview(); });
+    body.appendChild(_row('모서리 둥금 (border-radius)', radSel));
+
+    // 푸터 — EDIT_DIALOG_SPEC 3-버튼 규칙
+    var footer = document.createElement('div');
+    footer.style.cssText = 'padding: 0.7em 1em; border-top: 1px solid rgba(15,58,58,0.1); display: flex; justify-content: space-between; align-items: center; gap: 0.5em; background: #fff;';
+    var resetBtn = document.createElement('button');
+    resetBtn.type = 'button'; resetBtn.textContent = '초기화';
+    resetBtn.style.cssText = 'background: transparent; border: none; color: rgba(15,58,58,0.55); font-size: 0.85em; cursor: pointer; padding: 0.4em 0;';
+    resetBtn.addEventListener('click', function(){
+      try {
+        localStorage.removeItem('ddl.codeStyle');
+        current = {
+          background: 'rgba(15,58,58,0.08)',
+          color: 'var(--color, #0F3A3A)',
+          fontFamily: '"JetBrains Mono","Menlo","Consolas",monospace',
+          fontSize: '0.9em',
+          padding: '0.1em 0.35em',
+          borderRadius: '3px',
+          border: '1px solid rgba(15,58,58,0.1)'
+        };
+        _refreshBg(); _refreshColor(); _refreshBorder(); _renderPreview();
+      } catch(_){}
+    });
+    footer.appendChild(resetBtn);
+
+    var rightWrap = document.createElement('div');
+    rightWrap.style.cssText = 'display: flex; gap: 0.5em;';
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button'; cancelBtn.textContent = '취소';
+    cancelBtn.style.cssText = 'padding: 0.4em 0.8em; border-radius: 3px; cursor: pointer; background: transparent; border: 1px solid rgba(15,58,58,0.25); color: var(--color, #0F3A3A); font-size: 0.85em; font-family: inherit;';
+    cancelBtn.addEventListener('click', function(){ close(); });
+    rightWrap.appendChild(cancelBtn);
+
+    var saveBtn = document.createElement('button');
+    saveBtn.type = 'button'; saveBtn.textContent = '저장';
+    saveBtn.style.cssText = 'padding: 0.4em 0.8em; border-radius: 3px; cursor: pointer; background: var(--point, #FF9A76); border: 1px solid var(--point, #FF9A76); color: #fff; font-size: 0.85em; font-family: inherit;';
+    saveBtn.addEventListener('click', function(){
+      try { localStorage.setItem('ddl.codeStyle', JSON.stringify(current)); } catch(_){}
+      close();
+    });
+    rightWrap.appendChild(saveBtn);
+    footer.appendChild(rightWrap);
+    dialog.appendChild(footer);
+
+    function close(){
+      try { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch(_){}
+      document.removeEventListener('keydown', escHandler);
+    }
+    function escHandler(e){ if (e.key === 'Escape'){ close(); } }
+    document.addEventListener('keydown', escHandler);
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    _renderPreview();
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.openInlineCodeStyleEditor = openInlineCodeStyleEditor; } catch(_){}
+
+  // 인라인 코드 기본 스타일
   function _getInlineCodeStyle(){
     var def = {
       background: 'rgba(15,58,58,0.08)',
@@ -13916,7 +14215,7 @@
       '</div>' +
       // 4. 버전
       '<div style="margin-top:20px;padding-top:12px;border-top:1px solid rgba(15,58,58,0.06);font-size:11px;color:rgba(15,58,58,0.4);text-align:center;">' +
-        'v2.0-β-p19z' +
+        'v2.0-β-p20a' +
       '</div>';
 
     mask.appendChild(box);
@@ -13953,8 +14252,13 @@
           setTimeout(function(){ try { openFontLibraryManager(); } catch(_){} }, 10);
           return;
         }
+        if (hub === 'code') {  // p20a: 인라인 코드 스타일 편집
+          mask.remove();
+          setTimeout(function(){ try { openInlineCodeStyleEditor(); } catch(_){} }, 10);
+          return;
+        }
         // 나머지는 아직 구현 안 됨 — 토스트만
-        var name = { highlight:'형광펜', code:'인라인 코드 스타일', shortcut:'단축키', list:'목록 기본값' }[hub] || hub;
+        var name = { highlight:'형광펜', shortcut:'단축키', list:'목록 기본값' }[hub] || hub;
         _showStubToast(name + ' — 다음 배포에서 지원됩니다');
       });
     });
@@ -14408,8 +14712,13 @@
         html += '<div class="row"><div class="row-label">장식</div>'
           + '<select id="pf-deco"><option value="">없음</option><option value="underline">밑줄</option><option value="line-through">취소선</option><option value="underline double">이중 밑줄</option></select>'
           + '</div>';
+        // p20a: 폰트 라이브러리 통합
+        var _pfCurrent = (data && data.fontFamily) || '';
+        var _pfFontOpts = (window.__DDL_EDITOR && window.__DDL_EDITOR.buildFontSelectOptions)
+          ? window.__DDL_EDITOR.buildFontSelectOptions(_pfCurrent, { value: '', label: '기본 (Pretendard)' }, escapeAttr, escapeHtml)
+          : '<option value="">기본 (Pretendard)</option>';
         html += '<div class="row"><div class="row-label">폰트</div>'
-          + '<select id="pf-family"><option value="">기본 (Pretendard)</option><option value="\'Cafe24Danjunghae\',serif">카페단정해</option><option value="\'NanumURiDdarSonGeurSsi\',cursive">나눔손글씨</option><option value="\'Gowun Batang\',serif">고운바탕</option><option value="\'JetBrains Mono\',monospace">코드체</option></select>'
+          + '<select id="pf-family">' + _pfFontOpts + '</select>'
           + '</div>';
         html += '<div class="row"><div class="row-label">자간</div>'
           + '<select id="pf-tracking"><option value="">기본</option><option value="0.05em">넓게</option><option value="0.1em">더 넓게</option><option value="-0.02em">좁게</option></select>'
