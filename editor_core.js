@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p20f
+ * 2vvena Editor Core - v2.0-β-p20g
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -446,17 +446,22 @@
     '}',
     '.callout-box:hover .callout-resizer { opacity: 0.55; }',
     '.callout-resizer:hover { opacity: 1 !important; background: var(--point, #FF9A76) !important; transform: scale(1.15); }',
+    /* p20g: 콜아웃 body — 명시적으로 block 레이아웃. 자식이 flex 상속 받지 않게 방어. */
     '.callout-body {',
     '  flex: 1;',
     '  min-width: 0;',
     '  min-height: 1.5em;',
     '  outline: none;',
+    '  display: block !important;',
+    '  width: 100%;',
     '}',
-    '.callout-body > * { margin: 0.3em 0; }',
+    /* 콜아웃 body 자식은 무조건 block-level. 브라우저 기본 <div>/<p> 가 인라인으로 보이는 버그 방지. */
+    '.callout-body > * { margin: 0.3em 0; display: block; }',
     '.callout-body > *:first-child { margin-top: 0; }',
     '.callout-body > *:last-child { margin-bottom: 0; }',
+    '.callout-body > br { display: block; content: ""; margin: 0; }',
     /* 콜아웃 안 중첩 블록도 살짝 축소 */
-    '.callout-body .editor-block { margin: 0.4em 0; }',
+    '.callout-body .editor-block { margin: 0.4em 0; display: block; }',
     /* p15a: 이미지 블록 */
     '.editor-block[data-block-type="image"] { padding: 0.15em 0 0.15em 2em !important; }',
     /* p15c: figure 를 inline-block 이 아닌 block 로 → margin auto 로 좌·중·우 정렬 가능
@@ -1975,11 +1980,17 @@
           h.setAttribute('draggable', 'true');
         }
       });
-      // p20f: 노션식 — 특수블록의 요소 자체도 draggable=true 보장
-      root.querySelectorAll('.callout-box, .ep-divider-wrap, .kg-button-card, .editor-image-figure').forEach(function(el){
+      // p20g: 안전한 요소만 draggable=true.
+      //         버튼 card 는 제외 (클릭 = 편집창 열기이므로 drag 대상으로 부적합).
+      //         버튼은 handle 또는 그 부모 editor-block 으로 드래그.
+      root.querySelectorAll('.callout-icon, .callout-box, .ep-divider-wrap, .editor-image-figure').forEach(function(el){
         if (el.getAttribute('draggable') !== 'true'){
           el.setAttribute('draggable', 'true');
         }
+      });
+      // p20g: kg-button-card 에 이전 버전에서 잘못 붙은 draggable 제거 (편집창 휴과 꾸짐 간섭)
+      root.querySelectorAll('.kg-button-card[draggable="true"]').forEach(function(el){
+        el.removeAttribute('draggable');
       });
     } catch(_){}
   }
@@ -2162,7 +2173,28 @@
             }, 0);
             return;
           }
-          return; // 그 외엔 기본 줄바꿈 (br 삽입)
+          // p20g: 그 외엔 명시적 <br> 삽입 — 브라우저 기본 동작이 <div>를 삽입해 가로 배치 버그 유발하는 것 방지
+          e.preventDefault();
+          try {
+            var _br = document.createElement('br');
+            r.deleteContents();
+            r.insertNode(_br);
+            // 커서를 br 다음으로 이동
+            var _r2 = document.createRange();
+            _r2.setStartAfter(_br);
+            _r2.collapse(true);
+            // 마지막 br 이면 보이지 않으므로 더미 br 하나 더 붙이기
+            if (!_br.nextSibling || (_br.nextSibling.nodeType === 3 && !_br.nextSibling.nodeValue.replace(/\s/g,''))){
+              var _br2 = document.createElement('br');
+              _br.parentNode.insertBefore(_br2, _br.nextSibling);
+              _r2.setStartBefore(_br2);
+              _r2.collapse(true);
+            }
+            var _s2 = window.getSelection();
+            _s2.removeAllRanges();
+            _s2.addRange(_r2);
+          } catch(err){}
+          return;
         }
         e.preventDefault();
         var nb = insertNewBlock('p', '', block);
@@ -2874,7 +2906,8 @@
 
     var box = document.createElement('div');
     box.className = 'callout-box';
-    // p20f: box 자체를 잡아 드래그할 수 있게 — body(editable) 가 있음에도 draggable 부모 상속을 막지 않도록 box 자체만.
+    // p20g: 콜아웃 여백을 잡아도 드래그 가능하도록 box 자체를 draggable=true.
+    //         body 편집은 dragstart 리스너의 contenteditable 검사로 보호됨.
     box.setAttribute('draggable', 'true');
     box.setAttribute('data-icon-type', 'emoji');
     box.setAttribute('data-icon-value', '💡');
@@ -2891,6 +2924,8 @@
     iconEl.className = 'callout-icon';
     iconEl.textContent = '💡';
     iconEl.setAttribute('contenteditable', 'false');
+    // p20g: 콜아웃 아이콘을 잡으면 부모 바깥 이동 가능
+    iconEl.setAttribute('draggable', 'true');
 
     var bodyEl = document.createElement('div');
     bodyEl.className = 'callout-body';
@@ -11613,7 +11648,7 @@
     // 실제 Ghost 표준 카드
     var card = document.createElement('div');
     card.className = 'kg-card kg-button-card kg-align-center';
-    card.setAttribute('draggable', 'true'); // p20f: 요소 자체를 잡아도 드래그
+    // p20g: kg-button-card 에는 draggable=true 붙이지 않음 — 버튼 클릭을 편집창 트리거로 쓰기 위함.
     // p17d: 편집기 안에서는 <span> 사용 (링크 점프 방지). 저장 시 <a href> 로 변환.
     var a = document.createElement('span');
     a.className = 'kg-btn kg-btn-accent';
@@ -16367,6 +16402,11 @@
       // p15a: 이미지 편집 팝업·이미지 리사이저도 제외
       if (e.target.closest('#ep-img-popup')) return;
       if (e.target.closest('.editor-image-resizer')) return;
+      // p20g: 드래그 핸들 클릭을 다중선택으로 해석하면 드래그가 안되므로 리턴
+      if (e.target.closest('.block-handle')) return;
+      // p20g: draggable=true 요소 (콜아웃 box, 구분선 wrap, 버튼 card, 이미지 figure) 자체를 잡을 때도 리턴
+      var _dragEl = e.target.closest && e.target.closest('[draggable="true"]');
+      if (_dragEl) return;
       // p17c: 버튼·구분선 블록과 그 편집 팝업/다이얼로그 클릭도 다중선택에서 제외
       if (e.target.closest('.ep-button-block')) return;
       if (e.target.closest('.ep-divider-block')) return;
