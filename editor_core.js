@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p19r
+ * 2vvena Editor Core - v2.0-β-p19s
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -1000,9 +1000,7 @@
     '}',
     /* p19a: .ep-popup-v2 팩토리 전용 클래스 (기존 .ep-popup 과 병존) */
     /* p19q: z-index 재정의 — 툴바(9990)/모던툴바(9990) 위로 올려서 편집창이 툴바에 가려지지 않도록 */
-    /* p19r: pointer-events 강제 명시 — 부모가 pointer-events:none 이거나 
-              Ghost 편집기가 이벤트를 관통시키는 것 방지. 
-              사용자 증상: 「편집창 위에서 클릭하는데 아래 블록이 눌림」 */
+    /* p19s: pointer-events !important 와 isolation 제거 — p19r 부작용 오히려 상황 악화 */
     '.ep-popup-v2 {',
     '  position: fixed;',
     '  z-index: 99999;',
@@ -1016,12 +1014,6 @@
     '  flex-direction: column;',
     '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
     '  color: var(--ep-popup-body-color);',
-    '  pointer-events: auto !important;',
-    '  isolation: isolate;',
-    '}',
-    /* p19r: 편집창 모든 자손이 반드시 마우스 이벤트 받게 강제 */
-    '.ep-popup-v2 *, .ep-popup-v2 input, .ep-popup-v2 select, .ep-popup-v2 button, .ep-popup-v2 textarea {',
-    '  pointer-events: auto !important;',
     '}',
     '.ep-popup-v2-header {',
     '  padding: var(--ep-popup-header-padding);',
@@ -7232,14 +7224,11 @@
     root.setAttribute('data-shell-variant', shellVariant);
     if (width) root.style.width = width;
 
-    // p19r: ⭐ 헝팁 가드 — 편집창 안 이벤트가 아래 블록에 관통하는 버그 해결
-    //   사용자 증상: 「편집창 위에서 클릭하는데 아래 블록이 눌림」
-    //   원인: Ghost 편집기가 document 레벨 mousedown 을 캐처해서 포커스/선택을 가져감.
-    //   해결: 팝업 안 마우스/터치 이벤트 stopPropagation.
-    //         (preventDefault 는 안 함 → native 인풋/버튼/드롭다운은 동작해야 함)
-    ['mousedown','mouseup','click','pointerdown','pointerup','touchstart','touchend'].forEach(function(ev){
-      root.addEventListener(ev, function(e){ e.stopPropagation(); }, false);
-    });
+    // p19s: p19r 의 stopPropagation 가드 제거함.
+    //   이유: document.mouseup 이벤트가 버블링 모하으로 측정 몷둜 
+    //           드래그 상태가 종료 안 되는 버그 (사용자 증상: "드래그 후 놓아도 안떼짐").
+    //   따라서 모든 이벤트 가드 제거. 
+    //   대신 진짜 문제는 다른 곳에 있을 가능성 (다음 라운드에서 별도 진단).
 
     // 헤더
     var header = document.createElement('div');
@@ -8360,6 +8349,27 @@
     var initialSnapshot = JSON.parse(JSON.stringify(current));  // 초기화용
     var currentTab = 'props';   // 'props' | 'color'
 
+    // p19s: ⭐ 관리창과 편집창이 동시 개방되면 마우스 이벤트 충돌 발생.
+    //   편집창 열 때 관리창을 잠시 숫기고, 편집창 닫힐 때 다시 보이게 함.
+    //   + 배경 반투명 마스크로 편집창 외 클릭 방지 → 및단 블록에 이벤트 안 감.
+    var hiddenManagers = [];
+    Array.prototype.forEach.call(document.querySelectorAll('.ep-popup-v2'), function(el){
+      if (el.style.display !== 'none'){
+        hiddenManagers.push({ el: el, prevDisplay: el.style.display });
+        el.style.display = 'none';
+      }
+    });
+
+    // 배경 마스크 (클릭하면 아무 일 안 일어난 → 아래 블록에 안 감)
+    var mask = document.createElement('div');
+    mask.className = 'ddl-edit-mask';
+    mask.style.cssText = 'position:fixed; inset:0; z-index:99998; background:rgba(15,58,58,0.15);';
+    // 마스크 클릭 = 아무도 먹지 못하도록 이벤트 캐칭 + 기본 동작 사전에 차단
+    ['mousedown','click'].forEach(function(ev){
+      mask.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); });
+    });
+    document.body.appendChild(mask);
+
     var popup = window.__DDL_EDITOR.createBlockPopup({
       title: '프리셋 편집',
       width: '520px',
@@ -8378,6 +8388,11 @@
       ],
       onOpen: function(pp){
         _renderPresetEditorBody(pp, current, currentTab, function(newTab){ currentTab = newTab; });
+      },
+      onClose: function(){
+        // 마스크 제거 + 숫겼던 관리창들 다시 보이게
+        try { if (mask.parentNode) mask.parentNode.removeChild(mask); } catch(_){}
+        hiddenManagers.forEach(function(h){ try { h.el.style.display = h.prevDisplay || ''; } catch(_){} });
       }
     });
     popup.show();
