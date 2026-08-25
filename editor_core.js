@@ -17950,6 +17950,7 @@
     block.setAttribute('data-fold-head-bg-opacity', '100');
     block.setAttribute('data-fold-body-bg-opacity', '100');
     block.setAttribute('data-fold-border-style', 'none');
+    block.setAttribute('data-fold-border-color-mode', 'custom'); // p20p
     block.setAttribute('contenteditable', 'false');
 
     block.appendChild(makeBlockHandle());
@@ -18856,19 +18857,32 @@
 
   function _applyFoldBorderStyles(block){
     if (!block) return;
-    // v3 재정의: border-bottom of head (위아래 구분선)
+    // p20p: 테두리는 헤더 border-bottom + 블록 전체 outline (투명 배경 대응)
+    //   color mode 3종: custom (자유) / black (검은색 자동) / header (헤더색 자동)
     var s = block.getAttribute('data-fold-border-style') || 'none';
     var w = parseInt(block.getAttribute('data-fold-border-width') || '1', 10) || 1;
-    var c = block.getAttribute('data-fold-border-color') || 'rgba(15,58,58,0.15)';
     var op = parseInt(block.getAttribute('data-fold-border-opacity') || '100', 10) / 100;
+    var cMode = block.getAttribute('data-fold-border-color-mode') || 'custom';
+    var c;
+    if (cMode === 'black') c = '#000000';
+    else if (cMode === 'header') c = block.getAttribute('data-fold-head-bg') || '#0F3A3A';
+    else c = block.getAttribute('data-fold-border-color') || '#0F3A3A';
     var head = block.querySelector('.ddl-fold-head');
-    if (!head) return;
-    if (s === 'none') { head.style.borderBottom = ''; return; }
+    if (s === 'none') {
+      if (head) head.style.borderBottom = '';
+      block.style.removeProperty('outline');
+      block.style.removeProperty('outline-offset');
+      return;
+    }
     var effWidth = (s === 'bold') ? Math.max(2, w * 2) : w;
     var cssStyle = (s === 'bold') ? 'solid' : s;
     var rgb = _hexToRgb(c);
     var colorRgba = rgb ? ('rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + op + ')') : c;
-    head.style.borderBottom = effWidth + 'px ' + cssStyle + ' ' + colorRgba;
+    // 헤더-본문 구분선
+    if (head) head.style.borderBottom = effWidth + 'px ' + cssStyle + ' ' + colorRgba;
+    // 블록 전체 outline (투명 배경일 때 외부와 구분 · layout 영향 없음)
+    block.style.setProperty('outline', effWidth + 'px ' + cssStyle + ' ' + colorRgba);
+    block.style.setProperty('outline-offset', '0');
   }
 
   // ─── 프리셋 적용/저장 ────────────────────────────────────────────────────
@@ -19186,17 +19200,23 @@
     if (!open) block.classList.add('is-fold-closed');
     else block.classList.remove('is-fold-closed');
 
-    // 테두리 (헤더 아래 border-bottom) 유지
-    var bStyle = block.getAttribute('data-fold-border-style');
-    if (bStyle && bStyle !== 'none' && head) {
-      var bWidth = parseInt(block.getAttribute('data-fold-border-width') || '1', 10) || 1;
-      var bColor = block.getAttribute('data-fold-border-color') || 'rgba(15,58,58,0.15)';
-      var bOp = parseInt(block.getAttribute('data-fold-border-opacity') || '100', 10) / 100;
-      var eff = (bStyle === 'bold') ? Math.max(2, bWidth * 2) : bWidth;
-      var css = (bStyle === 'bold') ? 'solid' : bStyle;
-      var rgb = _hexToRgb(bColor);
-      var rgba = rgb ? ('rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + bOp + ')') : bColor;
-      head.style.setProperty('border-bottom', eff + 'px ' + css + ' ' + rgba, 'important');
+    // 테두리 (p20p: color mode 3종 + block outline)
+    var bStyleE = block.getAttribute('data-fold-border-style');
+    if (bStyleE && bStyleE !== 'none') {
+      var bWidthE = parseInt(block.getAttribute('data-fold-border-width') || '1', 10) || 1;
+      var bOpE = parseInt(block.getAttribute('data-fold-border-opacity') || '100', 10) / 100;
+      var bCmodeE = block.getAttribute('data-fold-border-color-mode') || 'custom';
+      var bColorE;
+      if (bCmodeE === 'black') bColorE = '#000000';
+      else if (bCmodeE === 'header') bColorE = block.getAttribute('data-fold-head-bg') || '#0F3A3A';
+      else bColorE = block.getAttribute('data-fold-border-color') || 'rgba(15,58,58,0.15)';
+      var effE = (bStyleE === 'bold') ? Math.max(2, bWidthE * 2) : bWidthE;
+      var cssE = (bStyleE === 'bold') ? 'solid' : bStyleE;
+      var rgbE = _hexToRgb(bColorE);
+      var rgbaE = rgbE ? ('rgba(' + rgbE.r + ',' + rgbE.g + ',' + rgbE.b + ',' + bOpE + ')') : bColorE;
+      if (head) head.style.setProperty('border-bottom', effE + 'px ' + cssE + ' ' + rgbaE, 'important');
+      block.style.setProperty('outline', effE + 'px ' + cssE + ' ' + rgbaE, 'important');
+      block.style.setProperty('outline-offset', '0', 'important');
     }
   }
 
