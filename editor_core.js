@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p20y';
+  var VERSION = 'v2.0-β-p20z';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2244,6 +2244,8 @@
       if (eb && eb.getAttribute('data-block-type') !== 'callout') {
         eb.setAttribute('data-block-type', 'callout');
       }
+      // p20z R7: 진입 시 컷아웃 색 재계산 (부모 배경 인식 · 이전 저장 데이터는 PAGE_BG_COLOR 였을 것)
+      try { _applyCalloutCutouts(box); } catch(_){}
     });
     if (fixed > 0) log('콜아웃 ' + fixed + '개 리사이저 추가');
   }
@@ -4844,6 +4846,12 @@
         + '</div></div>';
       html += '<div class="row"><div class="row-label">패턴 크기 (' + patternSize + 'px)</div>'
         + '<input type="range" data-cal-set="patternSize" min="4" max="40" step="1" value="' + patternSize + '" style="width:100%;"></div>';
+      // p20z R6: 패턴 각도 슬라이더 (stripe/zigzag 에서 회전 반영 · dot/check 는 통일 인터페이스)
+      var patternAngle = parseInt(box.getAttribute('data-pattern-angle') || '45', 10);
+      html += '<div class="row"><div class="row-label">패턴 각도 (' + patternAngle + '°)</div>'
+        + '<input type="range" data-cal-set="patternAngle" min="0" max="360" step="15" value="' + patternAngle + '" style="width:100%;">'
+        + '<div style="font-size:0.72em; opacity:0.55; margin-top:0.2em;">줄무늬 · 지그재그에 회전 적용됩니다. 도트 · 체크는 시각 차이 없음.</div>'
+        + '</div>';
     }
 
     // 통합 프리셋 (그라데이션·패턴에서만)
@@ -5399,6 +5407,12 @@
           applyCalloutBg(box);
           var _lbl2 = t.parentNode && t.parentNode.querySelector('.row-label');
           if (_lbl2) _lbl2.textContent = '패턴 크기 (' + _vv + 'px)';
+        } else if (_sk === 'patternAngle') {
+          // p20z R6: 콜아웃 패턴 각도 실시간 반영 (드래그 중 · 재렌더 안 함 · 라벨만 갱신)
+          box.setAttribute('data-pattern-angle', String(parseInt(_vv, 10)));
+          applyCalloutBg(box);
+          var _lblA = t.parentNode && t.parentNode.querySelector('.row-label');
+          if (_lblA) _lblA.textContent = '패턴 각도 (' + _vv + '°)';
         } else if (_sk === 'borderColor') {
           box.setAttribute('data-border-color', _vv);
           box.setAttribute('data-border-hex', _vv);
@@ -5592,12 +5606,12 @@
         box.setAttribute('data-font', t.value);
         return;
       }
-      // p13c: 텍스트 컷아웃 = 페이지 배경색으로 표시 (뚫린 것처럼)
+      // p13c → p20z R7: 텍스트 컷아웃 = 부모 배경색 인식 (콜아웃/접은글 중첩 시 자동 반영)
       if (t.id === 'pop-text-cutout') {
         var bodyEl2 = box.querySelector('.callout-body');
         if (!bodyEl2) return;
         if (t.checked) {
-          bodyEl2.style.color = PAGE_BG_COLOR;
+          bodyEl2.style.color = _calloutGetCutoutColor(box);
           bodyEl2.style.mixBlendMode = '';
           box.setAttribute('data-text-cutout', '1');
         } else {
@@ -5607,12 +5621,12 @@
         }
         return;
       }
-      // p13c: 아이콘 컷아웃 = 페이지 배경색
+      // p13c → p20z R7: 아이콘 컷아웃 = 부모 배경색 인식
       if (t.id === 'pop-icon-cutout') {
         var iconEl2 = box.querySelector('.callout-icon');
         if (!iconEl2) return;
         if (t.checked) {
-          iconEl2.style.setProperty('--icon-color', PAGE_BG_COLOR);
+          iconEl2.style.setProperty('--icon-color', _calloutGetCutoutColor(box));
           if (typeof updateShapeSpanStyle === "function") updateShapeSpanStyle(iconEl2);
           box.setAttribute('data-icon-cutout', '1');
         } else {
@@ -5958,6 +5972,101 @@
 
 
   // p18c: 콜아웃 배경 적용 (bgMode 별 - solid/gradient/pattern/image)
+  // p20z R7: 콜아웃 컷아웃 색 계산 - 부모 요소 배경 인식 (접은글 _foldGetCutoutColor 미러링)
+  //   원리: 텍스트/아이콘/테두리 색을 "그 뒤 배경 색" 으로 세팅해 뚫린 것처럼 보이게
+  //   콜아웃이 다른 콜아웃/접은글 body 안에 중첩되면 그 부모의 배경색 사용
+  function _calloutGetCutoutColor(box){
+    if (!box) return PAGE_BG_COLOR;
+    try {
+      var p = box.parentElement;
+      while (p) {
+        // 부모가 콜아웃 body 안이면 부모 콜아웃 배경색
+        if (p.classList && p.classList.contains('callout-body')) {
+          var parentBox = p.closest('.callout-box');
+          if (parentBox && parentBox !== box) {
+            var bh = parentBox.getAttribute('data-bg-hex');
+            if (bh) return bh;
+          }
+        }
+        // 부모가 접은글 body 안이면 부모 접은글 본문 배경색
+        if (p.classList && p.classList.contains('ddl-fold-body')) {
+          var parentFold = p.parentElement;
+          if (parentFold && parentFold.classList && parentFold.classList.contains('ddl-fold-block')) {
+            var pbb = parentFold.getAttribute('data-fold-body-bg');
+            if (pbb) return pbb;
+          }
+        }
+        p = p.parentElement;
+        if (p === document.body) break;
+      }
+    } catch(_){}
+    return (typeof PAGE_BG_COLOR !== 'undefined') ? PAGE_BG_COLOR : '#F5F5F5';
+  }
+
+  // p20z R6: 콜아웃 패턴 CSS 생성 - 각도 반영 · 프로퍼티 분리 (접은글 _foldMakePatternBg 방식)
+  //   반환: { image, size, position, repeat }
+  function _calloutMakePatternBg(pattern, c1, c2, size, angle){
+    var s = parseInt(size, 10) || 10;
+    var a = parseInt(angle, 10);
+    if (isNaN(a)) a = 45;
+    if (pattern === 'dot') {
+      return {
+        image: 'radial-gradient(circle at ' + (s/2) + 'px ' + (s/2) + 'px, ' + c2 + ' ' + (s*0.15) + 'px, ' + c1 + ' ' + (s*0.16) + 'px)',
+        size: s + 'px ' + s + 'px',
+        position: '0 0',
+        repeat: 'repeat'
+      };
+    } else if (pattern === 'stripe') {
+      return {
+        image: 'repeating-linear-gradient(' + a + 'deg, ' + c1 + ' 0, ' + c1 + ' ' + (s/2) + 'px, ' + c2 + ' ' + (s/2) + 'px, ' + c2 + ' ' + s + 'px)',
+        size: 'auto',
+        position: '0 0',
+        repeat: 'repeat'
+      };
+    } else if (pattern === 'check') {
+      return {
+        image: 'conic-gradient(' + c1 + ' 25%, ' + c2 + ' 25% 50%, ' + c1 + ' 50% 75%, ' + c2 + ' 75%)',
+        size: s + 'px ' + s + 'px',
+        position: '0 0',
+        repeat: 'repeat'
+      };
+    } else if (pattern === 'zigzag') {
+      // 두 방향 gradient 를 회전 각도 반영해서 조합 (접은글과 동일 방식)
+      var a1 = a + 45;
+      var a2 = a + 315; // -45
+      return {
+        image: 'linear-gradient(' + a1 + 'deg, ' + c1 + ' 25%, transparent 25%), '
+             + 'linear-gradient(' + a2 + 'deg, ' + c1 + ' 25%, transparent 25%)',
+        size: s + 'px ' + s + 'px, ' + s + 'px ' + s + 'px',
+        position: '0 0, 0 0',
+        repeat: 'repeat, repeat'
+      };
+    }
+    return null;
+  }
+
+  // 콜아웃 컷아웃 재적용 (모든 배경/부모 변경 후 호출)
+  function _applyCalloutCutouts(box){
+    if (!box) return;
+    var cutColor = _calloutGetCutoutColor(box);
+    // 텍스트
+    var body = box.querySelector('.callout-body');
+    if (body && box.getAttribute('data-text-cutout') === '1') {
+      body.style.color = cutColor;
+      body.style.mixBlendMode = '';
+    }
+    // 아이콘
+    var iconEl = box.querySelector('.callout-icon');
+    if (iconEl && box.getAttribute('data-icon-cutout') === '1') {
+      iconEl.style.setProperty('--icon-color', cutColor);
+      try { if (typeof updateShapeSpanStyle === 'function') updateShapeSpanStyle(iconEl); } catch(_){}
+    }
+    // 테두리: applyBorderToBox 를 통해 재적용
+    if (box.getAttribute('data-border-cutout') === '1' && typeof applyBorderToBox === 'function') {
+      applyBorderToBox(box);
+    }
+  }
+
   function applyCalloutBg(box){
     if (!box) return;
     var mode = box.getAttribute('data-bg-mode');
@@ -6002,24 +6111,23 @@
       if (_prgb2) c2p = 'rgba(' + _prgb2.r + ',' + _prgb2.g + ',' + _prgb2.b + ',' + _pf2 + ')';
       var p = box.getAttribute('data-pattern') || 'dot';
       var s = parseInt(box.getAttribute('data-pattern-size') || '10', 10);
-      var patternStyle = '';
-      if (p === 'dot') {
-        patternStyle = 'radial-gradient(circle at ' + (s/2) + 'px ' + (s/2) + 'px, ' + c2p + ' ' + (s*0.15) + 'px, ' + c1p + ' ' + (s*0.16) + 'px)';
-        box.style.backgroundSize = s + 'px ' + s + 'px';
-      } else if (p === 'stripe') {
-        patternStyle = 'repeating-linear-gradient(45deg, ' + c1p + ' 0, ' + c1p + ' ' + (s/2) + 'px, ' + c2p + ' ' + (s/2) + 'px, ' + c2p + ' ' + s + 'px)';
-      } else if (p === 'check') {
-        patternStyle = 'conic-gradient(' + c1p + ' 25%, ' + c2p + ' 25% 50%, ' + c1p + ' 50% 75%, ' + c2p + ' 75%)';
-        box.style.backgroundSize = s + 'px ' + s + 'px';
-      } else if (p === 'zigzag') {
-        patternStyle = 'linear-gradient(135deg, ' + c1p + ' 25%, transparent 25%) 0 0/' + s + 'px ' + s + 'px, '
-                     + 'linear-gradient(225deg, ' + c1p + ' 25%, transparent 25%) 0 0/' + s + 'px ' + s + 'px, '
-                     + c2p;
-      }
+      // p20z R6: 각도 파라미터 (접은글과 동일 원리 · stripe/zigzag 회전)
+      var pang = parseInt(box.getAttribute('data-pattern-angle') || '45', 10);
+      // p20z R6: 헬퍼로 통일 (프로퍼티 분리 · shorthand 폐기 · p20u 접은글 교훈 미러링)
+      var patObj = _calloutMakePatternBg(p, c1p, c2p, s, pang);
+      // 배경 리셋 (기존 세팅 잔재 제거)
+      box.style.removeProperty('background-image');
+      box.style.removeProperty('background-size');
+      box.style.removeProperty('background-position');
+      box.style.removeProperty('background-repeat');
       box.style.backgroundColor = 'transparent';
-      box.style.backgroundImage = patternStyle;
-      box.setAttribute('data-bg', patternStyle);
-      // opacity 는 별도 layer 필요 → 향후 확장
+      if (patObj) {
+        box.style.setProperty('background-image', patObj.image);
+        box.style.setProperty('background-size', patObj.size);
+        box.style.setProperty('background-position', patObj.position);
+        box.style.setProperty('background-repeat', patObj.repeat);
+        box.setAttribute('data-bg', patObj.image);
+      }
       return;
     }
 
@@ -6068,7 +6176,8 @@
     var cutout = box.getAttribute('data-border-cutout') === '1';
     var finalColor;
     if (cutout) {
-      finalColor = PAGE_BG_COLOR;
+      // p20z R7: 부모 배경색 인식
+      finalColor = _calloutGetCutoutColor(box);
     } else {
       var color = box.getAttribute('data-border-color') || '#0F3A3A';
       var rgb = parseRgb(color);
@@ -13448,6 +13557,20 @@
       body.style.wordBreak = 'break-word';
       // p20k: 본문 직계 자식들은 블록 레이아웃만 오게 (플렉스 상속 방지)
       body.style.display = 'block';
+
+      // p20z R7: 텍스트 컷아웃 시 자식 문단 색 강제 (접은글과 동일 원리)
+      //   body.style.color 만 세팅하면 자식 <p> 가 자기 color 갖고 있을 때 상속 안 됨
+      if (box.getAttribute('data-text-cutout') === '1') {
+        var cutC = _calloutGetCutoutColor(box);
+        try {
+          body.querySelectorAll('p, li, span, div:not(.ddl-fold-block):not(.callout-box), h1, h2, h3, h4, h5, h6').forEach(function(el){
+            if (el.closest && el.closest('.callout-body') && el.closest('.callout-body') !== body) return;
+            if (el.closest && el.closest('.ddl-fold-body')) return;
+            el.style.setProperty('color', cutC, 'important');
+          });
+        } catch(_){}
+      }
+
       // p20k: 직계 자식 사이 여백 보장 (특히 중첩 콜아웃이 붙어나오는 버그 방지)
       var directChildren = body.children;
       for (var i = 0; i < directChildren.length; i++) {
@@ -20075,6 +20198,9 @@
         body.setAttribute('contenteditable', 'true');
         body.setAttribute('data-block-container', 'true');
       }
+      // p20z: 이전 저장 데이터의 outline 잔재 정리 (p20t 이전 outline 방식이 저장 인라인에 남아있을 수 있음)
+      block.style.removeProperty('outline');
+      block.style.removeProperty('outline-offset');
       _applyFoldStyles(block);
     });
   }
