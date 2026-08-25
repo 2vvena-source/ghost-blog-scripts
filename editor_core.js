@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p21a';
+  var VERSION = 'v2.0-β-p21b';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -444,6 +444,23 @@
     '}',
     '.callout-box:hover .callout-resizer { opacity: 0.55; }',
     '.callout-resizer:hover { opacity: 1 !important; background: var(--point, #FF9A76) !important; transform: scale(1.15); }',
+    /* p21b: 접은글 리사이저 (콜아웃과 동일 스타일 · 우하단 점) */
+    '.ddl-fold-resizer {',
+    '  position: absolute !important;',
+    '  right: 3px !important;',
+    '  bottom: 3px !important;',
+    '  width: 10px !important;',
+    '  height: 10px !important;',
+    '  cursor: nwse-resize !important;',
+    '  opacity: 0;',
+    '  transition: opacity 0.15s ease, background 0.15s ease, transform 0.15s ease;',
+    '  z-index: 999 !important;',
+    '  background: rgba(15,58,58,0.4);',
+    '  border-radius: 50%;',
+    '  pointer-events: auto !important;',
+    '}',
+    '.ddl-fold-block:hover .ddl-fold-resizer { opacity: 0.55; }',
+    '.ddl-fold-resizer:hover { opacity: 1 !important; background: var(--point, #FF9A76) !important; transform: scale(1.15); }',
     /* p20g: 콜아웃 body — 명시적으로 block 레이아웃. 자식이 flex 상속 받지 않게 방어. */
     '.callout-body {',
     '  flex: 1;',
@@ -2146,7 +2163,7 @@
     var kept = 0;
     junk.forEach(function(el){
       // block-handle과 callout-resizer는 유지 (근데 이들은 button/input이 아니므로 실제로 걸리지 않음)
-      if (el.classList && (el.classList.contains('block-handle') || el.classList.contains('callout-resizer'))) { kept++; return; }
+      if (el.classList && (el.classList.contains('block-handle') || el.classList.contains('callout-resizer') || el.classList.contains('ddl-fold-resizer'))) { kept++; return; }
       // 부모가 팝업이면 유지 (팝업이 본문 안에 있을 리 없지만 방어적)
       if (el.closest && el.closest('#ep-cal-popup')) { kept++; return; }
       // p14a: 크롭 팝업도 보호
@@ -3083,7 +3100,7 @@
       var h = t.closest && t.closest('.block-handle');
       if (h) return h.closest('.editor-block');
       // 편집 팝업·다이얼로그 안은 드래그 안 됨
-      if (t.closest && (t.closest('.ep-popup') || t.closest('.ep-popup-v2') || t.closest('.ddl-editor-popup') || t.closest('#ep-btn-popup') || t.closest('#ep-div-popup') || t.closest('#ep-cal-popup') || t.closest('#ep-img-popup') || t.closest('.ep-crop-popup') || t.closest('.callout-resizer') || t.closest('.editor-image-resizer'))) return null;
+      if (t.closest && (t.closest('.ep-popup') || t.closest('.ep-popup-v2') || t.closest('.ddl-editor-popup') || t.closest('#ep-btn-popup') || t.closest('#ep-div-popup') || t.closest('#ep-cal-popup') || t.closest('#ep-img-popup') || t.closest('.ep-crop-popup') || t.closest('.callout-resizer') || t.closest('.ddl-fold-resizer') || t.closest('.editor-image-resizer'))) return null;
       // text editable 안이면 거부 (contenteditable=false 자식 예외는 허용)
       var editable = t.closest && t.closest('[contenteditable="true"]');
       var nonEd = t.closest && t.closest('[contenteditable="false"]');
@@ -6624,6 +6641,7 @@
     setupBlockKeyboard();
     if (typeof setupBlockDelete === 'function') setupBlockDelete();
     if (typeof setupCalloutResizer === 'function') setupCalloutResizer();
+    if (typeof setupFoldResizer === 'function') setupFoldResizer();
     if (typeof setupUndoRedo === 'function') setupUndoRedo();
     setupBlockDragOrder();
 
@@ -6704,6 +6722,55 @@
       document.body.style.userSelect = '';
     });
     log('콜아웃 리사이저 설치');
+  }
+
+  // p21b: 접은글 리사이저 (콜아웃 setupCalloutResizer 미러링)
+  function setupFoldResizer(){
+    if (!contentEl) return;
+    var dragging = null;
+    contentEl.addEventListener('mousedown', function(e){
+      var rz = e.target.closest && e.target.closest('.ddl-fold-resizer');
+      if (!rz) return;
+      var block = rz.closest('.ddl-fold-block');
+      if (!block) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var rect = block.getBoundingClientRect();
+      var parentRect = contentEl.getBoundingClientRect();
+      dragging = {
+        block: block,
+        startX: e.clientX,
+        startWidth: rect.width,
+        parentWidth: parentRect.width
+      };
+      document.body.style.cursor = 'nwse-resize';
+      document.body.style.userSelect = 'none';
+    });
+    document.addEventListener('mousemove', function(e){
+      if (!dragging) return;
+      var dx = e.clientX - dragging.startX;
+      var newW = dragging.startWidth + dx;
+      var pct = Math.round((newW / dragging.parentWidth) * 100);
+      pct = Math.max(25, Math.min(100, pct));
+      pct = Math.round(pct / 5) * 5;
+      dragging.block.setAttribute('data-width-pct', String(pct));
+      // p21a 에서 만든 _applyFoldStyles 폭 로직이 다 처리해줌
+      try { if (typeof _applyFoldStyles === 'function') _applyFoldStyles(dragging.block); } catch(_){}
+      // 열린 팝업의 슬라이더도 갱신
+      var slider = document.getElementById('pop-fold-width-pct');
+      if (slider) {
+        slider.value = pct;
+        var lbl = slider.parentNode.querySelector('.row-label');
+        if (lbl) lbl.textContent = '접은글 폭 (' + pct + '%)';
+      }
+    });
+    document.addEventListener('mouseup', function(){
+      if (!dragging) return;
+      dragging = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    });
+    log('접은글 리사이저 설치');
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -13763,7 +13830,7 @@
             if (innerDiv) enhanceDividerForSite(innerDiv);
           }
           // p13h: 리사이저 및 이물질 저장에서 제외
-          clone.querySelectorAll && clone.querySelectorAll('.callout-resizer, .editor-image-resizer, input, select, textarea, button, form').forEach(function(x){ x.parentNode && x.parentNode.removeChild(x); });
+          clone.querySelectorAll && clone.querySelectorAll('.callout-resizer, .ddl-fold-resizer, .editor-image-resizer, input, select, textarea, button, form').forEach(function(x){ x.parentNode && x.parentNode.removeChild(x); });
           innerHtml += clone.outerHTML;
         });
         parts.push('<!--kg-card-begin: html-->\n' + innerHtml + '\n<!--kg-card-end: html-->');
@@ -18273,6 +18340,13 @@
     body.innerHTML = '<p><br></p>';
     block.appendChild(body);
 
+    // p21b: 리사이저 (콜아웃과 동일 · 우하단 드래그 핸들)
+    var rz = document.createElement('div');
+    rz.className = 'ddl-fold-resizer';
+    rz.setAttribute('contenteditable', 'false');
+    rz.setAttribute('title', '드래그하여 접은글 크기 조절');
+    block.appendChild(rz);
+
     if (afterBlock && afterBlock.parentNode) {
       afterBlock.parentNode.insertBefore(block, afterBlock.nextSibling);
     } else if (contentEl) {
@@ -19866,6 +19940,8 @@
     block.removeAttribute('contenteditable');
     block.querySelectorAll('[contenteditable]').forEach(function(x){ x.removeAttribute('contenteditable'); });
     block.querySelectorAll('.block-handle').forEach(function(h){ h.parentNode && h.parentNode.removeChild(h); });
+    // p21b: 저장 시 리사이저 제거 (사이트에는 필요 없음)
+    block.querySelectorAll('.ddl-fold-resizer').forEach(function(x){ x.parentNode && x.parentNode.removeChild(x); });
 
     // 헤더 안쪽 wrapper 가 없으면 재구성 (안전빵)
     var head = block.querySelector('.ddl-fold-head');
@@ -20300,6 +20376,14 @@
       // p20z: 이전 저장 데이터의 outline 잔재 정리 (p20t 이전 outline 방식이 저장 인라인에 남아있을 수 있음)
       block.style.removeProperty('outline');
       block.style.removeProperty('outline-offset');
+      // p21b: 리사이저 없으면 재생성 (기존 저장 접은글 복원)
+      if (!block.querySelector(':scope > .ddl-fold-resizer')) {
+        var rzFix = document.createElement('div');
+        rzFix.className = 'ddl-fold-resizer';
+        rzFix.setAttribute('contenteditable', 'false');
+        rzFix.setAttribute('title', '드래그하여 접은글 크기 조절');
+        block.appendChild(rzFix);
+      }
       _applyFoldStyles(block);
     });
   }
