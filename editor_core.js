@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p21b';
+  var VERSION = 'v2.0-β-p21c';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -6724,7 +6724,9 @@
     log('콜아웃 리사이저 설치');
   }
 
-  // p21b: 접은글 리사이저 (콜아웃 setupCalloutResizer 미러링)
+  // p21b→p21c: 접은글 리사이저 (콜아웃 setupCalloutResizer 완전 미러링)
+  //   p21b 오류: _applyFoldStyles 재호출 방식 → 편집기 공통 폭 시스템과 충돌 → 실시간 반영 실패
+  //   p21c 해결: block.style.width 직접 세팅 (콜아웃과 동일) · 정렬 margin 도 직접 · _applyFoldStyles 안 호출
   function setupFoldResizer(){
     if (!contentEl) return;
     var dragging = null;
@@ -6753,15 +6755,20 @@
       var pct = Math.round((newW / dragging.parentWidth) * 100);
       pct = Math.max(25, Math.min(100, pct));
       pct = Math.round(pct / 5) * 5;
-      dragging.block.setAttribute('data-width-pct', String(pct));
-      // p21a 에서 만든 _applyFoldStyles 폭 로직이 다 처리해줌
-      try { if (typeof _applyFoldStyles === 'function') _applyFoldStyles(dragging.block); } catch(_){}
-      // 열린 팝업의 슬라이더도 갱신
-      var slider = document.getElementById('pop-fold-width-pct');
-      if (slider) {
-        slider.value = pct;
-        var lbl = slider.parentNode.querySelector('.row-label');
-        if (lbl) lbl.textContent = '접은글 폭 (' + pct + '%)';
+      // p21c: 콜아웃 방식 - block 자체에 직접 width 세팅 (즉시 렌더)
+      var blk = dragging.block;
+      blk.setAttribute('data-width-pct', String(pct));
+      if (pct >= 100) {
+        blk.style.width = '';
+        blk.style.marginLeft = '';
+        blk.style.marginRight = '';
+      } else {
+        blk.style.width = pct + '%';
+        blk.style.boxSizing = 'border-box';
+        // 기본 정렬 = 가운데 (사용자가 팡에서 별도 정렬 UI 없앰 · p21c)
+        blk.style.marginLeft = 'auto';
+        blk.style.marginRight = 'auto';
+        blk.setAttribute('data-align', 'center');
       }
     });
     document.addEventListener('mouseup', function(){
@@ -6770,7 +6777,7 @@
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     });
-    log('접은글 리사이저 설치');
+    log('접은글 리사이저 설치 (p21c · 직접 width)');
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -14576,7 +14583,13 @@
   function getBlockContentChildren(block){
     if (!block) return [];
     return Array.from(block.children).filter(function(c){
-      return !c.classList || !c.classList.contains('block-handle');
+      if (!c.classList) return true;
+      // p21c: 편집 UI 요소는 콘텐츠가 아님 (block-handle · 각종 리사이저)
+      if (c.classList.contains('block-handle')) return false;
+      if (c.classList.contains('callout-resizer')) return false;
+      if (c.classList.contains('ddl-fold-resizer')) return false;
+      if (c.classList.contains('editor-image-resizer')) return false;
+      return true;
     });
   }
 
@@ -14590,11 +14603,13 @@
     if (t === 'image') return true; // p15a: 이미지도 자체 리사이저
     if (t === 'divider') return true; // p16d: 구분선 정식 등록
     if (t === 'button') return true;  // p17a: 버튼 정식 등록
+    if (t === 'fold') return true;    // p21c: 접은글도 자체 리사이저 · 자식 폭 건드리지 말 것
     // 향후 추가될 특수 블록: product, toggle 등
     if (block.querySelector && block.querySelector('.callout-box')) return true;
     if (block.querySelector && block.querySelector('.editor-image-figure')) return true;
     if (block.classList && block.classList.contains('ep-divider-block')) return true;
     if (block.classList && block.classList.contains('ep-button-block')) return true;
+    if (block.classList && block.classList.contains('ddl-fold-block')) return true; // p21c: 접은글 클래스로도 감지
     return false;
   }
 
@@ -18932,19 +18947,7 @@
         + '<div style="font-size:0.72em; opacity:0.55; margin-top:0.2em;">100% = 좌우 꽉참, 80% = 좌우 10%씩 여백 (중앙 앵커)</div></div>';
     }
 
-    // p21a: 접은글 폭 & 정렬 (콜아웃과 동일 공통 시스템)
-    var widthPct21 = block.getAttribute('data-width-pct') || '100';
-    var alignCur21 = block.getAttribute('data-align') || 'center';
-    html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;">'
-      + '<div class="row-label" style="font-weight:600;">접은글 폭 (' + widthPct21 + '%)</div>'
-      + '<input type="range" id="pop-fold-width-pct" min="25" max="100" step="5" value="' + widthPct21 + '" style="width:100%;">'
-      + '<div style="font-size:0.72em; opacity:0.55; margin-top:0.2em;">100% = 편집기 전체 폭. 미만일 때 아래 정렬 적용.</div>'
-      + '</div>';
-    html += '<div class="row"><div class="row-label">가로 정렬</div>'
-      + '<button type="button" class="pop-btn' + (alignCur21==='left'?' is-active':'') + '" data-fold-align="left">왼쪽</button>'
-      + '<button type="button" class="pop-btn' + (alignCur21==='center'?' is-active':'') + '" data-fold-align="center">가운데</button>'
-      + '<button type="button" class="pop-btn' + (alignCur21==='right'?' is-active':'') + '" data-fold-align="right">오른쪽</button>'
-      + '</div>';
+    // p21c: 팡 안 폭 슬라이더 · 정렬 UI 제거 (사용자 요청 · 리사이저 드래그만 사용)
 
     html += _renderFoldPresetSection();
     return html;
@@ -19471,15 +19474,7 @@
         renderFoldPopupBody();
         return;
       }
-      // p21a: 접은글 가로 정렬 버튼
-      var alignBtn = e.target.closest('[data-fold-align]');
-      if (alignBtn) {
-        var alignV = alignBtn.getAttribute('data-fold-align');
-        block.setAttribute('data-align', alignV);
-        _applyFoldStyles(block);
-        renderFoldPopupBody();
-        return;
-      }
+      // p21c: 정렬 버튼 리스너 제거 (UI 자체 삭제됨 · 리사이저 드래그 시 자동 center)
       // p20y A2: 컷아웃 토글 (arrow · title · body)
       var cutBtn = e.target.closest('[data-fold-cutout]');
       if (cutBtn) {
@@ -19621,15 +19616,7 @@
         _applyFoldStyles(block);
         return;
       }
-      // p21a: 접은글 폭 슬라이더 (실시간 반영 · 재렌더 안 함 · 라벨만 갱신)
-      if (e.target.id === 'pop-fold-width-pct') {
-        var _wpv = String(parseInt(e.target.value, 10));
-        block.setAttribute('data-width-pct', _wpv);
-        _applyFoldStyles(block);
-        var _wpLbl = e.target.parentNode && e.target.parentNode.querySelector('.row-label');
-        if (_wpLbl) _wpLbl.textContent = '접은글 폭 (' + _wpv + '%)';
-        return;
-      }
+      // p21c: pop-fold-width-pct 리스너 삭제 (UI 자체 제거됨 · 리사이저 드래그로 대체)
       if (e.target.id === 'pop-fold-divider-width') {
         block.setAttribute('data-fold-divider-width', e.target.value);
         _applyFoldStyles(block);
