@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p20s';
+  var VERSION = 'v2.0-β-p20t';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2064,7 +2064,7 @@
     '}',
     /* p20l: 본문 - 좌측 오프셋 + 얇은 세로선 (잡지 목차 느낌) */
     '.ddl-fold-body {',
-    '  padding: 1em 1.2em 1.2em 3.4em;',
+    '  padding: 1em 1.2em 1.2em 2.6em;', /* p20t: 3.4em → 2.6em (라벨 오른쪽 끝 정렬) */
     '  min-height: 2em;',
     '  position: relative;',
     '  line-height: 1.65;',
@@ -2073,7 +2073,7 @@
     '.ddl-fold-body::before {',
     '  content: "";',
     '  position: absolute;',
-    '  left: 2.6em;',
+    '  left: 1.95em;', /* p20t: 라벨 실제 렌더 폭 (2.6 × 0.75) 에 세로선 정렬 */
     '  top: 0.4em;',
     '  bottom: 0.4em;',
     '  width: 1px;',
@@ -2469,9 +2469,11 @@
           // 그 외엔 브라우저 기본 (본문 안 위로 이동)
         }
 
-        // p20q: 외부에서 ↑/← 로 접은글 진입 (이전 형제가 접은글이면 본문 마지막으로 강제 이동)
+        // p20q/p20t: 외부에서 ↑/← 로 접은글 진입 (이전 형제가 접은글이면 본문 마지막으로 강제 이동)
+        // p20t: 진단 로그 추가 (한 번만 · 개발자 도구에서 확인 가능)
         var isInFoldQ = target.closest && target.closest('.ddl-fold-block');
         if (!isInFoldQ) {
+          try { if (window.__DDL_DBG_FOLD_UP) console.log('[FOLD-UP] target=', target.tagName, target.className, 'key=', e.key); } catch(_){}
           // target 이 접은글 밖 편집 요소인 경우
           var atStartQ = false;
           try {
@@ -2501,10 +2503,13 @@
             }
           } catch(_){}
 
+          try { if (window.__DDL_DBG_FOLD_UP) console.log('[FOLD-UP] atStartQ=', atStartQ); } catch(_){}
           if (atStartQ) {
             var currentBlockQ = target.closest('.editor-block');
+            try { if (window.__DDL_DBG_FOLD_UP) console.log('[FOLD-UP] currentBlockQ=', currentBlockQ && currentBlockQ.getAttribute('data-block-type')); } catch(_){}
             if (currentBlockQ) {
               var prevBlockQ = currentBlockQ.previousElementSibling;
+              try { if (window.__DDL_DBG_FOLD_UP) console.log('[FOLD-UP] prevBlockQ=', prevBlockQ && prevBlockQ.className, 'type=', prevBlockQ && prevBlockQ.getAttribute('data-block-type')); } catch(_){}
               var targetFold = null;
               // p20s 이슈 C 재수정: 이전 형제가 접은글이면 그 접은글 body 로 이동.
               //   nested fold 는 부모가 담고 있으므로, 이전 형제가 접은글 아니면 진입 시도하지 않음 (자연 이동)
@@ -18130,6 +18135,9 @@
       bodyBg = headBg; bodyFg = headFg;
       block.setAttribute('data-fold-body-bg', bodyBg);
       block.setAttribute('data-fold-body-fg', bodyFg);
+      // p20t: 통일 모드일 때 그라디언트/패턴 두번째 색 · 각도도 헤더 것 그대로
+      var uHb2 = block.getAttribute('data-fold-head-bg2');
+      if (uHb2) block.setAttribute('data-fold-body-bg2', uHb2);
     } else if (mode === 'shade-dark') {
       bodyBg = computeFoldAutoColor(headBg, 'shade-dark');
       bodyFg = headFg;
@@ -18655,29 +18663,61 @@
   function renderFoldBorderTab(){
     var block = foldPopupLock || selectedFold;
     if (!block) return '';
-    var bStyle = block.getAttribute('data-fold-border-style') || 'none';
+    // p20t: 외부 테두리와 내부 구분선 완전 독립
+    var bStyle = block.getAttribute('data-fold-border-style') || 'none'; // 외부
     var bWidth = block.getAttribute('data-fold-border-width') || '1';
     var bColor = _hexOrDefault(block.getAttribute('data-fold-border-color'), 'rgba(15,58,58,0.15)');
     var bOpacity = block.getAttribute('data-fold-border-opacity') || '100';
+    var bColorMode = block.getAttribute('data-fold-border-color-mode') || 'custom';
+    var iOn = block.getAttribute('data-fold-divider-inner-on') !== '0'; // 내부 (기본 켜짐)
+    var iStyle = block.getAttribute('data-fold-divider-inner-style') || 'solid';
+    var iWidth = block.getAttribute('data-fold-divider-inner-width') || '1';
 
     var html = '';
-    html += '<div class="row"><div class="row-label" style="font-weight:600;">위아래 구분선 (헤더 아래 · 본문 위)</div>'
-      + '<div style="font-size:0.75em; opacity:0.55; margin-bottom:0.4em;">접은글은 위쪽(헤더)과 아래쪽(본문)을 구분하는 가로 선을 씁니다.</div></div>';
+    // ─── 외부 테두리 섹션 ───
+    html += '<div class="row"><div class="row-label" style="font-weight:600;">외부 테두리 (블록 전체)</div>'
+      + '<div style="font-size:0.75em; opacity:0.55; margin-bottom:0.4em;">블록 모양(코너 둥글기)에 맞게 감싸는 테두리입니다.</div></div>';
     html += '<div class="row"><div class="row-label">스타일</div>'
-      + '<button class="pop-btn' + (bStyle==='none'?' is-active':'') + '" data-fold-border-style="none">없음</button>'
-      + '<button class="pop-btn' + (bStyle==='solid'?' is-active':'') + '" data-fold-border-style="solid">얇은 선</button>'
-      + '<button class="pop-btn' + (bStyle==='bold'?' is-active':'') + '" data-fold-border-style="bold">굵은 선</button>'
-      + '<button class="pop-btn' + (bStyle==='dashed'?' is-active':'') + '" data-fold-border-style="dashed">점선</button>'
-      + '<button class="pop-btn' + (bStyle==='dotted'?' is-active':'') + '" data-fold-border-style="dotted">동그란 점선</button>'
-      + '<button class="pop-btn' + (bStyle==='double'?' is-active':'') + '" data-fold-border-style="double">두 줄</button>'
+      + '<button type="button" class="pop-btn' + (bStyle==='none'?' is-active':'') + '" data-fold-border-style="none">없음</button>'
+      + '<button type="button" class="pop-btn' + (bStyle==='solid'?' is-active':'') + '" data-fold-border-style="solid">얇은 선</button>'
+      + '<button type="button" class="pop-btn' + (bStyle==='bold'?' is-active':'') + '" data-fold-border-style="bold">굵은 선</button>'
+      + '<button type="button" class="pop-btn' + (bStyle==='dashed'?' is-active':'') + '" data-fold-border-style="dashed">점선</button>'
+      + '<button type="button" class="pop-btn' + (bStyle==='dotted'?' is-active':'') + '" data-fold-border-style="dotted">동그란 점선</button>'
+      + '<button type="button" class="pop-btn' + (bStyle==='double'?' is-active':'') + '" data-fold-border-style="double">두 줄</button>'
       + '</div>';
     if (bStyle !== 'none') {
       html += '<div class="row"><div class="row-label">두께 (' + bWidth + 'px)</div>'
         + '<input type="range" id="pop-fold-border-width" min="1" max="10" step="1" value="' + bWidth + '" style="width:100%;"></div>';
       html += '<div class="row"><div class="row-label">투명도 (' + bOpacity + '%)</div>'
         + '<input type="range" id="pop-fold-border-opacity" min="0" max="100" step="5" value="' + bOpacity + '" style="width:100%;"></div>';
-      html += '<div class="row"><div class="row-label">색상</div>'
-        + '<div class="ep-color-row"><input type="color" data-fold-set="borderColor" value="' + escapeAttr(_hexOrDefault(bColor, '#0F3A3A')) + '"></div></div>';
+      html += '<div class="row"><div class="row-label">색상 모드</div>'
+        + '<button type="button" class="pop-btn' + (bColorMode==='custom'?' is-active':'') + '" data-fold-border-color-mode="custom">직접</button>'
+        + '<button type="button" class="pop-btn' + (bColorMode==='header'?' is-active':'') + '" data-fold-border-color-mode="header">헤더색</button>'
+        + '<button type="button" class="pop-btn' + (bColorMode==='black'?' is-active':'') + '" data-fold-border-color-mode="black">검정</button>'
+        + '</div>';
+      if (bColorMode === 'custom') {
+        html += '<div class="row"><div class="row-label">색상</div>'
+          + '<div class="ep-color-row"><input type="color" data-fold-set="borderColor" value="' + escapeAttr(_hexOrDefault(bColor, '#0F3A3A')) + '"></div></div>';
+      }
+    }
+    // ─── 내부 구분선 섹션 ───
+    html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;"><div class="row-label" style="font-weight:600;">내부 구분선 (헤더-본문 사이)</div>'
+      + '<div style="font-size:0.75em; opacity:0.55; margin-bottom:0.4em;">헤더와 본문 사이 가로 선입니다. 외부 테두리와 독립 동작.</div></div>';
+    html += '<div class="row"><div class="row-label">사용</div>'
+      + '<button type="button" class="pop-btn' + (iOn?' is-active':'') + '" data-fold-divider-inner-on="1">켜기</button>'
+      + '<button type="button" class="pop-btn' + (!iOn?' is-active':'') + '" data-fold-divider-inner-on="0">끄기</button>'
+      + '</div>';
+    if (iOn) {
+      html += '<div class="row"><div class="row-label">스타일</div>'
+        + '<button type="button" class="pop-btn' + (iStyle==='solid'?' is-active':'') + '" data-fold-divider-inner-style="solid">얇은 선</button>'
+        + '<button type="button" class="pop-btn' + (iStyle==='bold'?' is-active':'') + '" data-fold-divider-inner-style="bold">굵은 선</button>'
+        + '<button type="button" class="pop-btn' + (iStyle==='dashed'?' is-active':'') + '" data-fold-divider-inner-style="dashed">점선</button>'
+        + '<button type="button" class="pop-btn' + (iStyle==='dotted'?' is-active':'') + '" data-fold-divider-inner-style="dotted">동그란 점선</button>'
+        + '<button type="button" class="pop-btn' + (iStyle==='double'?' is-active':'') + '" data-fold-divider-inner-style="double">두 줄</button>'
+        + '</div>';
+      html += '<div class="row"><div class="row-label">두께 (' + iWidth + 'px)</div>'
+        + '<input type="range" id="pop-fold-divider-inner-width" min="1" max="10" step="1" value="' + iWidth + '" style="width:100%;"></div>';
+      html += '<div class="row"><div style="font-size:0.72em; opacity:0.6;">색상은 외부 테두리 색상 설정을 따릅니다.</div></div>';
     }
     return html;
   }
@@ -18914,6 +18954,33 @@
         renderFoldPopupBody();
         return;
       }
+      // p20t: 내부 구분선 on/off
+      var iOnBtn = e.target.closest('[data-fold-divider-inner-on]');
+      if (iOnBtn) {
+        var iOnVal = iOnBtn.getAttribute('data-fold-divider-inner-on');
+        block.setAttribute('data-fold-divider-inner-on', iOnVal);
+        _applyFoldBorderStyles(block);
+        renderFoldPopupBody();
+        return;
+      }
+      // p20t: 내부 구분선 스타일
+      var iStyleBtn = e.target.closest('[data-fold-divider-inner-style]');
+      if (iStyleBtn) {
+        var iStyleVal = iStyleBtn.getAttribute('data-fold-divider-inner-style');
+        block.setAttribute('data-fold-divider-inner-style', iStyleVal);
+        _applyFoldBorderStyles(block);
+        renderFoldPopupBody();
+        return;
+      }
+      // p20t: 외부 테두리 색상 모드
+      var bcmBtn = e.target.closest('[data-fold-border-color-mode]');
+      if (bcmBtn) {
+        var bcmVal = bcmBtn.getAttribute('data-fold-border-color-mode');
+        block.setAttribute('data-fold-border-color-mode', bcmVal);
+        _applyFoldBorderStyles(block);
+        renderFoldPopupBody();
+        return;
+      }
       // 테두리 스타일 버튼
       var borderStyleBtn = e.target.closest('[data-fold-border-style]');
       if (borderStyleBtn) {
@@ -19021,10 +19088,17 @@
       if (e.target.id === 'pop-fold-border-width') {
         block.setAttribute('data-fold-border-width', e.target.value);
         _applyFoldBorderStyles(block);
+        // slider drag 중에는 re-render 안 함 (drag 유지)
         return;
       }
       if (e.target.id === 'pop-fold-border-opacity') {
         block.setAttribute('data-fold-border-opacity', e.target.value);
+        _applyFoldBorderStyles(block);
+        return;
+      }
+      // p20t: 내부 구분선 두께
+      if (e.target.id === 'pop-fold-divider-inner-width') {
+        block.setAttribute('data-fold-divider-inner-width', e.target.value);
         _applyFoldBorderStyles(block);
         return;
       }
@@ -19085,8 +19159,9 @@
 
   function _applyFoldBorderStyles(block){
     if (!block) return;
-    // p20p: 테두리는 헤더 border-bottom + 블록 전체 outline (투명 배경 대응)
-    //   color mode 3종: custom (자유) / black (검은색 자동) / header (헤더색 자동)
+    // p20t: 테두리 완전 재설계 - 외부 border (block) 와 내부 divider (head border-bottom) 완전 독립
+    //   외부 border: 블록 모양 존중 (border-radius, box-sizing border-box), layout 자동 조정
+    //   내부 divider: 헤더 아래에만 얇은 선 (독립 스타일)
     var s = block.getAttribute('data-fold-border-style') || 'none';
     var w = parseInt(block.getAttribute('data-fold-border-width') || '1', 10) || 1;
     var op = parseInt(block.getAttribute('data-fold-border-opacity') || '100', 10) / 100;
@@ -19095,22 +19170,48 @@
     if (cMode === 'black') c = '#000000';
     else if (cMode === 'header') c = block.getAttribute('data-fold-head-bg') || '#0F3A3A';
     else c = block.getAttribute('data-fold-border-color') || '#0F3A3A';
+
+    // p20t: 이전 outline 잔재 제거 (p20p 방식 폐기)
+    block.style.removeProperty('outline');
+    block.style.removeProperty('outline-offset');
+
     var head = block.querySelector('.ddl-fold-head');
+
+    // 내부 divider (헤더 아래) - 항상 켜져있음 (스타일은 아래에서 조정)
+    // data-fold-divider-inner-on='1' 이면 켜기, '0' 이면 끄기 (기본 켜짐)
+    var innerOn = block.getAttribute('data-fold-divider-inner-on') !== '0';
+    var innerStyle = block.getAttribute('data-fold-divider-inner-style') || 'solid';
+    var innerWidth = parseInt(block.getAttribute('data-fold-divider-inner-width') || '1', 10) || 1;
+    if (head) {
+      if (innerOn) {
+        var innerEff = (innerStyle === 'bold') ? Math.max(2, innerWidth * 2) : innerWidth;
+        var innerCss = (innerStyle === 'bold') ? 'solid' : innerStyle;
+        var innerRgb = _hexToRgb(c);
+        var innerRgba = innerRgb ? ('rgba(' + innerRgb.r + ',' + innerRgb.g + ',' + innerRgb.b + ',' + op + ')') : c;
+        head.style.borderBottom = innerEff + 'px ' + innerCss + ' ' + innerRgba;
+      } else {
+        head.style.borderBottom = '';
+      }
+    }
+
+    // 외부 border (블록 전체) - 별도 on/off 가능
     if (s === 'none') {
-      if (head) head.style.borderBottom = '';
-      block.style.removeProperty('outline');
-      block.style.removeProperty('outline-offset');
+      block.style.removeProperty('border');
+      block.style.removeProperty('border-width');
+      block.style.removeProperty('border-style');
+      block.style.removeProperty('border-color');
       return;
     }
     var effWidth = (s === 'bold') ? Math.max(2, w * 2) : w;
     var cssStyle = (s === 'bold') ? 'solid' : s;
     var rgb = _hexToRgb(c);
     var colorRgba = rgb ? ('rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + op + ')') : c;
-    // 헤더-본문 구분선
-    if (head) head.style.borderBottom = effWidth + 'px ' + cssStyle + ' ' + colorRgba;
-    // 블록 전체 outline (투명 배경일 때 외부와 구분 · layout 영향 없음)
-    block.style.setProperty('outline', effWidth + 'px ' + cssStyle + ' ' + colorRgba);
-    block.style.setProperty('outline-offset', '0');
+    block.style.setProperty('border', effWidth + 'px ' + cssStyle + ' ' + colorRgba);
+    block.style.setProperty('box-sizing', 'border-box');
+    // 블록 자체에도 border-radius (전체 코너 처리)
+    var radius = block.getAttribute('data-fold-radius') || '6';
+    block.style.setProperty('border-radius', radius + 'px');
+    block.style.setProperty('overflow', 'hidden'); // 라벨/헤더 코너 자연스럽게 잘림
   }
 
   // ─── 프리셋 적용/저장 ────────────────────────────────────────────────────
@@ -19386,7 +19487,8 @@
     // 본문
     var body = block.querySelector('.ddl-fold-body');
     if (body) {
-      body.style.setProperty('padding', labelOn ? '1em 1.2em 1.2em 3.4em' : '1em 1.2em', 'important');
+      // p20t: 본문 padding-left 조정 - 라벨 실제 렌더 폭 (2.6em × 0.75 = 약 1.95em) + inner padding 정렬
+      body.style.setProperty('padding', labelOn ? '1em 1.2em 1.2em 2.6em' : '1em 1.2em', 'important');
       body.style.setProperty('min-height', '2em', 'important');
       body.style.setProperty('position', 'relative', 'important');
       body.style.setProperty('line-height', '1.65', 'important');
@@ -19441,23 +19543,36 @@
     if (!open) block.classList.add('is-fold-closed');
     else block.classList.remove('is-fold-closed');
 
-    // 테두리 (p20p: color mode 3종 + block outline)
-    var bStyleE = block.getAttribute('data-fold-border-style');
-    if (bStyleE && bStyleE !== 'none') {
-      var bWidthE = parseInt(block.getAttribute('data-fold-border-width') || '1', 10) || 1;
-      var bOpE = parseInt(block.getAttribute('data-fold-border-opacity') || '100', 10) / 100;
-      var bCmodeE = block.getAttribute('data-fold-border-color-mode') || 'custom';
-      var bColorE;
-      if (bCmodeE === 'black') bColorE = '#000000';
-      else if (bCmodeE === 'header') bColorE = block.getAttribute('data-fold-head-bg') || '#0F3A3A';
-      else bColorE = block.getAttribute('data-fold-border-color') || 'rgba(15,58,58,0.15)';
+    // p20t: 테두리 새 로직 - 외부 border (모양·코너 존중) + 내부 divider 완전 독립
+    var bStyleE = block.getAttribute('data-fold-border-style') || 'none';
+    var bWidthE = parseInt(block.getAttribute('data-fold-border-width') || '1', 10) || 1;
+    var bOpE = parseInt(block.getAttribute('data-fold-border-opacity') || '100', 10) / 100;
+    var bCmodeE = block.getAttribute('data-fold-border-color-mode') || 'custom';
+    var bColorE;
+    if (bCmodeE === 'black') bColorE = '#000000';
+    else if (bCmodeE === 'header') bColorE = block.getAttribute('data-fold-head-bg') || '#0F3A3A';
+    else bColorE = block.getAttribute('data-fold-border-color') || 'rgba(15,58,58,0.15)';
+    var rgbE = _hexToRgb(bColorE);
+    var rgbaE = rgbE ? ('rgba(' + rgbE.r + ',' + rgbE.g + ',' + rgbE.b + ',' + bOpE + ')') : bColorE;
+
+    // 외부 테두리 (블록 자체 border - 코너 존중)
+    if (bStyleE !== 'none') {
       var effE = (bStyleE === 'bold') ? Math.max(2, bWidthE * 2) : bWidthE;
       var cssE = (bStyleE === 'bold') ? 'solid' : bStyleE;
-      var rgbE = _hexToRgb(bColorE);
-      var rgbaE = rgbE ? ('rgba(' + rgbE.r + ',' + rgbE.g + ',' + rgbE.b + ',' + bOpE + ')') : bColorE;
-      if (head) head.style.setProperty('border-bottom', effE + 'px ' + cssE + ' ' + rgbaE, 'important');
-      block.style.setProperty('outline', effE + 'px ' + cssE + ' ' + rgbaE, 'important');
-      block.style.setProperty('outline-offset', '0', 'important');
+      block.style.setProperty('border', effE + 'px ' + cssE + ' ' + rgbaE, 'important');
+      block.style.setProperty('box-sizing', 'border-box', 'important');
+      block.style.setProperty('border-radius', radius + 'px', 'important');
+      block.style.setProperty('overflow', 'hidden', 'important');
+    }
+
+    // 내부 구분선 (헤더 border-bottom - 외부와 완전 독립)
+    var iOnE = block.getAttribute('data-fold-divider-inner-on') !== '0';
+    var iStyleE = block.getAttribute('data-fold-divider-inner-style') || 'solid';
+    var iWidthE = parseInt(block.getAttribute('data-fold-divider-inner-width') || '1', 10) || 1;
+    if (head && iOnE) {
+      var iEffE = (iStyleE === 'bold') ? Math.max(2, iWidthE * 2) : iWidthE;
+      var iCssE = (iStyleE === 'bold') ? 'solid' : iStyleE;
+      head.style.setProperty('border-bottom', iEffE + 'px ' + iCssE + ' ' + rgbaE, 'important');
     }
   }
 
