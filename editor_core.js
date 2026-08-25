@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p20x';
+  var VERSION = 'v2.0-β-p20y';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2480,23 +2480,46 @@
             var sQ = window.getSelection();
             if (sQ && sQ.rangeCount) {
               var rQ = sQ.getRangeAt(0);
-              if (rQ.collapsed && rQ.startOffset === 0) {
+              try { if (window.__DDL_DBG_FOLD_UP) console.log('[FOLD-UP] range collapsed=', rQ.collapsed, 'startOffset=', rQ.startOffset, 'startContainer=', rQ.startContainer && rQ.startContainer.nodeName); } catch(_){}
+              if (rQ.collapsed) {
                 var probe = rQ.startContainer;
-                if (probe === target) atStartQ = true;
-                else {
-                  var cur = probe, safe = true;
-                  while (cur && cur !== target) {
-                    if (cur.previousSibling) {
-                      var prev = cur.previousSibling;
-                      var isEmpty = (prev.nodeType === 3 && !(prev.nodeValue || '').replace(/\s/g,''))
-                                 || (prev.nodeType === 1 && prev.tagName === 'BR');
-                      if (!isEmpty) { safe = false; break; }
+                // p20y: 커서가 진짜 첫 위치인지 판정 완화
+                //   1) startOffset === 0 이면서 상위로 올라가며 이전 형제 모두 empty
+                //   2) probe 가 elem 이고 안이 완전히 비었으면 (예: <p><br></p> 에서 startOffset=1)
+                //   3) target 자체가 빈 문단이면 시작
+                if (rQ.startOffset === 0) {
+                  if (probe === target) atStartQ = true;
+                  else {
+                    var cur = probe, safe = true;
+                    while (cur && cur !== target) {
+                      if (cur.previousSibling) {
+                        var prev = cur.previousSibling;
+                        var isEmpty = (prev.nodeType === 3 && !(prev.nodeValue || '').replace(/\s/g,''))
+                                   || (prev.nodeType === 1 && prev.tagName === 'BR');
+                        if (!isEmpty) { safe = false; break; }
+                      }
+                      cur = cur.parentNode;
                     }
-                    cur = cur.parentNode;
+                    atStartQ = safe;
                   }
-                  atStartQ = safe;
+                }
+                // p20y 완화 2) probe 가 element 노드 · 그 안 이전 형제들 모두 empty
+                if (!atStartQ && probe && probe.nodeType === 1) {
+                  var childBefore = probe.childNodes[rQ.startOffset - 1];
+                  if (!childBefore) atStartQ = true;
+                  else {
+                    var allEmpty = true;
+                    for (var _ci = 0; _ci < rQ.startOffset; _ci++) {
+                      var _cc = probe.childNodes[_ci];
+                      var _ce = (_cc.nodeType === 3 && !(_cc.nodeValue || '').replace(/\s/g,''))
+                             || (_cc.nodeType === 1 && _cc.tagName === 'BR');
+                      if (!_ce) { allEmpty = false; break; }
+                    }
+                    if (allEmpty) atStartQ = true;
+                  }
                 }
               }
+              // p20y 완화 3) target 이 완전히 빈 문단이면 시작으로 간주 (커서 위치 무관)
               if (!atStartQ && (target.textContent || '').replace(/\s/g,'').length === 0) {
                 atStartQ = true;
               }
@@ -18064,6 +18087,11 @@
     block.setAttribute('data-fold-body-bg-opacity', '100');
     block.setAttribute('data-fold-border-style', 'none');
     block.setAttribute('data-fold-border-color-mode', 'custom'); // p20p
+    // p20y: A2 컷아웃 (arrow · title · body 각 독립) 초기값 = off
+    //   진짜 컷아웃 = 텍스트 색을 배경 색으로 (콜아웃 방식 미러링 + 부모 배경 인식)
+    block.setAttribute('data-fold-arrow-cutout', '0');
+    block.setAttribute('data-fold-title-cutout', '0');
+    block.setAttribute('data-fold-body-cutout', '0');
     block.setAttribute('contenteditable', 'false');
 
     block.appendChild(makeBlockHandle());
@@ -18296,6 +18324,87 @@
       body.style.borderBottomRightRadius = radius + 'px';
     }
     block.classList.toggle('is-fold-closed', !openR);
+
+    // p20y A2: 컷아웃 후처리 (텍스트 색을 부모 배경색으로 → 뚫린 효과)
+    _applyFoldCutouts(block);
+  }
+
+  // p20y A2: 컷아웃 색 계산 - 부모 요소 배경 인식
+  //   원리: 진짜 컷아웃은 텍스트 색을 "그 뒤 배경 색" 으로 세팅해 안 보이게 하는 것
+  //   콜아웃 방식은 PAGE_BG_COLOR 상수만 사용 (사용자 요청으로 부모 배경 인식 추가)
+  //   접은글이 콜아웃/다른 접은글 body 안에 중첩돼있으면 그 부모의 배경색 사용
+  function _foldGetCutoutColor(block){
+    if (!block) return PAGE_BG_COLOR;
+    try {
+      // 가장 가까운 부모 특수 블록 찾기 (콜아웃 body 또는 다른 접은글 body)
+      var p = block.parentElement;
+      while (p) {
+        // 콜아웃 body 안에 있는가?
+        if (p.classList && p.classList.contains('callout-body')) {
+          var box = p.closest('.callout-box');
+          if (box) {
+            var bh = box.getAttribute('data-bg-hex');
+            if (bh) return bh;
+          }
+        }
+        // 다른 접은글 body 안에 있는가?
+        if (p.classList && p.classList.contains('ddl-fold-body')) {
+          var parentFold = p.parentElement;
+          if (parentFold && parentFold.classList && parentFold.classList.contains('ddl-fold-block')) {
+            var pbb = parentFold.getAttribute('data-fold-body-bg');
+            if (pbb) return pbb;
+          }
+        }
+        // 다음 부모로
+        p = p.parentElement;
+        if (p === document.body) break; // 안전장치
+      }
+    } catch(_) {}
+    // 조상 특수 블록 없음 → 페이지 배경
+    return (typeof PAGE_BG_COLOR !== 'undefined') ? PAGE_BG_COLOR : '#F5F5F5';
+  }
+
+  // 접은글 컷아웃 3종 적용 (편집기 뷰 · !important 없이)
+  function _applyFoldCutouts(block){
+    if (!block) return;
+    var head  = block.querySelector('.ddl-fold-head');
+    var body  = block.querySelector('.ddl-fold-body');
+    var title = block.querySelector('.ddl-fold-title');
+    var arrow = block.querySelector('.ddl-fold-arrow');
+    var arrowCut = block.getAttribute('data-fold-arrow-cutout') === '1';
+    var titleCut = block.getAttribute('data-fold-title-cutout') === '1';
+    var bodyCut  = block.getAttribute('data-fold-body-cutout')  === '1';
+    var headFg   = block.getAttribute('data-fold-head-fg') || '#F5F5F5';
+    var bodyFg   = block.getAttribute('data-fold-body-fg') || '#F5F5F5';
+    var cutColor = _foldGetCutoutColor(block);
+
+    if (arrow) {
+      arrow.style.color = arrowCut ? cutColor : headFg;
+    }
+    if (title) {
+      title.style.color = titleCut ? cutColor : headFg;
+    }
+    if (body) {
+      // body 자기 color 를 세팅해 자식 문단이 상속 (자식이 color override 안 하면 이 색으로)
+      body.style.color = bodyCut ? cutColor : bodyFg;
+      // p20y: 편집기 뷰에서도 자식 문단이 자기 color 갖고 있으면 컷아웃 반영 안 됨.
+      //   → 컷아웃 켜지면 자식 텍스트 요소들에도 색 강제 (data-fold-cut-set='1' 로 표시)
+      //   → 컷아웃 꺼지면 그 표시 있는 자식만 리셋 (사용자가 직접 세팅한 색은 건드리지 않음)
+      try {
+        var kids = body.querySelectorAll('p, li, span, div:not(.ddl-fold-block):not(.callout-box), h1, h2, h3, h4, h5, h6');
+        kids.forEach(function(el){
+          if (el.closest && el.closest('.callout-body') && el.closest('.callout-body') !== body) return;
+          if (el.closest && el.closest('.ddl-fold-body') && el.closest('.ddl-fold-body') !== body) return;
+          if (bodyCut) {
+            el.style.color = cutColor;
+            el.setAttribute('data-fold-cut-set', '1');
+          } else if (el.getAttribute('data-fold-cut-set') === '1') {
+            el.style.removeProperty('color');
+            el.removeAttribute('data-fold-cut-set');
+          }
+        });
+      } catch(_){}
+    }
   }
 
   // p20u: 패턴 CSS 근본 재작성 - background shorthand 문법 폐기, 프로퍼티 분리
@@ -18771,6 +18880,29 @@
     }
     html += '</div>'; // 본문 섹션 끝
 
+    // ─── p20y A2 : 컷아웃 (오려내기) 섹션 ───
+    //   콜아웃 텍스트 컷아웃과 동일 원리 (텍스트 색을 배경 색으로 → 안 보임)
+    //   접은글이 콜아웃/다른 접은글 안에 중첩되면 자동으로 부모 배경색 인식
+    var arrowCut = block.getAttribute('data-fold-arrow-cutout') === '1';
+    var titleCut = block.getAttribute('data-fold-title-cutout') === '1';
+    var bodyCut  = block.getAttribute('data-fold-body-cutout')  === '1';
+    html += '<div style="margin-top:0.8em; padding:0.6em; border:1px solid rgba(15,58,58,0.1); border-radius:6px; background:rgba(15,58,58,0.03);">';
+    html += '<div class="row"><div class="row-label" style="font-weight:600; font-size:0.9em;">✂ 컷아웃 (오려내기)</div>'
+      + '<div style="font-size:0.72em; opacity:0.6; margin-top:0.2em;">글자를 뚫어서 접은글 뒤 페이지가 보이게 합니다. 콜아웃/접은글 안에 중첩되면 부모 배경색을 자동 인식합니다.</div></div>';
+    html += '<div class="row"><div class="row-label">화살표</div>'
+      + '<button type="button" class="pop-btn' + (arrowCut?' is-active':'') + '" data-fold-cutout="arrow" data-value="' + (arrowCut?'0':'1') + '">' + (arrowCut?'✓ 켜짐':'끄기') + '</button>'
+      + '</div>';
+    html += '<div class="row"><div class="row-label">제목</div>'
+      + '<button type="button" class="pop-btn' + (titleCut?' is-active':'') + '" data-fold-cutout="title" data-value="' + (titleCut?'0':'1') + '">' + (titleCut?'✓ 켜짐':'끄기') + '</button>'
+      + '</div>';
+    html += '<div class="row"><div class="row-label">본문 텍스트</div>'
+      + '<button type="button" class="pop-btn' + (bodyCut?' is-active':'') + '" data-fold-cutout="body" data-value="' + (bodyCut?'0':'1') + '">' + (bodyCut?'✓ 켜짐':'끄기') + '</button>'
+      + '</div>';
+    html += '<div class="row" style="opacity:0.4;"><div class="row-label">구분선</div>'
+      + '<button type="button" class="pop-btn" disabled title="다음 라운드에서 지원 예정">준비 중</button>'
+      + '</div>';
+    html += '</div>'; // 컷아웃 섹션 끝
+
     return html;
   }
 
@@ -19068,6 +19200,16 @@
         block.setAttribute('data-fold-' + bgT + '-bg-mode', bgV);
         // 호환용 data-fold-bg-mode 는 head 값 우선
         if (bgT === 'head') block.setAttribute('data-fold-bg-mode', bgV);
+        _applyFoldStyles(block);
+        renderFoldPopupBody();
+        return;
+      }
+      // p20y A2: 컷아웃 토글 (arrow · title · body)
+      var cutBtn = e.target.closest('[data-fold-cutout]');
+      if (cutBtn) {
+        var cutTarget = cutBtn.getAttribute('data-fold-cutout'); // arrow | title | body
+        var cutVal    = cutBtn.getAttribute('data-value'); // 다음 상태
+        block.setAttribute('data-fold-' + cutTarget + '-cutout', cutVal === '1' ? '1' : '0');
         _applyFoldStyles(block);
         renderFoldPopupBody();
         return;
@@ -19448,6 +19590,10 @@
     block.setAttribute('data-fold-body-fg', p.bodyFg || p.headFg);
     if (p.label != null) block.setAttribute('data-fold-label', p.label);
     if (p.labelOn != null) block.setAttribute('data-fold-label-on', p.labelOn ? '1' : '0');
+    // p20y A2: 컷아웃 확장 필드 (프리셋에 담기면 반영)
+    if (p.arrowCutout != null) block.setAttribute('data-fold-arrow-cutout', p.arrowCutout ? '1' : '0');
+    if (p.titleCutout != null) block.setAttribute('data-fold-title-cutout', p.titleCutout ? '1' : '0');
+    if (p.bodyCutout != null)  block.setAttribute('data-fold-body-cutout',  p.bodyCutout  ? '1' : '0');
     _applyFoldStyles(block);
   }
   function _openFoldPresetSaveDialog(block){
@@ -19761,6 +19907,32 @@
           body.style.setProperty('background-position', 'center', 'important');
           body.style.setProperty('background-repeat', 'no-repeat', 'important');
         }
+      }
+
+      // p20y A2: 컷아웃 저장 처리 (텍스트 색을 부모 배경색으로 !important)
+      //   편집기와 동일 원리 (콜아웃 방식 미러링 · 부모 배경 인식)
+      var arrowCutS = block.getAttribute('data-fold-arrow-cutout') === '1';
+      var titleCutS = block.getAttribute('data-fold-title-cutout') === '1';
+      var bodyCutS  = block.getAttribute('data-fold-body-cutout')  === '1';
+      var cutColorS = _foldGetCutoutColor(block);
+      if (arrow && arrowCutS) {
+        arrow.style.setProperty('color', cutColorS, 'important');
+      }
+      if (title && titleCutS) {
+        title.style.setProperty('color', cutColorS, 'important');
+      }
+      if (bodyCutS) {
+        body.style.setProperty('color', cutColorS, 'important');
+        // 저장 시 자식 <p>/<li> 등이 자기 color 를 갖고 있으면 컷아웃 상속 안 됨.
+        // 컷아웃 켠 상태 저장이라면 body 안의 텍스트 자식들도 색 강제.
+        try {
+          body.querySelectorAll('p, li, span, div:not(.ddl-fold-block):not(.callout-box), h1, h2, h3, h4, h5, h6').forEach(function(el){
+            // 이 자식이 특수 블록의 자식 body 안이면 skip (중첩)
+            if (el.closest && el.closest('.callout-body') && el.closest('.callout-body') !== body) return;
+            if (el.closest && el.closest('.ddl-fold-body') && el.closest('.ddl-fold-body') !== body) return;
+            el.style.setProperty('color', cutColorS, 'important');
+          });
+        } catch(_){}
       }
 
       // 본문 직계 자식 사이 margin 강제 (콜아웃과 동일)
