@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p20w';
+  var VERSION = 'v2.0-β-p20x';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -18064,10 +18064,6 @@
     block.setAttribute('data-fold-body-bg-opacity', '100');
     block.setAttribute('data-fold-border-style', 'none');
     block.setAttribute('data-fold-border-color-mode', 'custom'); // p20p
-    // p20w: A2 컷아웃 (arrow · title · body 각 독립) 초기값 = off
-    block.setAttribute('data-fold-arrow-cutout', '0');
-    block.setAttribute('data-fold-title-cutout', '0');
-    block.setAttribute('data-fold-body-cutout', '0');
     block.setAttribute('contenteditable', 'false');
 
     block.appendChild(makeBlockHandle());
@@ -18280,13 +18276,6 @@
       else if (ak === 'caret') arrow.textContent = '▾';
       else arrow.textContent = '⌄';
     }
-
-    // p20w A2: 컷아웃 (arrow · title · body 각 독립 · 그라디언트/패턴 배경에서 시각적으로 뚫려 보임)
-    //   기법: background-clip: text + color: transparent
-    //   arrow/title 은 head 배경을 자기 요소에도 다시 그려서 텍스트 모양대로 클립
-    //   body 는 자기 배경이 이미 있으므로 clip 만 얹음
-    _applyFoldCutouts(block);
-
     var radius = block.getAttribute('data-fold-radius') || '6';
     var openR = block.getAttribute('data-fold-open') !== '0';
     // p20s A3: 열림/닫힘에 따라 코너 처리 다르게
@@ -18307,154 +18296,6 @@
       body.style.borderBottomRightRadius = radius + 'px';
     }
     block.classList.toggle('is-fold-closed', !openR);
-  }
-
-  // p20w A2: 컷아웃 헬퍼 - 요소 하나에 지정된 배경(단색/그라디언트/패턴/이미지)의 이미지 계산
-  //   반환: null (그릴 이미지 없음 · 단색) 또는 { image, size, position, repeat }
-  //   arrow/title 은 head 값 사용 · body 컷아웃은 body 값 사용
-  function _foldComputeBgImageFor(block, target){
-    // target: 'head' | 'body'
-    var mode = block.getAttribute('data-fold-' + target + '-bg-mode')
-             || block.getAttribute('data-fold-bg-mode') || 'solid';
-    if (mode === 'solid') return null;
-    if (mode === 'gradient') {
-      var c1 = block.getAttribute('data-fold-' + target + '-bg') || '#0F3A3A';
-      var c2 = block.getAttribute('data-fold-' + target + '-bg2') || c1;
-      var angle = block.getAttribute('data-fold-' + target + '-gradient-angle')
-                || block.getAttribute('data-fold-gradient-angle') || '90';
-      // body 그라디언트는 별도 start 지원
-      if (target === 'body') {
-        var bStart = block.getAttribute('data-fold-body-bg-gradient-start') || c1;
-        c1 = bStart;
-      }
-      return {
-        image: 'linear-gradient(' + angle + 'deg, ' + c1 + ', ' + c2 + ')',
-        size: 'auto', position: '0 0', repeat: 'no-repeat'
-      };
-    }
-    if (mode === 'pattern') {
-      var pat = block.getAttribute('data-fold-' + target + '-pattern')
-              || block.getAttribute('data-fold-pattern') || 'dot';
-      var pColRaw = block.getAttribute('data-fold-' + target + '-bg2') || '#ffffff';
-      var pOp = block.getAttribute('data-fold-' + target + '-pattern-opacity')
-              || block.getAttribute('data-fold-pattern-opacity')
-              || (target === 'body' ? '15' : '30');
-      var pCol = _foldColorWithOp(pColRaw, pOp);
-      var pSz = block.getAttribute('data-fold-' + target + '-pattern-size')
-              || block.getAttribute('data-fold-pattern-size') || '10';
-      var pAng = block.getAttribute('data-fold-' + target + '-pattern-angle')
-               || block.getAttribute('data-fold-pattern-angle') || '45';
-      return _foldMakePatternBg(pat, pCol, pSz, pAng); // { image, size, position, repeat }
-    }
-    if (mode === 'image') {
-      var img = block.getAttribute('data-fold-' + target + '-bg-image') || '';
-      if (!img) return null;
-      return { image: 'url(' + img + ')', size: 'cover', position: 'center', repeat: 'no-repeat' };
-    }
-    return null;
-  }
-
-  // 요소에 컷아웃 스타일 적용 (편집기 뷰용 · !important 없이)
-  function _foldApplyClipToElem(elem, bgObj, fallbackColor){
-    if (!elem) return;
-    // 이전 컷아웃 잔재 리셋
-    elem.style.removeProperty('background-image');
-    elem.style.removeProperty('background-size');
-    elem.style.removeProperty('background-position');
-    elem.style.removeProperty('background-repeat');
-    elem.style.removeProperty('background-color');
-    elem.style.removeProperty('-webkit-background-clip');
-    elem.style.removeProperty('background-clip');
-    elem.style.removeProperty('-webkit-text-fill-color');
-    if (bgObj) {
-      // 그라디언트/패턴/이미지 → 배경 재적용 + clip:text
-      elem.style.setProperty('background-image', bgObj.image);
-      elem.style.setProperty('background-size', bgObj.size);
-      elem.style.setProperty('background-position', bgObj.position);
-      elem.style.setProperty('background-repeat', bgObj.repeat);
-      elem.style.setProperty('-webkit-background-clip', 'text');
-      elem.style.setProperty('background-clip', 'text');
-      elem.style.setProperty('-webkit-text-fill-color', 'transparent');
-      elem.style.setProperty('color', 'transparent');
-    } else {
-      // 단색 배경 위에서는 배경색으로 텍스트 색상만 맞춤 (시각적으로 뚫린 것처럼)
-      if (fallbackColor) elem.style.setProperty('color', fallbackColor);
-    }
-  }
-
-  function _applyFoldCutouts(block){
-    if (!block) return;
-    var head  = block.querySelector('.ddl-fold-head');
-    var body  = block.querySelector('.ddl-fold-body');
-    var title = block.querySelector('.ddl-fold-title');
-    var arrow = block.querySelector('.ddl-fold-arrow');
-    var arrowCut = block.getAttribute('data-fold-arrow-cutout') === '1';
-    var titleCut = block.getAttribute('data-fold-title-cutout') === '1';
-    var bodyCut  = block.getAttribute('data-fold-body-cutout')  === '1';
-    var headFg   = block.getAttribute('data-fold-head-fg') || '#F5F5F5';
-    var bodyFg   = block.getAttribute('data-fold-body-fg') || '#F5F5F5';
-    var headBg   = block.getAttribute('data-fold-head-bg') || '#0F3A3A';
-    var bodyBg   = block.getAttribute('data-fold-body-bg') || headBg;
-
-    // arrow: head 배경 참조
-    if (arrow) {
-      if (arrowCut) {
-        var arrowBg = _foldComputeBgImageFor(block, 'head');
-        _foldApplyClipToElem(arrow, arrowBg, headBg);
-      } else {
-        // 컷아웃 off → 원래 상태 복구 (배경 clear · 색상만)
-        arrow.style.removeProperty('background-image');
-        arrow.style.removeProperty('background-size');
-        arrow.style.removeProperty('background-position');
-        arrow.style.removeProperty('background-repeat');
-        arrow.style.removeProperty('-webkit-background-clip');
-        arrow.style.removeProperty('background-clip');
-        arrow.style.removeProperty('-webkit-text-fill-color');
-        arrow.style.setProperty('color', headFg);
-      }
-    }
-
-    // title: head 배경 참조
-    if (title) {
-      if (titleCut) {
-        var titleBg = _foldComputeBgImageFor(block, 'head');
-        _foldApplyClipToElem(title, titleBg, headBg);
-      } else {
-        title.style.removeProperty('background-image');
-        title.style.removeProperty('background-size');
-        title.style.removeProperty('background-position');
-        title.style.removeProperty('background-repeat');
-        title.style.removeProperty('-webkit-background-clip');
-        title.style.removeProperty('background-clip');
-        title.style.removeProperty('-webkit-text-fill-color');
-        title.style.setProperty('color', headFg);
-      }
-    }
-
-    // body: 자기 배경 그대로 · clip:text 만 얹음 (자기 배경 이미 세팅됨)
-    if (body) {
-      if (bodyCut) {
-        var bodyBgObj = _foldComputeBgImageFor(block, 'body');
-        if (bodyBgObj) {
-          // 그라디언트/패턴/이미지 배경 → clip:text 적용 (body 배경은 이미 세팅됨 · 재세팅해도 무해)
-          body.style.setProperty('-webkit-background-clip', 'text');
-          body.style.setProperty('background-clip', 'text');
-          body.style.setProperty('-webkit-text-fill-color', 'transparent');
-          body.style.setProperty('color', 'transparent');
-        } else {
-          // 단색 배경 → 시각 효과 없음 (텍스트 색만 배경색으로)
-          body.style.removeProperty('-webkit-background-clip');
-          body.style.removeProperty('background-clip');
-          body.style.removeProperty('-webkit-text-fill-color');
-          body.style.setProperty('color', bodyBg);
-        }
-      } else {
-        body.style.removeProperty('-webkit-background-clip');
-        body.style.removeProperty('background-clip');
-        body.style.removeProperty('-webkit-text-fill-color');
-        body.style.setProperty('color', bodyFg);
-      }
-    }
   }
 
   // p20u: 패턴 CSS 근본 재작성 - background shorthand 문법 폐기, 프로퍼티 분리
@@ -18930,36 +18771,6 @@
     }
     html += '</div>'; // 본문 섹션 끝
 
-    // ─── p20w A2 : 컷아웃 (오려내기) 섹션 ───
-    var arrowCut = block.getAttribute('data-fold-arrow-cutout') === '1';
-    var titleCut = block.getAttribute('data-fold-title-cutout') === '1';
-    var bodyCut  = block.getAttribute('data-fold-body-cutout')  === '1';
-    var headSolid = (headBgMode === 'solid');
-    var bodySolid = (bodyBgMode === 'solid');
-    html += '<div style="margin-top:0.8em; padding:0.6em; border:1px solid rgba(15,58,58,0.1); border-radius:6px; background:rgba(15,58,58,0.03);">';
-    html += '<div class="row"><div class="row-label" style="font-weight:600; font-size:0.9em;">✂ 컷아웃 (오려내기)</div>'
-      + '<div style="font-size:0.72em; opacity:0.6; margin-top:0.2em;">배경(그라디언트·패턴·이미지)이 텍스트 안으로 이어져 뚫린 것처럼 보입니다.</div></div>';
-    // 화살표 컷아웃
-    html += '<div class="row"><div class="row-label">화살표</div>'
-      + '<button type="button" class="pop-btn' + (arrowCut?' is-active':'') + '" data-fold-cutout="arrow" data-value="' + (arrowCut?'0':'1') + '">' + (arrowCut?'✓ 켜짐':'끄기') + '</button>'
-      + (headSolid ? '<span style="font-size:0.7em; opacity:0.55; margin-left:0.6em;">헤더 배경이 단색이라 효과가 보이지 않습니다.</span>' : '')
-      + '</div>';
-    // 제목 컷아웃
-    html += '<div class="row"><div class="row-label">제목</div>'
-      + '<button type="button" class="pop-btn' + (titleCut?' is-active':'') + '" data-fold-cutout="title" data-value="' + (titleCut?'0':'1') + '">' + (titleCut?'✓ 켜짐':'끄기') + '</button>'
-      + (headSolid ? '<span style="font-size:0.7em; opacity:0.55; margin-left:0.6em;">헤더 배경이 단색이라 효과가 보이지 않습니다.</span>' : '')
-      + '</div>';
-    // 본문 텍스트 컷아웃
-    html += '<div class="row"><div class="row-label">본문 텍스트</div>'
-      + '<button type="button" class="pop-btn' + (bodyCut?' is-active':'') + '" data-fold-cutout="body" data-value="' + (bodyCut?'0':'1') + '">' + (bodyCut?'✓ 켜짐':'끄기') + '</button>'
-      + (bodySolid ? '<span style="font-size:0.7em; opacity:0.55; margin-left:0.6em;">본문 배경이 단색이라 효과가 보이지 않습니다.</span>' : '')
-      + '</div>';
-    // 구분선 컷아웃 (미구현 · 자리만)
-    html += '<div class="row" style="opacity:0.4;"><div class="row-label">구분선</div>'
-      + '<button type="button" class="pop-btn" disabled title="다음 라운드에서 지원 예정">준비 중</button>'
-      + '</div>';
-    html += '</div>'; // 컷아웃 섹션 끝
-
     return html;
   }
 
@@ -19257,16 +19068,6 @@
         block.setAttribute('data-fold-' + bgT + '-bg-mode', bgV);
         // 호환용 data-fold-bg-mode 는 head 값 우선
         if (bgT === 'head') block.setAttribute('data-fold-bg-mode', bgV);
-        _applyFoldStyles(block);
-        renderFoldPopupBody();
-        return;
-      }
-      // p20w A2: 컷아웃 토글 (arrow · title · body)
-      var cutBtn = e.target.closest('[data-fold-cutout]');
-      if (cutBtn) {
-        var cutTarget = cutBtn.getAttribute('data-fold-cutout'); // 'arrow' | 'title' | 'body'
-        var cutVal = cutBtn.getAttribute('data-value'); // 다음 상태 값
-        block.setAttribute('data-fold-' + cutTarget + '-cutout', cutVal === '1' ? '1' : '0');
         _applyFoldStyles(block);
         renderFoldPopupBody();
         return;
@@ -19647,10 +19448,6 @@
     block.setAttribute('data-fold-body-fg', p.bodyFg || p.headFg);
     if (p.label != null) block.setAttribute('data-fold-label', p.label);
     if (p.labelOn != null) block.setAttribute('data-fold-label-on', p.labelOn ? '1' : '0');
-    // p20w A2: 컷아웃 확장 필드 (프리셋에 담기면 반영, 없으면 유지)
-    if (p.arrowCutout != null) block.setAttribute('data-fold-arrow-cutout', p.arrowCutout ? '1' : '0');
-    if (p.titleCutout != null) block.setAttribute('data-fold-title-cutout', p.titleCutout ? '1' : '0');
-    if (p.bodyCutout != null)  block.setAttribute('data-fold-body-cutout',  p.bodyCutout  ? '1' : '0');
     _applyFoldStyles(block);
   }
   function _openFoldPresetSaveDialog(block){
@@ -19963,55 +19760,6 @@
           body.style.setProperty('background-size', 'cover', 'important');
           body.style.setProperty('background-position', 'center', 'important');
           body.style.setProperty('background-repeat', 'no-repeat', 'important');
-        }
-      }
-
-      // p20w A2: 컷아웃 (arrow · title · body 각 독립) - 저장 시 인라인 !important
-      //   편집기와 동일한 시각 결과 (background-clip:text + color:transparent)
-      var arrowCutS = block.getAttribute('data-fold-arrow-cutout') === '1';
-      var titleCutS = block.getAttribute('data-fold-title-cutout') === '1';
-      var bodyCutS  = block.getAttribute('data-fold-body-cutout')  === '1';
-      if (arrow && arrowCutS) {
-        var arrBg = _foldComputeBgImageFor(block, 'head');
-        if (arrBg) {
-          arrow.style.setProperty('background-image', arrBg.image, 'important');
-          arrow.style.setProperty('background-size', arrBg.size, 'important');
-          arrow.style.setProperty('background-position', arrBg.position, 'important');
-          arrow.style.setProperty('background-repeat', arrBg.repeat, 'important');
-          arrow.style.setProperty('-webkit-background-clip', 'text', 'important');
-          arrow.style.setProperty('background-clip', 'text', 'important');
-          arrow.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
-          arrow.style.setProperty('color', 'transparent', 'important');
-        } else {
-          // 단색 배경 → 텍스트 색만 배경색으로 (시각적으로 뚫린 것처럼)
-          arrow.style.setProperty('color', headBg, 'important');
-        }
-      }
-      if (title && titleCutS) {
-        var ttlBg = _foldComputeBgImageFor(block, 'head');
-        if (ttlBg) {
-          title.style.setProperty('background-image', ttlBg.image, 'important');
-          title.style.setProperty('background-size', ttlBg.size, 'important');
-          title.style.setProperty('background-position', ttlBg.position, 'important');
-          title.style.setProperty('background-repeat', ttlBg.repeat, 'important');
-          title.style.setProperty('-webkit-background-clip', 'text', 'important');
-          title.style.setProperty('background-clip', 'text', 'important');
-          title.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
-          title.style.setProperty('color', 'transparent', 'important');
-        } else {
-          title.style.setProperty('color', headBg, 'important');
-        }
-      }
-      if (bodyCutS) {
-        var bdyBg = _foldComputeBgImageFor(block, 'body');
-        if (bdyBg) {
-          // body 자기 배경은 이미 위에서 세팅됨 · clip:text 만 얹음
-          body.style.setProperty('-webkit-background-clip', 'text', 'important');
-          body.style.setProperty('background-clip', 'text', 'important');
-          body.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
-          body.style.setProperty('color', 'transparent', 'important');
-        } else {
-          body.style.setProperty('color', bodyBg, 'important');
         }
       }
 
