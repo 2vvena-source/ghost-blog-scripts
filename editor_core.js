@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p20r';
+  var VERSION = 'v2.0-β-p20s';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2506,13 +2506,10 @@
             if (currentBlockQ) {
               var prevBlockQ = currentBlockQ.previousElementSibling;
               var targetFold = null;
-              if (prevBlockQ) {
-                if (prevBlockQ.classList && prevBlockQ.classList.contains('ddl-fold-block')) {
-                  targetFold = prevBlockQ;
-                } else if (prevBlockQ.querySelector) {
-                  var innerFolds = prevBlockQ.querySelectorAll('.ddl-fold-block');
-                  if (innerFolds.length) targetFold = innerFolds[innerFolds.length - 1];
-                }
+              // p20s 이슈 C 재수정: 이전 형제가 접은글이면 그 접은글 body 로 이동.
+              //   nested fold 는 부모가 담고 있으므로, 이전 형제가 접은글 아니면 진입 시도하지 않음 (자연 이동)
+              if (prevBlockQ && prevBlockQ.classList && prevBlockQ.classList.contains('ddl-fold-block')) {
+                targetFold = prevBlockQ;
               }
               if (targetFold) {
                 var isOpenQ = targetFold.getAttribute('data-fold-open') !== '0';
@@ -18146,6 +18143,18 @@
     }
     // separate 모드: 사용자가 개별 지정한 값 그대로 사용 (덮어쓰지 않음)
 
+    // p20s A5: 텍스트 자동 모드 시 배경 대비색으로 fg 재계산
+    var headFgMode = block.getAttribute('data-fold-head-fg-mode') || 'custom';
+    var bodyFgMode = block.getAttribute('data-fold-body-fg-mode') || 'custom';
+    if (headFgMode === 'auto') {
+      headFg = _foldAutoFg(headBg);
+      block.setAttribute('data-fold-head-fg', headFg);
+    }
+    if (bodyFgMode === 'auto') {
+      bodyFg = _foldAutoFg(bodyBg);
+      block.setAttribute('data-fold-body-fg', bodyFg);
+    }
+
     var head = block.querySelector('.ddl-fold-head');
     var body = block.querySelector('.ddl-fold-body');
     var label = block.querySelector('.ddl-fold-label');
@@ -18166,23 +18175,29 @@
     if (head) {
       head.style.backgroundColor = bgWithOp(headBg, headOp);
       head.style.color = headFg;
-      // 그라디언트 · 패턴 · 이미지
+      // p20s A4: 패턴/그라디언트/이미지 안정화 - 항상 먼저 제거 후 재설정 (브라우저 재계산 강제)
+      head.style.removeProperty('background-image');
+      head.style.removeProperty('background-size');
+      head.style.removeProperty('background-position');
+      head.style.removeProperty('background-repeat');
       if (bgMode === 'gradient') {
         var headBg2 = block.getAttribute('data-fold-head-bg2') || headBg;
         var angle = block.getAttribute('data-fold-gradient-angle') || '90';
-        head.style.backgroundImage = 'linear-gradient(' + angle + 'deg, ' + headBg + ', ' + headBg2 + ')';
+        head.style.setProperty('background-image', 'linear-gradient(' + angle + 'deg, ' + headBg + ', ' + headBg2 + ')');
       } else if (bgMode === 'pattern') {
         var pattern = block.getAttribute('data-fold-pattern') || 'dot';
         var pColor = block.getAttribute('data-fold-head-bg2') || 'rgba(255,255,255,0.15)';
         var pSize = block.getAttribute('data-fold-pattern-size') || '10';
-        head.style.backgroundImage = _foldMakePatternBg(pattern, pColor, pSize);
+        var patBg = _foldMakePatternBg(pattern, pColor, pSize);
+        if (patBg) head.style.setProperty('background-image', patBg);
       } else if (bgMode === 'image') {
         var img = block.getAttribute('data-fold-head-bg-image') || '';
-        if (img) { head.style.backgroundImage = 'url(' + img + ')'; head.style.backgroundSize = 'cover'; head.style.backgroundPosition = 'center'; }
-        else head.style.backgroundImage = '';
-      } else {
-        head.style.backgroundImage = '';
-        head.style.removeProperty('background-image');
+        if (img) {
+          head.style.setProperty('background-image', 'url(' + img + ')');
+          head.style.setProperty('background-size', 'cover');
+          head.style.setProperty('background-position', 'center');
+          head.style.setProperty('background-repeat', 'no-repeat');
+        }
       }
     }
     if (title) {
@@ -18195,23 +18210,29 @@
       body.style.color = bodyFg;
       var bodyFont = block.getAttribute('data-fold-body-font') || '';
       body.style.fontFamily = bodyFont || '';
-      // body 이미지·그라디언트도 반영
+      // p20s A4: 본문 배경도 항상 먼저 제거 후 재설정
+      body.style.removeProperty('background-image');
+      body.style.removeProperty('background-size');
+      body.style.removeProperty('background-position');
+      body.style.removeProperty('background-repeat');
       if (bgMode === 'gradient') {
         var bodyBg2 = block.getAttribute('data-fold-body-bg2') || bodyBg;
         var angle2 = block.getAttribute('data-fold-gradient-angle') || '90';
-        body.style.backgroundImage = 'linear-gradient(' + angle2 + 'deg, ' + bodyBg + ', ' + bodyBg2 + ')';
+        body.style.setProperty('background-image', 'linear-gradient(' + angle2 + 'deg, ' + bodyBg + ', ' + bodyBg2 + ')');
       } else if (bgMode === 'pattern') {
         var pat = block.getAttribute('data-fold-pattern') || 'dot';
         var pC = block.getAttribute('data-fold-body-bg2') || 'rgba(15,58,58,0.06)';
         var pS = block.getAttribute('data-fold-pattern-size') || '10';
-        body.style.backgroundImage = _foldMakePatternBg(pat, pC, pS);
+        var patBg2 = _foldMakePatternBg(pat, pC, pS);
+        if (patBg2) body.style.setProperty('background-image', patBg2);
       } else if (bgMode === 'image') {
         var imgB = block.getAttribute('data-fold-body-bg-image') || '';
-        if (imgB) { body.style.backgroundImage = 'url(' + imgB + ')'; body.style.backgroundSize = 'cover'; body.style.backgroundPosition = 'center'; }
-        else body.style.backgroundImage = '';
-      } else {
-        body.style.backgroundImage = '';
-        body.style.removeProperty('background-image');
+        if (imgB) {
+          body.style.setProperty('background-image', 'url(' + imgB + ')');
+          body.style.setProperty('background-size', 'cover');
+          body.style.setProperty('background-position', 'center');
+          body.style.setProperty('background-repeat', 'no-repeat');
+        }
       }
     }
     if (label) {
@@ -18226,10 +18247,25 @@
       else arrow.textContent = '⌄';
     }
     var radius = block.getAttribute('data-fold-radius') || '6';
-    if (head) { head.style.borderTopLeftRadius = radius + 'px'; head.style.borderTopRightRadius = radius + 'px'; }
-    if (body) { body.style.borderBottomLeftRadius = radius + 'px'; body.style.borderBottomRightRadius = radius + 'px'; }
-    var open = block.getAttribute('data-fold-open') !== '0';
-    block.classList.toggle('is-fold-closed', !open);
+    var openR = block.getAttribute('data-fold-open') !== '0';
+    // p20s A3: 열림/닫힘에 따라 코너 처리 다르게
+    if (head) {
+      head.style.borderTopLeftRadius = radius + 'px';
+      head.style.borderTopRightRadius = radius + 'px';
+      // 닫혀있을 때는 헤더가 4개 코너 모두 담당 (아래도 둥글게)
+      if (openR) {
+        head.style.borderBottomLeftRadius = '0';
+        head.style.borderBottomRightRadius = '0';
+      } else {
+        head.style.borderBottomLeftRadius = radius + 'px';
+        head.style.borderBottomRightRadius = radius + 'px';
+      }
+    }
+    if (body) {
+      body.style.borderBottomLeftRadius = radius + 'px';
+      body.style.borderBottomRightRadius = radius + 'px';
+    }
+    block.classList.toggle('is-fold-closed', !openR);
   }
 
   function _foldMakePatternBg(pattern, color, size){
@@ -18647,6 +18683,25 @@
   }
 
   // ─── 텍스트 탭 (헤더/본문 각각) ──────────────────────────────────────────
+  // p20s A5: 텍스트 팩토리 프리셋 (자주 쓰는 색 8종)
+  var FOLD_TEXT_PRESETS = [
+    { name:'화이트',    hex:'#FFFFFF' },
+    { name:'오프화이트',  hex:'#F5F5F5' },
+    { name:'진한 초록',  hex:'#0F3A3A' },
+    { name:'회색',      hex:'#808080' },
+    { name:'블랙',      hex:'#0A0A0A' },
+    { name:'주황',      hex:'#FF9A76' },
+    { name:'빨강',      hex:'#D32F2F' },
+    { name:'노랑',      hex:'#F1C40F' }
+  ];
+  // 배경 대비 자동 색상 계산 (밝기 기준)
+  function _foldAutoFg(bgHex){
+    var rgb = _hexToRgb(bgHex);
+    if (!rgb) return '#F5F5F5';
+    var yiq = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+    return yiq >= 140 ? '#0F3A3A' : '#F5F5F5';
+  }
+
   function renderFoldTextTab(){
     var block = foldPopupLock || selectedFold;
     if (!block) return '';
@@ -18654,6 +18709,8 @@
     var bodyFg = _hexOrDefault(block.getAttribute('data-fold-body-fg'), headFg);
     var headFont = block.getAttribute('data-fold-head-font') || '';
     var bodyFont = block.getAttribute('data-fold-body-font') || '';
+    var headFgMode = block.getAttribute('data-fold-head-fg-mode') || 'custom';
+    var bodyFgMode = block.getAttribute('data-fold-body-fg-mode') || 'custom';
 
     var headFontOpts = (window.__DDL_EDITOR && window.__DDL_EDITOR.buildFontSelectOptions)
       ? window.__DDL_EDITOR.buildFontSelectOptions(headFont, { value:'', label:'기본 (Cafe24Danjunghae)' }, escapeAttr, escapeHtml)
@@ -18662,10 +18719,33 @@
       ? window.__DDL_EDITOR.buildFontSelectOptions(bodyFont, { value:'', label:'기본 (사이트 폰트)' }, escapeAttr, escapeHtml)
       : '<option value="">기본</option>';
 
+    function presetSwatches(target, currentHex){
+      var out = '<div class="ep-preset-swatches" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:0.3em;">';
+      FOLD_TEXT_PRESETS.forEach(function(p){
+        var active = (currentHex.toLowerCase() === p.hex.toLowerCase()) ? ' is-active' : '';
+        out += '<button type="button" class="ep-fg-preset' + active + '" data-fold-fg-preset="' + target + '" data-value="' + p.hex + '" title="' + p.name + '" style="width:22px; height:22px; border-radius:4px; border:1px solid rgba(15,58,58,0.2); background:' + p.hex + '; cursor:pointer; padding:0;' + (active ? ' outline:2px solid #FF9A76; outline-offset:1px;' : '') + '"></button>';
+      });
+      out += '</div>';
+      return out;
+    }
+
     var html = '';
     html += '<div class="row"><div class="row-label" style="font-weight:600;">헤더 텍스트</div></div>';
-    html += '<div class="row"><div class="row-label">글자색</div>'
-      + '<div class="ep-color-row"><input type="color" data-fold-set="headFg" value="' + escapeAttr(headFg) + '"></div></div>';
+    // 3중 모드 스위처
+    html += '<div class="row"><div class="row-label">색상 모드</div>'
+      + '<button type="button" class="pop-btn' + (headFgMode==='auto'?' is-active':'') + '" data-fold-fg-mode="head" data-value="auto">자동</button>'
+      + '<button type="button" class="pop-btn' + (headFgMode==='preset'?' is-active':'') + '" data-fold-fg-mode="head" data-value="preset">프리셋</button>'
+      + '<button type="button" class="pop-btn' + (headFgMode==='custom'?' is-active':'') + '" data-fold-fg-mode="head" data-value="custom">직접</button>'
+      + '</div>';
+    if (headFgMode === 'auto') {
+      html += '<div class="row"><div style="font-size:0.75em; opacity:0.65;">헤더 배경 밝기에 따라 자동 대비색 적용 (배경 바뀌면 자동 갱신).</div></div>';
+      html += '<div class="row"><div style="height:24px; background:' + headFg + '; border:1px solid rgba(15,58,58,0.15); border-radius:4px;"></div></div>';
+    } else if (headFgMode === 'preset') {
+      html += '<div class="row"><div class="row-label">프리셋 팔레트</div>' + presetSwatches('head', headFg) + '</div>';
+    } else {
+      html += '<div class="row"><div class="row-label">글자색</div>'
+        + '<div class="ep-color-row"><input type="color" data-fold-set="headFg" value="' + escapeAttr(headFg) + '"></div></div>';
+    }
     html += '<div class="row"><div class="row-label" style="display:flex; justify-content:space-between; align-items:center;">'
       + '<span>폰트</span>'
       + '<button type="button" data-btn="fold-open-font-library-head" style="background:transparent; border:none; color:var(--point, #FF9A76); font-size:0.72em; cursor:pointer; padding:0;">→ 라이브러리 관리</button>'
@@ -18675,8 +18755,21 @@
       + '<button type="button" data-btn="fold-open-font-picker-head" title="카드로 고르기" style="width:32px; background:transparent; border:1px solid rgba(15,58,58,0.2); border-radius:3px; cursor:pointer; color:var(--color,#0F3A3A);">가</button>'
       + '</div></div>';
     html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;"><div class="row-label" style="font-weight:600;">본문 텍스트</div></div>';
-    html += '<div class="row"><div class="row-label">글자색</div>'
-      + '<div class="ep-color-row"><input type="color" data-fold-set="bodyFg" value="' + escapeAttr(bodyFg) + '"></div></div>';
+    // p20s A5: 본문 텍스트 3중 모드
+    html += '<div class="row"><div class="row-label">색상 모드</div>'
+      + '<button type="button" class="pop-btn' + (bodyFgMode==='auto'?' is-active':'') + '" data-fold-fg-mode="body" data-value="auto">자동</button>'
+      + '<button type="button" class="pop-btn' + (bodyFgMode==='preset'?' is-active':'') + '" data-fold-fg-mode="body" data-value="preset">프리셋</button>'
+      + '<button type="button" class="pop-btn' + (bodyFgMode==='custom'?' is-active':'') + '" data-fold-fg-mode="body" data-value="custom">직접</button>'
+      + '</div>';
+    if (bodyFgMode === 'auto') {
+      html += '<div class="row"><div style="font-size:0.75em; opacity:0.65;">본문 배경 밝기에 따라 자동 대비색 적용.</div></div>';
+      html += '<div class="row"><div style="height:24px; background:' + bodyFg + '; border:1px solid rgba(15,58,58,0.15); border-radius:4px;"></div></div>';
+    } else if (bodyFgMode === 'preset') {
+      html += '<div class="row"><div class="row-label">프리셋 팔레트</div>' + presetSwatches('body', bodyFg) + '</div>';
+    } else {
+      html += '<div class="row"><div class="row-label">글자색</div>'
+        + '<div class="ep-color-row"><input type="color" data-fold-set="bodyFg" value="' + escapeAttr(bodyFg) + '"></div></div>';
+    }
     html += '<div class="row"><div class="row-label" style="display:flex; justify-content:space-between; align-items:center;">'
       + '<span>폰트</span>'
       + '<button type="button" data-btn="fold-open-font-library-body" style="background:transparent; border:none; color:var(--point, #FF9A76); font-size:0.72em; cursor:pointer; padding:0;">→ 라이브러리 관리</button>'
@@ -18735,6 +18828,33 @@
         } catch(_){}
         return;
       }
+      // p20s A5: 텍스트 3중 모드 스위치
+      var fgModeBtn = e.target.closest('[data-fold-fg-mode]');
+      if (fgModeBtn) {
+        var which = fgModeBtn.getAttribute('data-fold-fg-mode'); // 'head' | 'body'
+        var val = fgModeBtn.getAttribute('data-value');
+        block.setAttribute('data-fold-' + which + '-fg-mode', val);
+        // auto 모드 즉시 계산
+        if (val === 'auto') {
+          var bgHex = block.getAttribute(which === 'head' ? 'data-fold-head-bg' : 'data-fold-body-bg') || '#0F3A3A';
+          var autoFg = _foldAutoFg(bgHex);
+          block.setAttribute('data-fold-' + which + '-fg', autoFg);
+        }
+        _applyFoldStyles(block);
+        renderFoldPopupBody();
+        return;
+      }
+      // 텍스트 프리셋 스와치 클릭
+      var fgPresetBtn = e.target.closest('[data-fold-fg-preset]');
+      if (fgPresetBtn) {
+        var which2 = fgPresetBtn.getAttribute('data-fold-fg-preset');
+        var hex = fgPresetBtn.getAttribute('data-value');
+        block.setAttribute('data-fold-' + which2 + '-fg', hex);
+        _applyFoldStyles(block);
+        renderFoldPopupBody();
+        return;
+      }
+
       // 색상 반전 (p20o 재정의: 헤더 배경 ↔ 본문 배경 맞바꾸기)
       if (e.target.closest('[data-fold-invert-colors="1"]')) {
         var invHb = block.getAttribute('data-fold-head-bg') || '#0F3A3A';
@@ -19007,6 +19127,19 @@
     }
     if (!p) return;
     block.setAttribute('data-fold-color-mode', p.colorMode || 'unify');
+    // p20s A1: 배경 모드/패턴/그라디언트 확장 필드 반영
+    if (p.bgMode) block.setAttribute('data-fold-bg-mode', p.bgMode);
+    if (p.pattern) block.setAttribute('data-fold-pattern', p.pattern);
+    if (p.patternSize != null) block.setAttribute('data-fold-pattern-size', String(p.patternSize));
+    if (p.gradientAngle != null) block.setAttribute('data-fold-gradient-angle', String(p.gradientAngle));
+    if (p.headBg2) block.setAttribute('data-fold-head-bg2', p.headBg2);
+    if (p.bodyBg2) block.setAttribute('data-fold-body-bg2', p.bodyBg2);
+    if (p.borderStyle) block.setAttribute('data-fold-border-style', p.borderStyle);
+    if (p.borderWidth != null) block.setAttribute('data-fold-border-width', String(p.borderWidth));
+    if (p.borderColor) block.setAttribute('data-fold-border-color', p.borderColor);
+    if (p.borderColorMode) block.setAttribute('data-fold-border-color-mode', p.borderColorMode);
+    if (p.headFgMode) block.setAttribute('data-fold-head-fg-mode', p.headFgMode);
+    if (p.bodyFgMode) block.setAttribute('data-fold-body-fg-mode', p.bodyFgMode);
     block.setAttribute('data-fold-head-bg', p.headBg);
     block.setAttribute('data-fold-head-fg', p.headFg);
     block.setAttribute('data-fold-body-bg', p.bodyBg || p.headBg);
@@ -19367,7 +19500,9 @@
       + '},true);'
       + 'document.querySelectorAll(".ddl-fold-block").forEach(function(b){'
       + '  var op=b.getAttribute("data-fold-open");'
-      + '  if(op==="0"){b.classList.add("is-fold-closed");var bd=b.querySelector(":scope > .ddl-fold-body");if(bd)bd.style.setProperty("display","none","important");var ar=b.querySelector(":scope > .ddl-fold-head .ddl-fold-arrow");if(ar)ar.style.setProperty("transform","rotate(-90deg)","important");}'
+      + '  var rd=b.getAttribute("data-fold-radius")||"6";'
+      + '  var hdInit=b.querySelector(":scope > .ddl-fold-head");'
+      + '  if(op==="0"){b.classList.add("is-fold-closed");var bd=b.querySelector(":scope > .ddl-fold-body");if(bd)bd.style.setProperty("display","none","important");var ar=b.querySelector(":scope > .ddl-fold-head .ddl-fold-arrow");if(ar)ar.style.setProperty("transform","rotate(-90deg)","important");if(hdInit){hdInit.style.setProperty("border-bottom-left-radius",rd+"px","important");hdInit.style.setProperty("border-bottom-right-radius",rd+"px","important");}}else if(hdInit){hdInit.style.setProperty("border-bottom-left-radius","0","important");hdInit.style.setProperty("border-bottom-right-radius","0","important");}'
       + '});'
       + '})();';
     return '<!--kg-card-begin: html-->\n<script>' + toggleJs + '</script>\n<!--kg-card-end: html-->';
