@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p20t';
+  var VERSION = 'v2.0-β-p20u';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -18193,11 +18193,19 @@
         var angle = block.getAttribute('data-fold-gradient-angle') || '90';
         head.style.setProperty('background-image', 'linear-gradient(' + angle + 'deg, ' + headBg + ', ' + headBg2 + ')');
       } else if (bgMode === 'pattern') {
+        // p20u: 패턴 프로퍼티 분리 세팅 + 투명도
         var pattern = block.getAttribute('data-fold-pattern') || 'dot';
-        var pColor = block.getAttribute('data-fold-head-bg2') || 'rgba(255,255,255,0.15)';
+        var pColorRaw = block.getAttribute('data-fold-head-bg2') || '#ffffff';
+        var pOp = block.getAttribute('data-fold-pattern-opacity') || '30';
+        var pColor = _foldColorWithOp(pColorRaw, pOp);
         var pSize = block.getAttribute('data-fold-pattern-size') || '10';
-        var patBg = _foldMakePatternBg(pattern, pColor, pSize);
-        if (patBg) head.style.setProperty('background-image', patBg);
+        var patObj = _foldMakePatternBg(pattern, pColor, pSize);
+        if (patObj) {
+          head.style.setProperty('background-image', patObj.image);
+          head.style.setProperty('background-size', patObj.size);
+          head.style.setProperty('background-position', patObj.position);
+          head.style.setProperty('background-repeat', patObj.repeat);
+        }
       } else if (bgMode === 'image') {
         var img = block.getAttribute('data-fold-head-bg-image') || '';
         if (img) {
@@ -18224,15 +18232,26 @@
       body.style.removeProperty('background-position');
       body.style.removeProperty('background-repeat');
       if (bgMode === 'gradient') {
+        // p20u: 본문 그라디언트 - 본문 전용 속성 있으면 그것 사용, 없으면 헤더와 동일
         var bodyBg2 = block.getAttribute('data-fold-body-bg2') || bodyBg;
-        var angle2 = block.getAttribute('data-fold-gradient-angle') || '90';
-        body.style.setProperty('background-image', 'linear-gradient(' + angle2 + 'deg, ' + bodyBg + ', ' + bodyBg2 + ')');
+        var angle2 = block.getAttribute('data-fold-body-gradient-angle') || block.getAttribute('data-fold-gradient-angle') || '90';
+        var bodyBgStart = block.getAttribute('data-fold-body-bg-gradient-start') || bodyBg;
+        body.style.setProperty('background-image', 'linear-gradient(' + angle2 + 'deg, ' + bodyBgStart + ', ' + bodyBg2 + ')');
       } else if (bgMode === 'pattern') {
-        var pat = block.getAttribute('data-fold-pattern') || 'dot';
-        var pC = block.getAttribute('data-fold-body-bg2') || 'rgba(15,58,58,0.06)';
-        var pS = block.getAttribute('data-fold-pattern-size') || '10';
-        var patBg2 = _foldMakePatternBg(pat, pC, pS);
-        if (patBg2) body.style.setProperty('background-image', patBg2);
+        // p20u: 본문 패턴 - 별도 설정 없으면 헤더와 동일하게 (통일 모드 자연 상속)
+        //   본문 전용 속성 (data-fold-body-*) 있으면 그것 사용
+        var pat = block.getAttribute('data-fold-body-pattern') || block.getAttribute('data-fold-pattern') || 'dot';
+        var pCRaw = block.getAttribute('data-fold-body-bg2') || '#0F3A3A';
+        var pOpB = block.getAttribute('data-fold-body-pattern-opacity') || block.getAttribute('data-fold-pattern-opacity') || '15';
+        var pC = _foldColorWithOp(pCRaw, pOpB);
+        var pS = block.getAttribute('data-fold-body-pattern-size') || block.getAttribute('data-fold-pattern-size') || '10';
+        var patObjB = _foldMakePatternBg(pat, pC, pS);
+        if (patObjB) {
+          body.style.setProperty('background-image', patObjB.image);
+          body.style.setProperty('background-size', patObjB.size);
+          body.style.setProperty('background-position', patObjB.position);
+          body.style.setProperty('background-repeat', patObjB.repeat);
+        }
       } else if (bgMode === 'image') {
         var imgB = block.getAttribute('data-fold-body-bg-image') || '';
         if (imgB) {
@@ -18276,18 +18295,52 @@
     block.classList.toggle('is-fold-closed', !openR);
   }
 
+  // p20u: 패턴 CSS 근본 재작성 - background shorthand 문법 폐기, 프로퍼티 분리
+  //   이전 버그: 'linear-gradient(...) 0 0/Xpx Xpx' 는 background shorthand 문법이라
+  //             backgroundImage 프로퍼티에 넣으면 파싱 실패 (dot/check/zigzag 무반응 원인)
+  //   해결: 객체 { image, size, position, repeat } 반환하여 각 프로퍼티 개별 세팅
   function _foldMakePatternBg(pattern, color, size){
     var s = parseInt(size, 10) || 10;
     if (pattern === 'dot') {
-      return 'radial-gradient(circle at ' + (s/2) + 'px ' + (s/2) + 'px, ' + color + ' ' + (s*0.15) + 'px, transparent ' + (s*0.16) + 'px), transparent';
+      return {
+        image: 'radial-gradient(circle at ' + (s/2) + 'px ' + (s/2) + 'px, ' + color + ' ' + (s*0.2) + 'px, transparent ' + (s*0.22) + 'px)',
+        size: s + 'px ' + s + 'px',
+        position: '0 0',
+        repeat: 'repeat'
+      };
     } else if (pattern === 'stripe') {
-      return 'repeating-linear-gradient(45deg, ' + color + ' 0, ' + color + ' ' + (s/2) + 'px, transparent ' + (s/2) + 'px, transparent ' + s + 'px)';
+      return {
+        image: 'repeating-linear-gradient(45deg, ' + color + ' 0, ' + color + ' ' + (s/2) + 'px, transparent ' + (s/2) + 'px, transparent ' + s + 'px)',
+        size: 'auto',
+        position: '0 0',
+        repeat: 'repeat'
+      };
     } else if (pattern === 'check') {
-      return 'linear-gradient(45deg, ' + color + ' 25%, transparent 25%, transparent 75%, ' + color + ' 75%) 0 0/' + s + 'px ' + s + 'px';
+      // 체크: linear-gradient 두 방향 겹치기 (background-image 는 콤마 리스트)
+      return {
+        image: 'linear-gradient(45deg, ' + color + ' 25%, transparent 25%, transparent 75%, ' + color + ' 75%), linear-gradient(45deg, ' + color + ' 25%, transparent 25%, transparent 75%, ' + color + ' 75%)',
+        size: s + 'px ' + s + 'px, ' + s + 'px ' + s + 'px',
+        position: '0 0, ' + (s/2) + 'px ' + (s/2) + 'px',
+        repeat: 'repeat, repeat'
+      };
     } else if (pattern === 'zigzag') {
-      return 'linear-gradient(135deg, ' + color + ' 25%, transparent 25%) 0 0/' + s + 'px ' + s + 'px, linear-gradient(225deg, ' + color + ' 25%, transparent 25%) 0 0/' + s + 'px ' + s + 'px';
+      return {
+        image: 'linear-gradient(135deg, ' + color + ' 25%, transparent 25%), linear-gradient(225deg, ' + color + ' 25%, transparent 25%), linear-gradient(315deg, ' + color + ' 25%, transparent 25%), linear-gradient(45deg, ' + color + ' 25%, transparent 25%)',
+        size: s + 'px ' + s + 'px',
+        position: '0 0, 0 0, ' + (s/2) + 'px ' + (s/2) + 'px, ' + (s/2) + 'px ' + (s/2) + 'px',
+        repeat: 'repeat'
+      };
     }
-    return '';
+    return null;
+  }
+  // p20u: 색상 + 투명도 → rgba (패턴 색상용)
+  function _foldColorWithOp(hex, opPercent){
+    var rgb = _hexToRgb(hex);
+    var op = parseInt(opPercent, 10);
+    if (isNaN(op)) op = 100;
+    op = Math.max(0, Math.min(100, op)) / 100;
+    if (!rgb) return hex;
+    return 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + op + ')';
   }
 
   // ─── selectionchange · 클릭으로 selectedFold 관리 (콜아웃 미러) ───────────
@@ -18614,11 +18667,12 @@
       html += '<div class="row"><div class="row-label">방향 (' + angle + '°)</div>'
         + '<input type="range" id="pop-fold-gradient-angle" min="0" max="360" step="15" value="' + angle + '" style="width:100%;"></div>';
     }
-    // 패턴 세부
+    // 패턴 세부 (p20u: 투명도 추가)
     if (bgMode === 'pattern') {
       var pattern = block.getAttribute('data-fold-pattern') || 'dot';
       var pSize = block.getAttribute('data-fold-pattern-size') || '10';
-      html += '<div class="row"><div class="row-label">패턴</div>'
+      var pPatOp = block.getAttribute('data-fold-pattern-opacity') || '30';
+      html += '<div class="row"><div class="row-label">패턴 유형</div>'
         + '<button type="button" class="pop-btn' + (pattern==='dot'?' is-active':'') + '" data-fold-set="pattern" data-value="dot">도트</button>'
         + '<button type="button" class="pop-btn' + (pattern==='stripe'?' is-active':'') + '" data-fold-set="pattern" data-value="stripe">줄무늬</button>'
         + '<button type="button" class="pop-btn' + (pattern==='check'?' is-active':'') + '" data-fold-set="pattern" data-value="check">체크</button>'
@@ -18626,6 +18680,8 @@
         + '</div>';
       html += '<div class="row"><div class="row-label">패턴 크기 (' + pSize + 'px)</div>'
         + '<input type="range" id="pop-fold-pattern-size" min="4" max="40" step="1" value="' + pSize + '" style="width:100%;"></div>';
+      html += '<div class="row"><div class="row-label">패턴 투명도 (' + pPatOp + '%)</div>'
+        + '<input type="range" id="pop-fold-pattern-opacity" min="0" max="100" step="5" value="' + pPatOp + '" style="width:100%;"></div>';
     }
     // 이미지 업로드
     if (bgMode === 'image') {
@@ -18640,14 +18696,43 @@
         + (bodyImg ? '<button type="button" class="pop-btn" data-fold-bg-action="remove-body-image">본문 이미지 제거</button>' : '')
         + '</div>';
     }
-    // 본문 배경 (separate 일 때만 편집 가능)
+    // 본문 배경 (separate 일 때만 편집 가능) + p20u: 본문 그라디언트/패턴 독립 옵션
     if (mode === 'separate') {
-      html += '<div class="row" style="margin-top:0.8em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;"><div class="row-label" style="font-weight:600;">본문 배경색 (개별)</div>'
+      html += '<div class="row" style="margin-top:0.8em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;"><div class="row-label" style="font-weight:600;">본문 배경 (개별 지정)</div>'
         + '<div class="ep-color-row" style="display:flex; align-items:center; gap:8px;">'
         + '<input type="color" data-fold-set="bodyBg" value="' + escapeAttr(bodyBg) + '">'
         + '<span style="font-size:0.75em; opacity:0.7; white-space:nowrap;">투명도 ' + bodyOp + '%</span>'
         + '<input type="range" id="pop-fold-body-bg-opacity" min="0" max="100" step="5" value="' + bodyOp + '" style="flex:1; min-width:80px;">'
         + '</div></div>';
+      // p20u: 본문 그라디언트/패턴 별도 지정
+      if (bgMode === 'gradient') {
+        var bBgAngle = block.getAttribute('data-fold-body-gradient-angle') || block.getAttribute('data-fold-gradient-angle') || '90';
+        var bBgStart = _hexOrDefault(block.getAttribute('data-fold-body-bg-gradient-start'), bodyBg);
+        var bBg2 = _hexOrDefault(block.getAttribute('data-fold-body-bg2'), '#F5F5F5');
+        html += '<div class="row"><div class="row-label">본문 그라디언트 시작색</div>'
+          + '<div class="ep-color-row"><input type="color" data-fold-set="bodyBgGradStart" value="' + escapeAttr(bBgStart) + '"></div></div>';
+        html += '<div class="row"><div class="row-label">본문 그라디언트 끝색</div>'
+          + '<div class="ep-color-row"><input type="color" data-fold-set="bodyBg2" value="' + escapeAttr(bBg2) + '"></div></div>';
+        html += '<div class="row"><div class="row-label">본문 방향 (' + bBgAngle + '°)</div>'
+          + '<input type="range" id="pop-fold-body-gradient-angle" min="0" max="360" step="15" value="' + bBgAngle + '" style="width:100%;"></div>';
+      } else if (bgMode === 'pattern') {
+        var bPattern = block.getAttribute('data-fold-body-pattern') || block.getAttribute('data-fold-pattern') || 'dot';
+        var bPatSize = block.getAttribute('data-fold-body-pattern-size') || block.getAttribute('data-fold-pattern-size') || '10';
+        var bPatOp = block.getAttribute('data-fold-body-pattern-opacity') || '15';
+        var bPatCol = _hexOrDefault(block.getAttribute('data-fold-body-bg2'), '#0F3A3A');
+        html += '<div class="row"><div class="row-label">본문 패턴 유형</div>'
+          + '<button type="button" class="pop-btn' + (bPattern==='dot'?' is-active':'') + '" data-fold-body-pattern="dot">도트</button>'
+          + '<button type="button" class="pop-btn' + (bPattern==='stripe'?' is-active':'') + '" data-fold-body-pattern="stripe">줄무늬</button>'
+          + '<button type="button" class="pop-btn' + (bPattern==='check'?' is-active':'') + '" data-fold-body-pattern="check">체크</button>'
+          + '<button type="button" class="pop-btn' + (bPattern==='zigzag'?' is-active':'') + '" data-fold-body-pattern="zigzag">지그재그</button>'
+          + '</div>';
+        html += '<div class="row"><div class="row-label">본문 패턴 색</div>'
+          + '<div class="ep-color-row"><input type="color" data-fold-set="bodyBg2" value="' + escapeAttr(bPatCol) + '"></div></div>';
+        html += '<div class="row"><div class="row-label">본문 패턴 크기 (' + bPatSize + 'px)</div>'
+          + '<input type="range" id="pop-fold-body-pattern-size" min="4" max="40" step="1" value="' + bPatSize + '" style="width:100%;"></div>';
+        html += '<div class="row"><div class="row-label">본문 패턴 투명도 (' + bPatOp + '%)</div>'
+          + '<input type="range" id="pop-fold-body-pattern-opacity" min="0" max="100" step="5" value="' + bPatOp + '" style="width:100%;"></div>';
+      }
     } else {
       var previewLabel = mode === 'unify' ? '헤더와 동일' : (mode === 'shade-dark' ? '자동 진하게' : '자동 연하게');
       html += '<div class="row" style="margin-top:0.6em;"><div class="row-label">본문 배경 (' + previewLabel + ')</div>'
@@ -18945,6 +19030,14 @@
         renderFoldPopupBody();
         return;
       }
+      // p20u: 본문 패턴 유형 버튼 (data-fold-body-pattern)
+      var bPatBtn = e.target.closest('[data-fold-body-pattern]');
+      if (bPatBtn) {
+        block.setAttribute('data-fold-body-pattern', bPatBtn.getAttribute('data-fold-body-pattern'));
+        _applyFoldStyles(block);
+        renderFoldPopupBody();
+        return;
+      }
       // setter 버튼
       var setBtn = e.target.closest('[data-fold-set]');
       if (setBtn && setBtn.tagName === 'BUTTON') {
@@ -19085,6 +19178,29 @@
         _applyFoldStyles(block);
         return;
       }
+      // p20u: 패턴 투명도
+      if (e.target.id === 'pop-fold-pattern-opacity') {
+        block.setAttribute('data-fold-pattern-opacity', e.target.value);
+        _applyFoldStyles(block);
+        return;
+      }
+      // p20u: 본문 그라디언트 방향
+      if (e.target.id === 'pop-fold-body-gradient-angle') {
+        block.setAttribute('data-fold-body-gradient-angle', e.target.value);
+        _applyFoldStyles(block);
+        return;
+      }
+      // p20u: 본문 패턴 크기·투명도
+      if (e.target.id === 'pop-fold-body-pattern-size') {
+        block.setAttribute('data-fold-body-pattern-size', e.target.value);
+        _applyFoldStyles(block);
+        return;
+      }
+      if (e.target.id === 'pop-fold-body-pattern-opacity') {
+        block.setAttribute('data-fold-body-pattern-opacity', e.target.value);
+        _applyFoldStyles(block);
+        return;
+      }
       if (e.target.id === 'pop-fold-border-width') {
         block.setAttribute('data-fold-border-width', e.target.value);
         _applyFoldBorderStyles(block);
@@ -19133,6 +19249,8 @@
   }
 
   function _applyFoldAttrSet(block, key, val){
+    // p20u: 본문 전용 속성 지원
+    if (key === 'bodyBgGradStart') { block.setAttribute('data-fold-body-bg-gradient-start', val); _applyFoldStyles(block); return; }
     if (!block || !key) return;
     var map = {
       arrow: 'data-fold-arrow',
@@ -19501,13 +19619,43 @@
       if (!open) body.style.setProperty('display', 'none', 'important');
       else body.style.setProperty('display', 'block', 'important');
 
-      // 그라디언트/패턴/이미지 (기존 편집기 뷰와 동일하게 저장)
+      // p20u: 그라디언트/패턴/이미지 저장 (본문 전용 속성 지원)
       if (bgMode === 'gradient') {
         var bg2 = block.getAttribute('data-fold-head-bg2') || headBg;
         var ang = block.getAttribute('data-fold-gradient-angle') || '90';
         if (head) head.style.setProperty('background-image', 'linear-gradient(' + ang + 'deg, ' + headBg + ', ' + bg2 + ')', 'important');
-        var bg2b = block.getAttribute('data-fold-body-bg2') || bodyBg;
-        body.style.setProperty('background-image', 'linear-gradient(' + ang + 'deg, ' + bodyBg + ', ' + bg2b + ')', 'important');
+        // 본문 - 별도 설정 있으면 그것 사용
+        var bodyBg2s = block.getAttribute('data-fold-body-bg2') || bodyBg;
+        var angBody = block.getAttribute('data-fold-body-gradient-angle') || ang;
+        var bodyBgStartS = block.getAttribute('data-fold-body-bg-gradient-start') || bodyBg;
+        body.style.setProperty('background-image', 'linear-gradient(' + angBody + 'deg, ' + bodyBgStartS + ', ' + bodyBg2s + ')', 'important');
+      } else if (bgMode === 'pattern') {
+        // p20u: 저장 시에도 패턴 프로퍼티 분리 + 투명도
+        var patternS = block.getAttribute('data-fold-pattern') || 'dot';
+        var pOpH = block.getAttribute('data-fold-pattern-opacity') || '30';
+        var pColorHead = _foldColorWithOp(block.getAttribute('data-fold-head-bg2') || '#ffffff', pOpH);
+        var pSizeS = block.getAttribute('data-fold-pattern-size') || '10';
+        if (head) {
+          var pOH = _foldMakePatternBg(patternS, pColorHead, pSizeS);
+          if (pOH) {
+            head.style.setProperty('background-image', pOH.image, 'important');
+            head.style.setProperty('background-size', pOH.size, 'important');
+            head.style.setProperty('background-position', pOH.position, 'important');
+            head.style.setProperty('background-repeat', pOH.repeat, 'important');
+          }
+        }
+        // 본문 - 본문 전용 속성 지원
+        var patBody = block.getAttribute('data-fold-body-pattern') || patternS;
+        var pOpB2 = block.getAttribute('data-fold-body-pattern-opacity') || pOpH;
+        var pColorBody = _foldColorWithOp(block.getAttribute('data-fold-body-bg2') || '#0F3A3A', pOpB2);
+        var pSizeB = block.getAttribute('data-fold-body-pattern-size') || pSizeS;
+        var pOB = _foldMakePatternBg(patBody, pColorBody, pSizeB);
+        if (pOB) {
+          body.style.setProperty('background-image', pOB.image, 'important');
+          body.style.setProperty('background-size', pOB.size, 'important');
+          body.style.setProperty('background-position', pOB.position, 'important');
+          body.style.setProperty('background-repeat', pOB.repeat, 'important');
+        }
       } else if (bgMode === 'image') {
         var hImg = block.getAttribute('data-fold-head-bg-image');
         var bImg = block.getAttribute('data-fold-body-bg-image');
