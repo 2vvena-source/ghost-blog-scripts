@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p21c';
+  var VERSION = 'v2.0-β-p21d';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -6724,22 +6724,29 @@
     log('콜아웃 리사이저 설치');
   }
 
-  // p21b→p21c: 접은글 리사이저 (콜아웃 setupCalloutResizer 완전 미러링)
+  // p21b→p21c→p21d: 접은글 리사이저 (콜아웃 setupCalloutResizer 완전 미러링 + 강화)
   //   p21b 오류: _applyFoldStyles 재호출 방식 → 편집기 공통 폭 시스템과 충돌 → 실시간 반영 실패
-  //   p21c 해결: block.style.width 직접 세팅 (콜아웃과 동일) · 정렬 margin 도 직접 · _applyFoldStyles 안 호출
-  function setupFoldResizer(){
-    if (!contentEl) return;
-    var dragging = null;
-    contentEl.addEventListener('mousedown', function(e){
-      var rz = e.target.closest && e.target.closest('.ddl-fold-resizer');
-      if (!rz) return;
+  //   p21c 해결: block.style.width 직접 세팅 (콜아웃과 동일) · _applyFoldStyles 안 호출
+  //   p21d 강화: 사용자 보고 - contentEl 위임이 실전에서 이벤트 삼켜짐 → document 레벨 capture 로 이동
+  //              + 리사이저 요소 자체에 직접 mousedown 리스너 이중 부착 (attachFoldResizerHandler)
+  //              + 정렬은 접은글의 data-align 을 읽어 반영 (사이드바 정렬 시스템과 완전 연동)
+  //              + 진단 로그 확장 (window.__DDL_DBG_FOLD_RZ = true 로 켜기)
+  var _foldRzDragging = null;
+  function attachFoldResizerHandler(rz){
+    if (!rz || rz._foldRzAttached) return;
+    rz._foldRzAttached = true;
+    rz.addEventListener('mousedown', function(e){
+      if (e.button !== 0) return;
       var block = rz.closest('.ddl-fold-block');
       if (!block) return;
+      if (window.__DDL_DBG_FOLD_RZ) console.log('[FOLD-RZ] mousedown', { block: block, clientX: e.clientX });
       e.preventDefault();
       e.stopPropagation();
       var rect = block.getBoundingClientRect();
-      var parentRect = contentEl.getBoundingClientRect();
-      dragging = {
+      // 부모 폭 계산 - 접은글의 부모(콜아웃 body 안이면 그 body, 최상위면 contentEl)
+      var parent = block.parentElement || contentEl;
+      var parentRect = parent.getBoundingClientRect();
+      _foldRzDragging = {
         block: block,
         startX: e.clientX,
         startWidth: rect.width,
@@ -6747,37 +6754,78 @@
       };
       document.body.style.cursor = 'nwse-resize';
       document.body.style.userSelect = 'none';
-    });
+    }, true); // capture 페이즈로 다른 리스너보다 먼저 잡기
+  }
+
+  function setupFoldResizer(){
+    if (!contentEl) return;
+
+    // 이미 존재하는 리사이저들에 직접 리스너 부착
+    contentEl.querySelectorAll('.ddl-fold-resizer').forEach(attachFoldResizerHandler);
+
+    // 위임 리스너 (신규/복원되는 리사이저 커버) - capture 페이즈
+    document.addEventListener('mousedown', function(e){
+      if (e.button !== 0) return;
+      var rz = e.target && e.target.closest && e.target.closest('.ddl-fold-resizer');
+      if (!rz) return;
+      if (rz._foldRzAttached) return; // 이미 직접 리스너로 처리됨
+      var block = rz.closest('.ddl-fold-block');
+      if (!block) return;
+      if (window.__DDL_DBG_FOLD_RZ) console.log('[FOLD-RZ] mousedown(delegated)', { block: block });
+      e.preventDefault();
+      e.stopPropagation();
+      var rect = block.getBoundingClientRect();
+      var parent = block.parentElement || contentEl;
+      var parentRect = parent.getBoundingClientRect();
+      _foldRzDragging = {
+        block: block,
+        startX: e.clientX,
+        startWidth: rect.width,
+        parentWidth: parentRect.width
+      };
+      document.body.style.cursor = 'nwse-resize';
+      document.body.style.userSelect = 'none';
+    }, true);
+
     document.addEventListener('mousemove', function(e){
-      if (!dragging) return;
-      var dx = e.clientX - dragging.startX;
-      var newW = dragging.startWidth + dx;
-      var pct = Math.round((newW / dragging.parentWidth) * 100);
+      if (!_foldRzDragging) return;
+      var dx = e.clientX - _foldRzDragging.startX;
+      var newW = _foldRzDragging.startWidth + dx;
+      var pct = Math.round((newW / _foldRzDragging.parentWidth) * 100);
       pct = Math.max(25, Math.min(100, pct));
       pct = Math.round(pct / 5) * 5;
-      // p21c: 콜아웃 방식 - block 자체에 직접 width 세팅 (즉시 렌더)
-      var blk = dragging.block;
+      var blk = _foldRzDragging.block;
       blk.setAttribute('data-width-pct', String(pct));
       if (pct >= 100) {
-        blk.style.width = '';
-        blk.style.marginLeft = '';
-        blk.style.marginRight = '';
+        blk.style.setProperty('width', '', '');
+        blk.style.setProperty('margin-left', '', '');
+        blk.style.setProperty('margin-right', '', '');
       } else {
-        blk.style.width = pct + '%';
-        blk.style.boxSizing = 'border-box';
-        // 기본 정렬 = 가운데 (사용자가 팡에서 별도 정렬 UI 없앰 · p21c)
-        blk.style.marginLeft = 'auto';
-        blk.style.marginRight = 'auto';
-        blk.setAttribute('data-align', 'center');
+        blk.style.setProperty('width', pct + '%', 'important');
+        blk.style.setProperty('box-sizing', 'border-box', 'important');
+        // 정렬은 접은글의 data-align 을 그대로 사용 (사이드바에서 설정된 값 유지)
+        var al = blk.getAttribute('data-align') || 'center';
+        if (al === 'left')       { blk.style.setProperty('margin-left','0','important');    blk.style.setProperty('margin-right','auto','important'); }
+        else if (al === 'right') { blk.style.setProperty('margin-left','auto','important'); blk.style.setProperty('margin-right','0','important'); }
+        else                     { blk.style.setProperty('margin-left','auto','important'); blk.style.setProperty('margin-right','auto','important'); }
       }
-    });
+      if (window.__DDL_DBG_FOLD_RZ) console.log('[FOLD-RZ] mousemove', { pct: pct, width: blk.style.width });
+      // 팡 안 사이드바 정렬/폭 UI 동기화
+      var pctLbl = document.getElementById('ep-block-pct-lbl');
+      var pctSli = document.getElementById('ep-block-pct');
+      if (pctLbl) pctLbl.textContent = '폭 ' + pct + '%';
+      if (pctSli && document.activeElement !== pctSli) pctSli.value = pct;
+    }, true);
+
     document.addEventListener('mouseup', function(){
-      if (!dragging) return;
-      dragging = null;
+      if (!_foldRzDragging) return;
+      if (window.__DDL_DBG_FOLD_RZ) console.log('[FOLD-RZ] mouseup', { finalPct: _foldRzDragging.block.getAttribute('data-width-pct') });
+      _foldRzDragging = null;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
-    });
-    log('접은글 리사이저 설치 (p21c · 직접 width)');
+    }, true);
+
+    log('접은글 리사이저 설치 (p21d · document capture + 직접 리스너 이중 부착)');
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -14684,6 +14732,26 @@
   function setBlockAlign(block, align){
     if (!block) return;
     block.setAttribute('data-align', align);
+    // p21d: 접은글 특수 경로 - block 자체에 margin 직접 세팅 (콜아웃 wrapper 와 달리 block 자체가 특수 요소)
+    //   폭이 100% 미만일 때만 시각적 정렬 발동 (100%면 margin auto 무의미)
+    if (block.classList && block.classList.contains('ddl-fold-block')) {
+      var _pct = parseInt(block.getAttribute('data-width-pct') || '100', 10);
+      if (_pct < 100) {
+        if (align === 'left')       { block.style.setProperty('margin-left','0','important');    block.style.setProperty('margin-right','auto','important'); }
+        else if (align === 'right') { block.style.setProperty('margin-left','auto','important'); block.style.setProperty('margin-right','0','important'); }
+        else                        { block.style.setProperty('margin-left','auto','important'); block.style.setProperty('margin-right','auto','important'); }
+      } else {
+        block.style.removeProperty('margin-left');
+        block.style.removeProperty('margin-right');
+      }
+      // 팡 안 정렬 버튼 UI 동기화
+      try {
+        document.querySelectorAll('#ep-fold-popup [data-fold-align]').forEach(function(b){
+          b.classList.toggle('is-active', b.getAttribute('data-fold-align') === align);
+        });
+      } catch(_){}
+      return;
+    }
     // p17a: 버튼 블록 정렬 (kg-button-card 의 text-align + margin)
     if (block.classList && block.classList.contains('ep-button-block')) {
       applyButtonStyles(block);
@@ -18355,12 +18423,13 @@
     body.innerHTML = '<p><br></p>';
     block.appendChild(body);
 
-    // p21b: 리사이저 (콜아웃과 동일 · 우하단 드래그 핸들)
+    // p21b→p21d: 리사이저 (콜아웃과 동일 · 우하단 드래그 핸들) + 직접 리스너 부착
     var rz = document.createElement('div');
     rz.className = 'ddl-fold-resizer';
     rz.setAttribute('contenteditable', 'false');
     rz.setAttribute('title', '드래그하여 접은글 크기 조절');
     block.appendChild(rz);
+    if (typeof attachFoldResizerHandler === 'function') attachFoldResizerHandler(rz);
 
     if (afterBlock && afterBlock.parentNode) {
       afterBlock.parentNode.insertBefore(block, afterBlock.nextSibling);
@@ -18876,6 +18945,19 @@
         return;
       }
     });
+
+    // p21d: 정렬 3버튼 클릭 위임 (setBlockAlign 호출)
+    if (foldPopup) {
+      foldPopup.addEventListener('click', function(e){
+        var alignBtn = e.target.closest && e.target.closest('[data-fold-align]');
+        if (!alignBtn) return;
+        var _b = foldPopupLock || selectedFold;
+        if (_b && typeof setBlockAlign === 'function') setBlockAlign(_b, alignBtn.getAttribute('data-fold-align'));
+        foldPopup.querySelectorAll('[data-fold-align]').forEach(function(b){
+          b.classList.toggle('is-active', b === alignBtn);
+        });
+      });
+    }
   }
   function renderFoldPopupBody(){
     if (!foldPopupEl) return;
@@ -18947,7 +19029,18 @@
         + '<div style="font-size:0.72em; opacity:0.55; margin-top:0.2em;">100% = 좌우 꽉참, 80% = 좌우 10%씩 여백 (중앙 앵커)</div></div>';
     }
 
-    // p21c: 팡 안 폭 슬라이더 · 정렬 UI 제거 (사용자 요청 · 리사이저 드래그만 사용)
+    // p21c: 폭 슬라이더 제거 (리사이저 드래그로만 조정)
+    // p21d: 정렬 3버튼 (좌/중/우) 재추가 - 사이드바 정렬 시스템과 완전 연동 (사용자 요청)
+    var currentAlign = block.getAttribute('data-align') || 'center';
+    html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;">'
+      + '<div class="row-label" style="font-weight:600;">정렬 (폭 100% 미만일 때만 시각적)</div>'
+      + '<div style="display:flex; gap:0.4em;">'
+      + '<button type="button" class="pop-btn' + (currentAlign==='left'?' is-active':'') + '" data-fold-align="left" style="flex:1;">◀ 좌</button>'
+      + '<button type="button" class="pop-btn' + (currentAlign==='center'?' is-active':'') + '" data-fold-align="center" style="flex:1;">■ 중</button>'
+      + '<button type="button" class="pop-btn' + (currentAlign==='right'?' is-active':'') + '" data-fold-align="right" style="flex:1;">▶ 우</button>'
+      + '</div>'
+      + '<div style="font-size:0.72em; opacity:0.55; margin-top:0.3em;">우측 사이드바「블록 정렬·폭」과 동일. 폭은 우하단 리사이저 드래그.</div>'
+      + '</div>';
 
     html += _renderFoldPresetSection();
     return html;
@@ -20363,13 +20456,18 @@
       // p20z: 이전 저장 데이터의 outline 잔재 정리 (p20t 이전 outline 방식이 저장 인라인에 남아있을 수 있음)
       block.style.removeProperty('outline');
       block.style.removeProperty('outline-offset');
-      // p21b: 리사이저 없으면 재생성 (기존 저장 접은글 복원)
-      if (!block.querySelector(':scope > .ddl-fold-resizer')) {
+      // p21b→p21d: 리사이저 없으면 재생성 (기존 저장 접은글 복원) + 직접 리스너 부착
+      var existingRz = block.querySelector(':scope > .ddl-fold-resizer');
+      if (!existingRz) {
         var rzFix = document.createElement('div');
         rzFix.className = 'ddl-fold-resizer';
         rzFix.setAttribute('contenteditable', 'false');
         rzFix.setAttribute('title', '드래그하여 접은글 크기 조절');
         block.appendChild(rzFix);
+        if (typeof attachFoldResizerHandler === 'function') attachFoldResizerHandler(rzFix);
+      } else if (typeof attachFoldResizerHandler === 'function') {
+        // 기존 리사이저에도 리스너 재부착 (부팅 시)
+        attachFoldResizerHandler(existingRz);
       }
       _applyFoldStyles(block);
     });
