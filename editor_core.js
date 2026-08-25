@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p20o';
+  var VERSION = 'v2.0-β-p20r';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2468,11 +2468,119 @@
           }
           // 그 외엔 브라우저 기본 (본문 안 위로 이동)
         }
+
+        // p20q: 외부에서 ↑/← 로 접은글 진입 (이전 형제가 접은글이면 본문 마지막으로 강제 이동)
+        var isInFoldQ = target.closest && target.closest('.ddl-fold-block');
+        if (!isInFoldQ) {
+          // target 이 접은글 밖 편집 요소인 경우
+          var atStartQ = false;
+          try {
+            var sQ = window.getSelection();
+            if (sQ && sQ.rangeCount) {
+              var rQ = sQ.getRangeAt(0);
+              if (rQ.collapsed && rQ.startOffset === 0) {
+                var probe = rQ.startContainer;
+                if (probe === target) atStartQ = true;
+                else {
+                  var cur = probe, safe = true;
+                  while (cur && cur !== target) {
+                    if (cur.previousSibling) {
+                      var prev = cur.previousSibling;
+                      var isEmpty = (prev.nodeType === 3 && !(prev.nodeValue || '').replace(/\s/g,''))
+                                 || (prev.nodeType === 1 && prev.tagName === 'BR');
+                      if (!isEmpty) { safe = false; break; }
+                    }
+                    cur = cur.parentNode;
+                  }
+                  atStartQ = safe;
+                }
+              }
+              if (!atStartQ && (target.textContent || '').replace(/\s/g,'').length === 0) {
+                atStartQ = true;
+              }
+            }
+          } catch(_){}
+
+          if (atStartQ) {
+            var currentBlockQ = target.closest('.editor-block');
+            if (currentBlockQ) {
+              var prevBlockQ = currentBlockQ.previousElementSibling;
+              var targetFold = null;
+              if (prevBlockQ) {
+                if (prevBlockQ.classList && prevBlockQ.classList.contains('ddl-fold-block')) {
+                  targetFold = prevBlockQ;
+                } else if (prevBlockQ.querySelector) {
+                  var innerFolds = prevBlockQ.querySelectorAll('.ddl-fold-block');
+                  if (innerFolds.length) targetFold = innerFolds[innerFolds.length - 1];
+                }
+              }
+              if (targetFold) {
+                var isOpenQ = targetFold.getAttribute('data-fold-open') !== '0';
+                if (isOpenQ) {
+                  var bodyQ = targetFold.querySelector(':scope > .ddl-fold-body');
+                  if (bodyQ) {
+                    var lastEdQ = null;
+                    // p20r: nested fold 의 자식 요소까지 잡히지 않도록 직계 자식만 선택 (:scope > 필터)
+                    var candsQ = bodyQ.querySelectorAll(':scope > p, :scope > div:not(.ddl-fold-block):not(.callout-box), :scope > li');
+                    if (candsQ.length) lastEdQ = candsQ[candsQ.length - 1];
+                    else lastEdQ = bodyQ;
+                    e.preventDefault();
+                    try {
+                      var rEQ = document.createRange();
+                      rEQ.selectNodeContents(lastEdQ);
+                      rEQ.collapse(false);
+                      var sEQ = window.getSelection();
+                      sEQ.removeAllRanges();
+                      sEQ.addRange(rEQ);
+                      var focQ = lastEdQ.closest && lastEdQ.closest('[contenteditable="true"]') || bodyQ;
+                      if (focQ && focQ.focus) focQ.focus({ preventScroll: false });
+                    } catch(_){}
+                    return;
+                  }
+                }
+              }
+            }
+          }
+        }
       }
 
       if (e.key === 'Enter' && !e.shiftKey) {
         var t = target.tagName;
         if (t === 'LI' || t === 'UL' || t === 'OL') return; // 리스트는 기본 동작
+
+        // p20r: 접은글 제목(.ddl-fold-title)에서 Enter → 본문 첫 위치로 이동 (span 밖 튀는 버그 방지)
+        if (target.classList && target.classList.contains('ddl-fold-title')) {
+          e.preventDefault();
+          var foldBlockT = target.closest('.ddl-fold-block');
+          if (!foldBlockT) return;
+          // 닫혀있으면 먼저 열기 (편집 흐름 자연스럽게)
+          var isOpenT = foldBlockT.getAttribute('data-fold-open') !== '0';
+          if (!isOpenT) {
+            foldBlockT.setAttribute('data-fold-open', '1');
+            foldBlockT.classList.remove('is-fold-closed');
+          }
+          var bodyT = foldBlockT.querySelector(':scope > .ddl-fold-body');
+          if (!bodyT) return;
+          bodyT.style.display = 'block';
+          // 본문에 편집 가능 자식이 없으면 <p><br></p> 생성
+          if (!bodyT.firstElementChild) {
+            var newP0 = document.createElement('p');
+            newP0.innerHTML = '<br>';
+            bodyT.appendChild(newP0);
+          }
+          var firstEditT = bodyT.querySelector(':scope > p, :scope > div, :scope > li') || bodyT;
+          try {
+            var rT = document.createRange();
+            rT.selectNodeContents(firstEditT);
+            rT.collapse(true);
+            var sT = window.getSelection();
+            sT.removeAllRanges();
+            sT.addRange(rT);
+            bodyT.focus({ preventScroll: false });
+          } catch(_){}
+          return;
+        }
+
         // p20m: 콜아웃/접은글 body Enter - 진짜 노션식 (엔터 1번=새 문단, 엔터 2번=탈출)
         if (target.classList && (target.classList.contains('callout-body') || target.classList.contains('ddl-fold-body'))) {
           var s = window.getSelection();
@@ -13351,7 +13459,7 @@
     contentEl.querySelectorAll('.editor-block').forEach(function(b){
       // p20d: 콜아웃 body 안에 중첩된 editor-block 은 부모 콜아웃이 통째로 저장하므로 top-level 에서는 스킵
       //         (이 가드 없으면 안에 있는 블록이 밖에도 또 한 번 저장되어 노션 스타일 중첩이 깨짐)
-      try { if (b.parentElement && b.parentElement.closest && b.parentElement.closest('.callout-body')) return; } catch(_){}
+      try { if (b.parentElement && b.parentElement.closest && b.parentElement.closest('.callout-body, .ddl-fold-body')) return; } catch(_){} // p20r: 접은글 body 안 nested block 도 skip (부모가 통째로 저장)
       var blockType = b.getAttribute('data-block-type') || '';
       var innerEls = Array.from(b.children).filter(function(c){ return !c.classList.contains('block-handle'); });
       // p13f: data-block-type 뿐 아니라 실제 .callout-box 존재 여부로도 판단 (더 견고)
@@ -19222,8 +19330,9 @@
 
   // 저장 HTML 최상단에 붙는 통합 스타일+스크립트 (Ghost 는 kg-card html 안 <style>/<script> 허용)
   function _getFoldRuntimeCard(){
-    // p20n: <style> 폐기 (사이트 스킨 CSS 에 밀림) — 이제 모든 CSS 는 enhanceFoldForSite 가 인라인으로 심음
-    //   여기서는 사이트 원본 블로그의 클릭 토글 스크립트만 반환
+    // p20q: 사이트 토글 스크립트 완전 재작성 — 중첩 접은글 대응 · :scope > 로 직속 자식만 검사 · 캡처링(true)
+    //   이전 실패: e.target.closest('.ddl-fold-body') 를 먼저 검사해서 내부 접은글 head 를 body 안 클릭으로 오인
+    //   해결: head 를 먼저 찾고, 그 head 의 직속 block 안의 :scope > body 만 검사 (부모/자식 오탐 방지)
     var toggleJs = '(function(){'
       + 'if(window.__DDL_FOLD_TOGGLE_LOADED)return;'
       + 'window.__DDL_FOLD_TOGGLE_LOADED=true;'
@@ -19231,9 +19340,9 @@
       + '  var open=block.getAttribute("data-fold-open")==="1";'
       + '  block.setAttribute("data-fold-open",open?"0":"1");'
       + '  if(open)block.classList.add("is-fold-closed");else block.classList.remove("is-fold-closed");'
-      + '  var body=block.querySelector(".ddl-fold-body");'
-      + '  var head=block.querySelector(".ddl-fold-head");'
-      + '  var arrow=block.querySelector(".ddl-fold-arrow");'
+      + '  var body=block.querySelector(":scope > .ddl-fold-body");'
+      + '  var head=block.querySelector(":scope > .ddl-fold-head");'
+      + '  var arrow=head?head.querySelector(".ddl-fold-arrow"):null;'
       + '  var radius=block.getAttribute("data-fold-radius")||"6";'
       + '  if(body){body.style.setProperty("display",open?"none":"block","important");}'
       + '  if(arrow){arrow.style.setProperty("transform",open?"rotate(-90deg)":"none","important");}'
@@ -19245,17 +19354,20 @@
       + 'document.addEventListener("click",function(e){'
       + '  if(!e.target||!e.target.closest)return;'
       + '  if(e.target.tagName==="A")return;'
-      + '  if(e.target.closest(".ddl-fold-body"))return;'
       + '  var head=e.target.closest(".ddl-fold-head");'
       + '  if(!head)return;'
       + '  var block=head.parentElement;'
       + '  if(!block||!block.classList.contains("ddl-fold-block"))return;'
+      + '  var bodyEl=block.querySelector(":scope > .ddl-fold-body");'
+      + '  if(bodyEl&&bodyEl.contains(e.target))return;'
+      + '  try{console.log("[DDL-FOLD] toggle:",block.getAttribute("data-fold-label")||"?","->",block.getAttribute("data-fold-open")==="1"?"close":"open");}catch(_){}'
       + '  apply(block);'
       + '  e.preventDefault();'
-      + '});'
+      + '  e.stopPropagation();'
+      + '},true);'
       + 'document.querySelectorAll(".ddl-fold-block").forEach(function(b){'
       + '  var op=b.getAttribute("data-fold-open");'
-      + '  if(op==="0"){b.classList.add("is-fold-closed");var bd=b.querySelector(".ddl-fold-body");if(bd)bd.style.setProperty("display","none","important");var ar=b.querySelector(".ddl-fold-arrow");if(ar)ar.style.setProperty("transform","rotate(-90deg)","important");}'
+      + '  if(op==="0"){b.classList.add("is-fold-closed");var bd=b.querySelector(":scope > .ddl-fold-body");if(bd)bd.style.setProperty("display","none","important");var ar=b.querySelector(":scope > .ddl-fold-head .ddl-fold-arrow");if(ar)ar.style.setProperty("transform","rotate(-90deg)","important");}'
       + '});'
       + '})();';
     return '<!--kg-card-begin: html-->\n<script>' + toggleJs + '</script>\n<!--kg-card-end: html-->';
