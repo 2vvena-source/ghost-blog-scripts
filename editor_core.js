@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p20m';
+  var VERSION = 'v2.0-β-p20n';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2332,21 +2332,46 @@
       var block = target.closest('.editor-block');
       if (!block) return;
 
-      // p20m: 백스페이스 방어 — 콜아웃/접은글 body 안에서 body 가 완전히 비어있으면 백스페이스로 블록 삭제 안 되게
+      // p20n: 백스페이스 방어 정밀화 — 커서가 첫 위치에 있으면 블록 삭제 원천 차단
       if (e.key === 'Backspace') {
         var isContainerBody = target.classList && (target.classList.contains('callout-body') || target.classList.contains('ddl-fold-body'));
-        if (isContainerBody) {
-          // body 텍스트 없고 자식이 <p><br></p> 하나뿐이면 삭제 이벤트 차단
-          var bodyText = (target.textContent || '').replace(/\s/g, '');
-          if (bodyText.length === 0) {
-            e.preventDefault();
-            return;
+        var isFoldTitle = target.classList && target.classList.contains('ddl-fold-title');
+
+        if (isContainerBody || isFoldTitle) {
+          var bsSel = window.getSelection();
+          if (bsSel && bsSel.rangeCount) {
+            var bsR = bsSel.getRangeAt(0);
+            // 커서가 요소 처음 위치인지 판정
+            var atStart = false;
+            try {
+              if (bsR.startOffset === 0) {
+                var probe = bsR.startContainer;
+                // 첫 텍스트 노드거나 target 자체
+                if (probe === target) atStart = true;
+                else {
+                  // probe 의 조상 중 target 에 도달하기까지 previousSibling 이 없어야 함
+                  var cur = probe;
+                  atStart = true;
+                  while (cur && cur !== target) {
+                    if (cur.previousSibling) {
+                      // <br> 외 텍스트/요소가 있으면 첫 위치 아님
+                      var prev = cur.previousSibling;
+                      var isEmptyPrev = (prev.nodeType === 3 && !(prev.nodeValue || '').replace(/\s/g,''))
+                                     || (prev.nodeType === 1 && prev.tagName === 'BR');
+                      if (!isEmptyPrev) { atStart = false; break; }
+                    }
+                    cur = cur.parentNode;
+                  }
+                }
+              }
+            } catch(_){}
+            // body/제목 텍스트가 완전히 비어있는 경우도 첫 위치로 간주
+            var totalText = (target.textContent || '').replace(/\s/g, '');
+            if (atStart || totalText.length === 0) {
+              e.preventDefault();
+              return;
+            }
           }
-        }
-        // 접은글 제목에서 백스페이스 시 제목이 완전히 비어있으면 무시 (블록 삭제 방지)
-        if (target.classList && target.classList.contains('ddl-fold-title')) {
-          var tt = (target.textContent || '').replace(/\s/g, '');
-          if (tt.length === 0) { e.preventDefault(); return; }
         }
       }
 
@@ -17949,17 +17974,23 @@
     var bodyBg = block.getAttribute('data-fold-body-bg') || headBg;
     var bodyFg = block.getAttribute('data-fold-body-fg') || headFg;
 
+    // p20n: 색 계산 개선 — separate 모드는 사용자 지정 값 유지, 그 외만 재계산
     if (mode === 'unify') {
       bodyBg = headBg; bodyFg = headFg;
+      block.setAttribute('data-fold-body-bg', bodyBg);
+      block.setAttribute('data-fold-body-fg', bodyFg);
     } else if (mode === 'shade-dark') {
       bodyBg = computeFoldAutoColor(headBg, 'shade-dark');
       bodyFg = headFg;
+      block.setAttribute('data-fold-body-bg', bodyBg);
+      block.setAttribute('data-fold-body-fg', bodyFg);
     } else if (mode === 'shade-light') {
       bodyBg = computeFoldAutoColor(headBg, 'shade-light');
       bodyFg = '#0F3A3A';
+      block.setAttribute('data-fold-body-bg', bodyBg);
+      block.setAttribute('data-fold-body-fg', bodyFg);
     }
-    block.setAttribute('data-fold-body-bg', bodyBg);
-    block.setAttribute('data-fold-body-fg', bodyFg);
+    // separate 모드: 사용자가 개별 지정한 값 그대로 사용 (덮어쓰지 않음)
 
     var head = block.querySelector('.ddl-fold-head');
     var body = block.querySelector('.ddl-fold-body');
@@ -17997,6 +18028,7 @@
         else head.style.backgroundImage = '';
       } else {
         head.style.backgroundImage = '';
+        head.style.removeProperty('background-image');
       }
     }
     if (title) {
@@ -18025,6 +18057,7 @@
         else body.style.backgroundImage = '';
       } else {
         body.style.backgroundImage = '';
+        body.style.removeProperty('background-image');
       }
     }
     if (label) {
@@ -18857,51 +18890,230 @@
   // 저장 시 clone 이 받아야 하는 최소한의 정보만 정리 (인라인 스타일은 최소로)
   function enhanceFoldForSite(block){
     if (!block) return;
-    // 편집기 전용 클래스 제거
+    // p20n: 콜아웃 방식 마이그레이션 — 모든 결정적 CSS 를 인라인 스타일로 직접 심음
+    //   이유: <style> 블록은 사이트 스킨 CSS 에 밀림. 인라인은 specificity 최상.
+
+    // 편집기 전용 클래스·속성 제거
     block.classList.remove('is-editing-focus', 'is-selected', 'dragging', 'drop-into');
-    block.classList.remove('editor-block'); // 사이트에선 필요 없음, ddl-fold-block 만 남김
-    // contenteditable 제거는 상위 collectPostData 에서 이미 처리됨
+    block.classList.remove('editor-block');
+    block.removeAttribute('contenteditable');
+    block.querySelectorAll('[contenteditable]').forEach(function(x){ x.removeAttribute('contenteditable'); });
+    block.querySelectorAll('.block-handle').forEach(function(h){ h.parentNode && h.parentNode.removeChild(h); });
 
-    // 라벨 텍스트 동기화
-    var label = block.querySelector('.ddl-fold-label');
-    if (label) label.textContent = block.getAttribute('data-fold-label') || '접은글';
-
-    // arrow 문자 동기화
-    var arrow = block.querySelector('.ddl-fold-arrow');
-    if (arrow) {
-      var ak = block.getAttribute('data-fold-arrow') || 'chevron';
-      if (ak === 'triangle') arrow.textContent = '▶';
-      else if (ak === 'caret') arrow.textContent = '▾';
-      else arrow.textContent = '⌄';
-    }
-    // 헤더 안쪽이 없으면 재구성 (안전빵)
+    // 헤더 안쪽 wrapper 가 없으면 재구성 (안전빵)
     var head = block.querySelector('.ddl-fold-head');
     if (head && !head.querySelector('.ddl-fold-head-inner')) {
-      var t = head.querySelector('.ddl-fold-title');
-      var a = head.querySelector('.ddl-fold-arrow');
-      var inner = document.createElement('div');
-      inner.className = 'ddl-fold-head-inner';
-      if (t) inner.appendChild(t);
-      if (a) inner.appendChild(a);
-      head.appendChild(inner);
+      var t0 = head.querySelector('.ddl-fold-title');
+      var a0 = head.querySelector('.ddl-fold-arrow');
+      var inner0 = document.createElement('div');
+      inner0.className = 'ddl-fold-head-inner';
+      if (t0) inner0.appendChild(t0);
+      if (a0) inner0.appendChild(a0);
+      head.appendChild(inner0);
     }
 
-    // 인라인 스타일: 각 요소에 색상만 심는다 (구조·flex 는 <style> 블록이 담당)
-    var headBg = block.getAttribute('data-fold-head-bg') || '#0F3A3A';
-    var headFg = block.getAttribute('data-fold-head-fg') || '#F5F5F5';
-    var bodyBg = block.getAttribute('data-fold-body-bg') || headBg;
-    var bodyFg = block.getAttribute('data-fold-body-fg') || headFg;
-    if (head) { head.style.backgroundColor = headBg; head.style.color = headFg; }
-    if (label) { label.style.backgroundColor = headBg; label.style.color = headFg; }
+    // 속성값 읽기
+    var mode      = block.getAttribute('data-fold-color-mode') || 'unify';
+    var headBg    = block.getAttribute('data-fold-head-bg') || '#0F3A3A';
+    var headFg    = block.getAttribute('data-fold-head-fg') || '#F5F5F5';
+    var bodyBg    = block.getAttribute('data-fold-body-bg') || headBg;
+    var bodyFg    = block.getAttribute('data-fold-body-fg') || headFg;
+    var radius    = block.getAttribute('data-fold-radius') || '6';
+    var headSize  = block.getAttribute('data-fold-head-size') || 'normal';
+    var labelOn   = block.getAttribute('data-fold-label-on') !== '0';
+    var labelText = block.getAttribute('data-fold-label') || '접은글';
+    var arrowKind = block.getAttribute('data-fold-arrow') || 'chevron';
+    var arrowPos  = block.getAttribute('data-fold-arrow-pos') || 'right';
+    var open      = block.getAttribute('data-fold-open') !== '0';
+    var headFont  = block.getAttribute('data-fold-head-font') || '';
+    var bodyFont  = block.getAttribute('data-fold-body-font') || '';
+    var bgMode    = block.getAttribute('data-fold-bg-mode') || 'solid';
+    var divOn     = block.getAttribute('data-fold-divider') === '1';
+    var divStyle  = block.getAttribute('data-fold-divider-style') || 'solid';
+    var divWidth  = block.getAttribute('data-fold-divider-width') || '80';
+
+    // 블록 컨테이너 — 모든 결정적 CSS 인라인
+    block.style.setProperty('position', 'relative', 'important');
+    block.style.setProperty('margin', '0.9em 0', 'important');
+    block.style.setProperty('box-sizing', 'border-box', 'important');
+    block.style.setProperty('overflow', 'visible', 'important');
+    block.style.setProperty('display', 'block', 'important');
+
+    // 헤더
+    if (head) {
+      head.style.setProperty('display', 'flex', 'important');
+      head.style.setProperty('align-items', 'stretch', 'important');
+      head.style.setProperty('min-height', '2.4em', 'important');
+      head.style.setProperty('overflow', 'hidden', 'important');
+      head.style.setProperty('cursor', 'pointer', 'important');
+      head.style.setProperty('background-color', headBg, 'important');
+      head.style.setProperty('color', headFg, 'important');
+      head.style.setProperty('border-top-left-radius', radius + 'px', 'important');
+      head.style.setProperty('border-top-right-radius', radius + 'px', 'important');
+      head.style.setProperty('position', 'relative', 'important');
+      if (!open) {
+        head.style.setProperty('border-bottom-left-radius', radius + 'px', 'important');
+        head.style.setProperty('border-bottom-right-radius', radius + 'px', 'important');
+      }
+    }
+
+    // 라벨 (세로 스탬프) — writing-mode 필수 인라인
+    var label = block.querySelector('.ddl-fold-label');
+    if (label) {
+      if (labelOn) {
+        label.style.setProperty('display', 'flex', 'important');
+        label.style.setProperty('flex', '0 0 auto', 'important');
+        label.style.setProperty('width', '2.6em', 'important');
+        label.style.setProperty('min-width', '2.6em', 'important');
+        label.style.setProperty('background-color', headBg, 'important');
+        label.style.setProperty('color', headFg, 'important');
+        label.style.setProperty('align-items', 'center', 'important');
+        label.style.setProperty('justify-content', 'center', 'important');
+        label.style.setProperty('font-size', '0.75em', 'important');
+        label.style.setProperty('font-family', '"Cafe24Danjunghae","NanumURiDdarSonGeurSsi",serif', 'important');
+        label.style.setProperty('letter-spacing', '0.15em', 'important');
+        label.style.setProperty('writing-mode', 'vertical-rl', 'important');
+        label.style.setProperty('text-orientation', 'mixed', 'important');
+        label.style.setProperty('padding', '0.6em 0', 'important');
+        label.style.setProperty('user-select', 'none', 'important');
+        label.style.setProperty('box-sizing', 'border-box', 'important');
+        label.textContent = labelText;
+      } else {
+        label.style.setProperty('display', 'none', 'important');
+      }
+    }
+
+    // 헤더 안쪽
+    var inner = block.querySelector('.ddl-fold-head-inner');
+    if (inner) {
+      inner.style.setProperty('flex', '1 1 auto', 'important');
+      inner.style.setProperty('display', 'flex', 'important');
+      inner.style.setProperty('align-items', 'center', 'important');
+      inner.style.setProperty('gap', '0.6em', 'important');
+      inner.style.setProperty('min-width', '0', 'important');
+      inner.style.setProperty('box-sizing', 'border-box', 'important');
+      if (labelOn) inner.style.setProperty('border-left', '1px solid rgba(15,58,58,0.15)', 'important');
+      else inner.style.setProperty('border-left', 'none', 'important');
+      // 헤더 높이 3단
+      if (headSize === 'small') { inner.style.setProperty('padding', '0.4em 0.8em', 'important'); inner.style.setProperty('font-size', '0.9em', 'important'); }
+      else if (headSize === 'large') { inner.style.setProperty('padding', '1.1em 1em', 'important'); inner.style.setProperty('font-size', '1.12em', 'important'); }
+      else { inner.style.setProperty('padding', '0.7em 0.9em 0.7em 1em', 'important'); inner.style.setProperty('font-size', '1em', 'important'); }
+    }
+
+    // 제목
+    var title = block.querySelector('.ddl-fold-title');
+    if (title) {
+      title.style.setProperty('flex', '1 1 auto', 'important');
+      title.style.setProperty('min-width', '0', 'important');
+      title.style.setProperty('min-height', '1.4em', 'important');
+      title.style.setProperty('color', headFg, 'important');
+      title.style.setProperty('font-weight', '500', 'important');
+      title.style.setProperty('line-height', '1.4', 'important');
+      title.style.setProperty('word-break', 'break-word', 'important');
+      title.style.setProperty('order', (arrowPos === 'left') ? '1' : '1', 'important');
+      title.style.setProperty('font-family', headFont || '"Cafe24Danjunghae",inherit', 'important');
+    }
+
+    // arrow — 실제 문자 + order 인라인
+    var arrow = block.querySelector('.ddl-fold-arrow');
+    if (arrow) {
+      arrow.style.setProperty('display', 'inline-flex', 'important');
+      arrow.style.setProperty('align-items', 'center', 'important');
+      arrow.style.setProperty('justify-content', 'center', 'important');
+      arrow.style.setProperty('width', '1.6em', 'important');
+      arrow.style.setProperty('height', '1.6em', 'important');
+      arrow.style.setProperty('cursor', 'pointer', 'important');
+      arrow.style.setProperty('font-size', '0.95em', 'important');
+      arrow.style.setProperty('color', headFg, 'important');
+      arrow.style.setProperty('opacity', '0.7', 'important');
+      arrow.style.setProperty('user-select', 'none', 'important');
+      arrow.style.setProperty('flex', '0 0 auto', 'important');
+      arrow.style.setProperty('transition', 'transform 0.18s ease', 'important');
+      if (arrowPos === 'left') { arrow.style.setProperty('order', '0', 'important'); arrow.style.setProperty('margin-right', '0.4em', 'important'); arrow.style.setProperty('margin-left', '0', 'important'); }
+      else { arrow.style.setProperty('order', '2', 'important'); arrow.style.setProperty('margin-left', '0.4em', 'important'); arrow.style.setProperty('margin-right', '0', 'important'); }
+      if (!open) arrow.style.setProperty('transform', 'rotate(-90deg)', 'important');
+      else arrow.style.setProperty('transform', 'none', 'important');
+      // arrow 문자
+      if (arrowKind === 'triangle') arrow.textContent = '▶';
+      else if (arrowKind === 'caret') arrow.textContent = '▾';
+      else arrow.textContent = '⌄';
+    }
+
+    // 세로 구분선 (::after 폐기 → 실제 <div> 자식으로 그림 · 콜아웃 도형 방식과 동일)
+    if (head) {
+      // 기존 divider 자식 제거
+      var oldDiv = head.querySelector('.ddl-fold-head-divider');
+      if (oldDiv && oldDiv.parentNode) oldDiv.parentNode.removeChild(oldDiv);
+      if (divOn) {
+        var dv = document.createElement('div');
+        dv.className = 'ddl-fold-head-divider';
+        dv.style.setProperty('position', 'absolute', 'important');
+        dv.style.setProperty('bottom', '0', 'important');
+        dv.style.setProperty('left', '50%', 'important');
+        dv.style.setProperty('transform', 'translateX(-50%)', 'important');
+        dv.style.setProperty('width', divWidth + '%', 'important');
+        dv.style.setProperty('pointer-events', 'none', 'important');
+        if (divStyle === 'bold') {
+          dv.style.setProperty('height', '3px', 'important');
+          dv.style.setProperty('background', headFg, 'important');
+          dv.style.setProperty('opacity', '0.35', 'important');
+        } else if (divStyle === 'dashed') {
+          dv.style.setProperty('height', '0', 'important');
+          dv.style.setProperty('border-top', '1px dashed ' + headFg, 'important');
+          dv.style.setProperty('opacity', '0.5', 'important');
+        } else if (divStyle === 'double') {
+          dv.style.setProperty('height', '3px', 'important');
+          dv.style.setProperty('border-top', '1px solid ' + headFg, 'important');
+          dv.style.setProperty('border-bottom', '1px solid ' + headFg, 'important');
+          dv.style.setProperty('opacity', '0.5', 'important');
+        } else {
+          dv.style.setProperty('height', '1px', 'important');
+          dv.style.setProperty('background', headFg, 'important');
+          dv.style.setProperty('opacity', '0.3', 'important');
+        }
+        head.appendChild(dv);
+      }
+    }
+
+    // 본문
     var body = block.querySelector('.ddl-fold-body');
-    if (body) { body.style.backgroundColor = bodyBg; body.style.color = bodyFg; }
-
-    // 초기 닫힘 상태
-    var open = block.getAttribute('data-fold-open') !== '0';
-    if (!open) { block.classList.add('is-fold-closed'); if (body) body.style.display = 'none'; }
-
-    // 본문 직계 자식 사이 margin 강제 (중첩 대응)
     if (body) {
+      body.style.setProperty('padding', labelOn ? '1em 1.2em 1.2em 3.4em' : '1em 1.2em', 'important');
+      body.style.setProperty('min-height', '2em', 'important');
+      body.style.setProperty('position', 'relative', 'important');
+      body.style.setProperty('line-height', '1.65', 'important');
+      body.style.setProperty('word-break', 'break-word', 'important');
+      body.style.setProperty('background-color', bodyBg, 'important');
+      body.style.setProperty('color', bodyFg, 'important');
+      body.style.setProperty('border-bottom-left-radius', radius + 'px', 'important');
+      body.style.setProperty('border-bottom-right-radius', radius + 'px', 'important');
+      if (bodyFont) body.style.setProperty('font-family', bodyFont, 'important');
+      if (!open) body.style.setProperty('display', 'none', 'important');
+      else body.style.setProperty('display', 'block', 'important');
+
+      // 그라디언트/패턴/이미지 (기존 편집기 뷰와 동일하게 저장)
+      if (bgMode === 'gradient') {
+        var bg2 = block.getAttribute('data-fold-head-bg2') || headBg;
+        var ang = block.getAttribute('data-fold-gradient-angle') || '90';
+        if (head) head.style.setProperty('background-image', 'linear-gradient(' + ang + 'deg, ' + headBg + ', ' + bg2 + ')', 'important');
+        var bg2b = block.getAttribute('data-fold-body-bg2') || bodyBg;
+        body.style.setProperty('background-image', 'linear-gradient(' + ang + 'deg, ' + bodyBg + ', ' + bg2b + ')', 'important');
+      } else if (bgMode === 'image') {
+        var hImg = block.getAttribute('data-fold-head-bg-image');
+        var bImg = block.getAttribute('data-fold-body-bg-image');
+        if (head && hImg) {
+          head.style.setProperty('background-image', 'url(' + hImg + ')', 'important');
+          head.style.setProperty('background-size', 'cover', 'important');
+          head.style.setProperty('background-position', 'center', 'important');
+        }
+        if (bImg) {
+          body.style.setProperty('background-image', 'url(' + bImg + ')', 'important');
+          body.style.setProperty('background-size', 'cover', 'important');
+          body.style.setProperty('background-position', 'center', 'important');
+        }
+      }
+
+      // 본문 직계 자식 사이 margin 강제 (콜아웃과 동일)
       var directChildren = body.children;
       for (var i = 0; i < directChildren.length; i++) {
         var ch = directChildren[i];
@@ -18916,36 +19128,29 @@
         }
       }
     }
+
+    // 닫힘 상태 클래스
+    if (!open) block.classList.add('is-fold-closed');
+    else block.classList.remove('is-fold-closed');
+
+    // 테두리 (헤더 아래 border-bottom) 유지
+    var bStyle = block.getAttribute('data-fold-border-style');
+    if (bStyle && bStyle !== 'none' && head) {
+      var bWidth = parseInt(block.getAttribute('data-fold-border-width') || '1', 10) || 1;
+      var bColor = block.getAttribute('data-fold-border-color') || 'rgba(15,58,58,0.15)';
+      var bOp = parseInt(block.getAttribute('data-fold-border-opacity') || '100', 10) / 100;
+      var eff = (bStyle === 'bold') ? Math.max(2, bWidth * 2) : bWidth;
+      var css = (bStyle === 'bold') ? 'solid' : bStyle;
+      var rgb = _hexToRgb(bColor);
+      var rgba = rgb ? ('rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + bOp + ')') : bColor;
+      head.style.setProperty('border-bottom', eff + 'px ' + css + ' ' + rgba, 'important');
+    }
   }
 
   // 저장 HTML 최상단에 붙는 통합 스타일+스크립트 (Ghost 는 kg-card html 안 <style>/<script> 허용)
   function _getFoldRuntimeCard(){
-    var css = ''
-      + '.ddl-fold-block{position:relative;margin:0.9em 0;box-sizing:border-box;overflow:visible;}'
-      + '.ddl-fold-block .ddl-fold-head{position:relative;display:flex;align-items:stretch;min-height:2.4em;overflow:hidden;cursor:pointer;border-top-left-radius:6px;border-top-right-radius:6px;}'
-      + '.ddl-fold-block .ddl-fold-label{flex:0 0 auto;width:2.6em;min-width:2.6em;display:flex;align-items:center;justify-content:center;font-size:0.75em;font-family:"Cafe24Danjunghae","NanumURiDdarSonGeurSsi",serif;letter-spacing:0.15em;writing-mode:vertical-rl;text-orientation:mixed;padding:0.6em 0;user-select:none;box-sizing:border-box;}'
-      + '.ddl-fold-block[data-fold-label-on="0"] .ddl-fold-label{display:none;}'
-      + '.ddl-fold-block .ddl-fold-head-inner{flex:1 1 auto;display:flex;align-items:center;gap:0.6em;padding:0.7em 0.9em 0.7em 1em;border-left:1px solid rgba(15,58,58,0.15);min-width:0;box-sizing:border-box;}'
-      + '.ddl-fold-block[data-fold-label-on="0"] .ddl-fold-head-inner{border-left:none;padding-left:1.2em;}'
-      + '.ddl-fold-block[data-fold-head-size="small"] .ddl-fold-head-inner{padding:0.4em 0.8em;font-size:0.9em;}'
-      + '.ddl-fold-block[data-fold-head-size="large"] .ddl-fold-head-inner{padding:1.1em 1em;font-size:1.12em;}'
-      + '.ddl-fold-block[data-fold-arrow-pos="left"] .ddl-fold-arrow{order:0;margin-right:0.4em;}'
-      + '.ddl-fold-block[data-fold-arrow-pos="left"] .ddl-fold-title{order:1;}'
-      + '.ddl-fold-block[data-fold-arrow-pos="right"] .ddl-fold-arrow{order:2;margin-left:0.4em;}'
-      + '.ddl-fold-block[data-fold-arrow-pos="right"] .ddl-fold-title{order:1;}'
-      + '.ddl-fold-block .ddl-fold-arrow{display:inline-flex;align-items:center;justify-content:center;width:1.6em;height:1.6em;cursor:pointer;font-size:0.95em;opacity:0.7;user-select:none;flex:0 0 auto;transition:transform 0.18s ease;}'
-      + '.ddl-fold-block.is-fold-closed .ddl-fold-arrow{transform:rotate(-90deg);}'
-      + '.ddl-fold-block .ddl-fold-title{flex:1 1 auto;min-width:0;min-height:1.4em;font-family:"Cafe24Danjunghae",inherit;font-weight:500;line-height:1.4;word-break:break-word;}'
-      + '.ddl-fold-block .ddl-fold-body{padding:1em 1.2em 1.2em 3.4em;min-height:2em;position:relative;line-height:1.65;word-break:break-word;border-bottom-left-radius:6px;border-bottom-right-radius:6px;}'
-      + '.ddl-fold-block[data-fold-label-on="0"] .ddl-fold-body{padding-left:1.2em;}'
-      // 제목-본문 세로 구분선 (헤더 내부 border)
-      + '.ddl-fold-block[data-fold-divider="1"] .ddl-fold-head{position:relative;}'
-      + '.ddl-fold-block[data-fold-divider="1"] .ddl-fold-head::after{content:"";position:absolute;bottom:0;left:50%;transform:translateX(-50%);height:1px;background:currentColor;opacity:0.25;width:var(--fold-div-width,80%);}'
-      + '.ddl-fold-block[data-fold-divider="1"][data-fold-divider-style="bold"] .ddl-fold-head::after{height:3px;}'
-      + '.ddl-fold-block[data-fold-divider="1"][data-fold-divider-style="dashed"] .ddl-fold-head::after{background:transparent;border-top:1px dashed currentColor;height:0;}'
-      + '.ddl-fold-block[data-fold-divider="1"][data-fold-divider-style="double"] .ddl-fold-head::after{background:transparent;border-top:1px solid currentColor;border-bottom:1px solid currentColor;height:3px;}'
-      // 폭 변수는 인라인 style 로 심어짐
-      ;
+    // p20n: <style> 폐기 (사이트 스킨 CSS 에 밀림) — 이제 모든 CSS 는 enhanceFoldForSite 가 인라인으로 심음
+    //   여기서는 사이트 원본 블로그의 클릭 토글 스크립트만 반환
     var toggleJs = '(function(){'
       + 'if(window.__DDL_FOLD_TOGGLE_LOADED)return;'
       + 'window.__DDL_FOLD_TOGGLE_LOADED=true;'
@@ -18954,7 +19159,15 @@
       + '  block.setAttribute("data-fold-open",open?"0":"1");'
       + '  if(open)block.classList.add("is-fold-closed");else block.classList.remove("is-fold-closed");'
       + '  var body=block.querySelector(".ddl-fold-body");'
-      + '  if(body)body.style.display=open?"none":"";'
+      + '  var head=block.querySelector(".ddl-fold-head");'
+      + '  var arrow=block.querySelector(".ddl-fold-arrow");'
+      + '  var radius=block.getAttribute("data-fold-radius")||"6";'
+      + '  if(body){body.style.setProperty("display",open?"none":"block","important");}'
+      + '  if(arrow){arrow.style.setProperty("transform",open?"rotate(-90deg)":"none","important");}'
+      + '  if(head){'
+      + '    if(open){head.style.setProperty("border-bottom-left-radius",radius+"px","important");head.style.setProperty("border-bottom-right-radius",radius+"px","important");}'
+      + '    else{head.style.setProperty("border-bottom-left-radius","0","important");head.style.setProperty("border-bottom-right-radius","0","important");}'
+      + '  }'
       + '}'
       + 'document.addEventListener("click",function(e){'
       + '  if(!e.target||!e.target.closest)return;'
@@ -18967,16 +19180,12 @@
       + '  apply(block);'
       + '  e.preventDefault();'
       + '});'
-      + '// 초기 닫힘 상태 반영'
       + 'document.querySelectorAll(".ddl-fold-block").forEach(function(b){'
       + '  var op=b.getAttribute("data-fold-open");'
-      + '  if(op==="0"){b.classList.add("is-fold-closed");var bd=b.querySelector(".ddl-fold-body");if(bd)bd.style.display="none";}'
-      + '  // 세로 구분선 폭 변수'
-      + '  var dw=b.getAttribute("data-fold-divider-width");'
-      + '  if(dw){var hd=b.querySelector(".ddl-fold-head");if(hd)hd.style.setProperty("--fold-div-width",dw+"%");}'
+      + '  if(op==="0"){b.classList.add("is-fold-closed");var bd=b.querySelector(".ddl-fold-body");if(bd)bd.style.setProperty("display","none","important");var ar=b.querySelector(".ddl-fold-arrow");if(ar)ar.style.setProperty("transform","rotate(-90deg)","important");}'
       + '});'
       + '})();';
-    return '<!--kg-card-begin: html-->\n<style>' + css + '</style>\n<script>' + toggleJs + '</script>\n<!--kg-card-end: html-->';
+    return '<!--kg-card-begin: html-->\n<script>' + toggleJs + '</script>\n<!--kg-card-end: html-->';
   }
 
   // ─── hydration ────────────────────────────────────────────────────────────
