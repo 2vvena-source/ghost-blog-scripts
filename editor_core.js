@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p20z';
+  var VERSION = 'v2.0-β-p21a';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -4463,7 +4463,10 @@
     calPopupEl.innerHTML = ''
       + '<div class="ep-popup-header" id="ep-cal-popup-drag">'
       + '  <span>콜아웃 편집</span>'
-      + '  <button type="button" class="ep-popup-close" data-cal-pop="close">×</button>'
+      + '  <div style="display:flex; gap:4px; align-items:center;">'
+      + '    <button type="button" class="ep-popup-delete" data-cal-pop="delete" title="이 콜아웃 삭제" style="background:transparent; border:1px solid rgba(200,50,50,0.35); color:#c83232; border-radius:4px; padding:2px 8px; cursor:pointer; font-size:0.75em;">🗑 삭제</button>'
+      + '    <button type="button" class="ep-popup-close" data-cal-pop="close">×</button>'
+      + '  </div>'
       + '</div>'
       + '<div class="ep-popup-tabs">'
       + '  <button type="button" class="ep-popup-tab is-active" data-cal-pop-tab="icon">아이콘</button>'
@@ -4537,6 +4540,19 @@
       }
       var closeBtn = e.target.closest('[data-cal-pop="close"]');
       if (closeBtn) { closeCalloutPopup(); return; }
+      // p21a: 삭제 버튼
+      var delBtn = e.target.closest('[data-cal-pop="delete"]');
+      if (delBtn) {
+        var target = calPopupLock || selectedCallout;
+        if (!target) { closeCalloutPopup(); return; }
+        var ok = window.confirm('이 콜아웃을 삭제하시겠어요? (이 안 내용도 함께 삭제됩니다)');
+        if (!ok) return;
+        // wrapper editor-block 찾아서 통째로 제거
+        var wrap = target.closest('.editor-block') || target;
+        try { wrap.parentNode && wrap.parentNode.removeChild(wrap); } catch(_){}
+        closeCalloutPopup();
+        return;
+      }
     });
   }
 
@@ -18215,6 +18231,9 @@
     block.setAttribute('data-fold-arrow-cutout', '0');
     block.setAttribute('data-fold-title-cutout', '0');
     block.setAttribute('data-fold-body-cutout', '0');
+    // p21a: 접은글 폭 (콜아웃과 동일 공통 시스템 · 25~100%)
+    block.setAttribute('data-width-pct', '100');
+    block.setAttribute('data-align', 'center'); // 100% 미만일 때 정렬
     block.setAttribute('contenteditable', 'false');
 
     block.appendChild(makeBlockHandle());
@@ -18448,6 +18467,26 @@
     }
     block.classList.toggle('is-fold-closed', !openR);
 
+    // p21a: 접은글 폭 & 정렬 (콜아웃 방식 미러링)
+    //   data-width-pct = 25~100 · block 자체에 width 인라인
+    //   data-align 은 100 미만일 때만 실효
+    try {
+      var _wpNum = parseInt(block.getAttribute('data-width-pct') || '100', 10);
+      if (isNaN(_wpNum) || _wpNum <= 0) _wpNum = 100;
+      if (_wpNum >= 100) {
+        block.style.width = '';
+        block.style.marginLeft = '';
+        block.style.marginRight = '';
+      } else {
+        block.style.width = _wpNum + '%';
+        block.style.boxSizing = 'border-box';
+        var _al = block.getAttribute('data-align') || 'center';
+        if (_al === 'left')       { block.style.marginLeft = '0';    block.style.marginRight = 'auto'; }
+        else if (_al === 'right') { block.style.marginLeft = 'auto'; block.style.marginRight = '0';    }
+        else                      { block.style.marginLeft = 'auto'; block.style.marginRight = 'auto'; }
+      }
+    } catch(_){}
+
     // p20y A2: 컷아웃 후처리 (텍스트 색을 부모 배경색으로 → 뚫린 효과)
     _applyFoldCutouts(block);
   }
@@ -18665,7 +18704,10 @@
     foldPopupEl.innerHTML = ''
       + '<div class="ep-popup-header" id="ep-fold-popup-drag">'
       + '  <span>접은글 편집</span>'
-      + '  <button type="button" class="ep-popup-close" data-fold-pop="close">×</button>'
+      + '  <div style="display:flex; gap:4px; align-items:center;">'
+      + '    <button type="button" class="ep-popup-delete" data-fold-pop="delete" title="이 접은글 삭제" style="background:transparent; border:1px solid rgba(200,50,50,0.35); color:#c83232; border-radius:4px; padding:2px 8px; cursor:pointer; font-size:0.75em;">🗑 삭제</button>'
+      + '    <button type="button" class="ep-popup-close" data-fold-pop="close">×</button>'
+      + '  </div>'
       + '</div>'
       + '<div class="ep-popup-tabs">'
       + '  <button type="button" class="ep-popup-tab is-active" data-fold-pop-tab="shape">모양</button>'
@@ -18730,6 +18772,20 @@
         return;
       }
       if (e.target.closest('[data-fold-pop="close"]')) { closeFoldPopup(); return; }
+      // p21a: 접은글 삭제
+      if (e.target.closest('[data-fold-pop="delete"]')) {
+        var target = foldPopupLock || selectedFold;
+        if (!target) { closeFoldPopup(); return; }
+        var ok = window.confirm('이 접은글을 삭제하시겠어요? (본문 내용도 함께 삭제됩니다)');
+        if (!ok) return;
+        // 접은글 블록은 자체가 editor-block · 그대로 제거
+        var wrap = target.closest('.editor-block') || target;
+        try { wrap.parentNode && wrap.parentNode.removeChild(wrap); } catch(_){}
+        closeFoldPopup();
+        selectedFold = null;
+        try { renderFoldEditPanel(); } catch(_){}
+        return;
+      }
     });
   }
   function renderFoldPopupBody(){
@@ -18801,6 +18857,20 @@
         + '<input type="range" id="pop-fold-divider-width" min="10" max="100" step="5" value="' + divWidth + '" style="width:100%;">'
         + '<div style="font-size:0.72em; opacity:0.55; margin-top:0.2em;">100% = 좌우 꽉참, 80% = 좌우 10%씩 여백 (중앙 앵커)</div></div>';
     }
+
+    // p21a: 접은글 폭 & 정렬 (콜아웃과 동일 공통 시스템)
+    var widthPct21 = block.getAttribute('data-width-pct') || '100';
+    var alignCur21 = block.getAttribute('data-align') || 'center';
+    html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;">'
+      + '<div class="row-label" style="font-weight:600;">접은글 폭 (' + widthPct21 + '%)</div>'
+      + '<input type="range" id="pop-fold-width-pct" min="25" max="100" step="5" value="' + widthPct21 + '" style="width:100%;">'
+      + '<div style="font-size:0.72em; opacity:0.55; margin-top:0.2em;">100% = 편집기 전체 폭. 미만일 때 아래 정렬 적용.</div>'
+      + '</div>';
+    html += '<div class="row"><div class="row-label">가로 정렬</div>'
+      + '<button type="button" class="pop-btn' + (alignCur21==='left'?' is-active':'') + '" data-fold-align="left">왼쪽</button>'
+      + '<button type="button" class="pop-btn' + (alignCur21==='center'?' is-active':'') + '" data-fold-align="center">가운데</button>'
+      + '<button type="button" class="pop-btn' + (alignCur21==='right'?' is-active':'') + '" data-fold-align="right">오른쪽</button>'
+      + '</div>';
 
     html += _renderFoldPresetSection();
     return html;
@@ -19327,6 +19397,15 @@
         renderFoldPopupBody();
         return;
       }
+      // p21a: 접은글 가로 정렬 버튼
+      var alignBtn = e.target.closest('[data-fold-align]');
+      if (alignBtn) {
+        var alignV = alignBtn.getAttribute('data-fold-align');
+        block.setAttribute('data-align', alignV);
+        _applyFoldStyles(block);
+        renderFoldPopupBody();
+        return;
+      }
       // p20y A2: 컷아웃 토글 (arrow · title · body)
       var cutBtn = e.target.closest('[data-fold-cutout]');
       if (cutBtn) {
@@ -19466,6 +19545,15 @@
       if (e.target.id === 'pop-fold-radius') {
         block.setAttribute('data-fold-radius', e.target.value);
         _applyFoldStyles(block);
+        return;
+      }
+      // p21a: 접은글 폭 슬라이더 (실시간 반영 · 재렌더 안 함 · 라벨만 갱신)
+      if (e.target.id === 'pop-fold-width-pct') {
+        var _wpv = String(parseInt(e.target.value, 10));
+        block.setAttribute('data-width-pct', _wpv);
+        _applyFoldStyles(block);
+        var _wpLbl = e.target.parentNode && e.target.parentNode.querySelector('.row-label');
+        if (_wpLbl) _wpLbl.textContent = '접은글 폭 (' + _wpv + '%)';
         return;
       }
       if (e.target.id === 'pop-fold-divider-width') {
@@ -19813,7 +19901,18 @@
 
     // 블록 컨테이너 — 모든 결정적 CSS 인라인
     block.style.setProperty('position', 'relative', 'important');
-    block.style.setProperty('margin', '0.9em 0', 'important');
+    // p21a: 폭 & 정렬 (data-width-pct 25~100)
+    var _wpEnh = parseInt(block.getAttribute('data-width-pct') || '100', 10);
+    if (isNaN(_wpEnh) || _wpEnh <= 0) _wpEnh = 100;
+    var _alEnh = block.getAttribute('data-align') || 'center';
+    if (_wpEnh >= 100) {
+      block.style.setProperty('margin', '0.9em 0', 'important');
+    } else {
+      block.style.setProperty('width', _wpEnh + '%', 'important');
+      if (_alEnh === 'left')       block.style.setProperty('margin', '0.9em auto 0.9em 0',    'important');
+      else if (_alEnh === 'right') block.style.setProperty('margin', '0.9em 0 0.9em auto',    'important');
+      else                          block.style.setProperty('margin', '0.9em auto',            'important');
+    }
     block.style.setProperty('box-sizing', 'border-box', 'important');
     block.style.setProperty('overflow', 'visible', 'important');
     block.style.setProperty('display', 'block', 'important');
