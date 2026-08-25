@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p20n';
+  var VERSION = 'v2.0-β-p20o';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2375,55 +2375,98 @@
         }
       }
 
-      // p20m: 화살표 키로 접은글 제목↔본문 이동
+      // p20o: 화살표 키로 접은글 제목↔본문 이동 (정밀 판정)
+      //   판정 원칙:
+      //     - 제목 span 안: 커서가 진짜 끝일 때만 → ArrowDown/ArrowRight 로 본문 첫 위치 이동
+      //     - 본문 안: 커서가 진짜 처음일 때만 → ArrowUp/ArrowLeft 로 제목 끝 위치 이동
+      //     - 그 외엔 브라우저 기본 동작 (제목 span 안 커서 이동, 본문 안 자연 이동)
+      function _fold_atEndOfNode(node){
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return false;
+        var r = sel.getRangeAt(0);
+        if (!r.collapsed) return false;
+        // node 전체 텍스트 길이와 커서 위치까지 텍스트 길이 비교
+        try {
+          var full = document.createRange();
+          full.selectNodeContents(node);
+          var toCaret = document.createRange();
+          toCaret.setStart(full.startContainer, full.startOffset);
+          toCaret.setEnd(r.startContainer, r.startOffset);
+          var textToCaret = toCaret.toString();
+          var textFull = full.toString();
+          return textToCaret.length === textFull.length;
+        } catch(_){ return false; }
+      }
+      function _fold_atStartOfNode(node){
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return false;
+        var r = sel.getRangeAt(0);
+        if (!r.collapsed) return false;
+        try {
+          var full = document.createRange();
+          full.selectNodeContents(node);
+          var toCaret = document.createRange();
+          toCaret.setStart(full.startContainer, full.startOffset);
+          toCaret.setEnd(r.startContainer, r.startOffset);
+          return toCaret.toString().length === 0;
+        } catch(_){ return false; }
+      }
+
       if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
         if (target.classList && target.classList.contains('ddl-fold-title')) {
-          var foldBlockA = target.closest('.ddl-fold-block');
-          if (foldBlockA) {
-            var bodyA = foldBlockA.querySelector('.ddl-fold-body');
-            var firstEditable = bodyA && (bodyA.querySelector('p, div, span, [contenteditable="true"]') || bodyA);
-            if (firstEditable) {
-              e.preventDefault();
-              try {
-                firstEditable.focus();
-                var rA = document.createRange();
-                rA.selectNodeContents(firstEditable);
-                rA.collapse(true);
-                var sA = window.getSelection();
-                sA.removeAllRanges();
-                sA.addRange(rA);
-              } catch(_){}
-              return;
-            }
-          }
-        }
-      }
-      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-        if (target.classList && target.classList.contains('ddl-fold-body')) {
-          // 커서가 body 첫 위치인지 확인
-          var selUp = window.getSelection();
-          if (selUp && selUp.rangeCount) {
-            var rUp = selUp.getRangeAt(0);
-            var atStart = rUp.startOffset === 0;
-            // 첫 자식 노드에도 있는지
-            if (atStart && rUp.startContainer === target || (atStart && target.firstChild === rUp.startContainer)) {
-              var foldBlockB = target.closest('.ddl-fold-block');
-              var titleB = foldBlockB && foldBlockB.querySelector('.ddl-fold-title');
-              if (titleB) {
+          // ArrowRight 는 제목 끝에서만 이동, ArrowDown 은 언제나 (다음 줄로 자연스레)
+          var goDown = (e.key === 'ArrowDown');
+          var atEnd = _fold_atEndOfNode(target);
+          if (goDown || atEnd) {
+            var foldBlockA = target.closest('.ddl-fold-block');
+            if (foldBlockA) {
+              var bodyA = foldBlockA.querySelector('.ddl-fold-body');
+              // 본문이 열려있을 때만 (닫힘이면 밖으로 자연 이동)
+              var isOpen = foldBlockA.getAttribute('data-fold-open') !== '0';
+              if (bodyA && isOpen) {
+                // 본문의 첫 편집 가능 자식 (보통 <p>) 찾기
+                var firstEditable = bodyA.querySelector('p, div, li') || bodyA;
                 e.preventDefault();
                 try {
-                  titleB.focus();
-                  var rB = document.createRange();
-                  rB.selectNodeContents(titleB);
-                  rB.collapse(false);
-                  var sB = window.getSelection();
-                  sB.removeAllRanges();
-                  sB.addRange(rB);
+                  var rA = document.createRange();
+                  rA.selectNodeContents(firstEditable);
+                  rA.collapse(true);
+                  var sA = window.getSelection();
+                  sA.removeAllRanges();
+                  sA.addRange(rA);
+                  // focus 는 실제 [contenteditable="true"] 인 조상에게
+                  var focusTarget = firstEditable.closest && firstEditable.closest('[contenteditable="true"]') || bodyA;
+                  if (focusTarget && focusTarget.focus) focusTarget.focus({ preventScroll: false });
                 } catch(_){}
                 return;
               }
             }
           }
+          // 그 외엔 브라우저 기본 동작 (제목 span 안에서 옆으로 이동)
+        }
+      }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        if (target.classList && target.classList.contains('ddl-fold-body') || (target.closest && target.closest('.ddl-fold-body'))) {
+          // body 안 첫 위치인지 판정
+          var bodyEl = target.classList.contains('ddl-fold-body') ? target : target.closest('.ddl-fold-body');
+          if (bodyEl && _fold_atStartOfNode(bodyEl)) {
+            var foldBlockB = bodyEl.closest('.ddl-fold-block');
+            var titleB = foldBlockB && foldBlockB.querySelector('.ddl-fold-title');
+            if (titleB) {
+              e.preventDefault();
+              try {
+                titleB.focus();
+                var rB = document.createRange();
+                rB.selectNodeContents(titleB);
+                rB.collapse(false); // 끝에
+                var sB = window.getSelection();
+                sB.removeAllRanges();
+                sB.addRange(rB);
+              } catch(_){}
+              return;
+            }
+          }
+          // 그 외엔 브라우저 기본 (본문 안 위로 이동)
         }
       }
 
@@ -13323,7 +13366,9 @@
       if (hasDivider) innerEls = [b];
       // p17a: 버튼도 블록 자체
       if (hasButton) innerEls = [b];
-      // p20k: 표·접은글 로직은 다음 라운드에서 재설계 (이번 라운드는 예외 처리 앞으로 앞당김)
+      // p20o: 접은글도 블록 자체(.editor-block.ddl-fold-block)를 통째로 저장 (콜아웃과 동등한 처리 · innerEls 분해 방지)
+      //   이전 버그: b.children 필터로 head/body 두 자식이 분해되어 enhanceFoldForSite 가 실제로 스타일을 못 심음 → 사이트 렌더 붕괴
+      if (hasFoldBlock) innerEls = [b];
       var hasTable = false, hasFold = false;
       var isCustom = (blockType === 'callout' || hasCalloutBox || blockType === 'image' || hasImageFig || blockType === 'divider' || hasDivider || blockType === 'button' || hasButton || blockType === 'fold' || hasFoldBlock);
       // p13f: 감지 시 data-block-type 자동 교정
@@ -18389,7 +18434,7 @@
       + '<button type="button" class="pop-btn' + (mode==='separate'?' is-active':'') + '" data-fold-set="colorMode" data-value="separate">개별 지정</button>'
       + '</div>';
     // 색상 반전 버튼
-    html += '<div class="row"><button type="button" class="pop-btn" data-fold-invert-colors="1" style="width:100%;">🔄 헤더 색상 반전 (배경 ↔ 글자)</button></div>';
+    html += '<div class="row"><button type="button" class="pop-btn" data-fold-invert-colors="1" style="width:100%;">🔄 헤더 ↔ 본문 배경 반전</button></div>';
     // 배경 유형
     html += '<div class="row" style="margin-top:0.6em;"><div class="row-label">배경 유형</div>'
       + '<button type="button" class="pop-btn' + (bgMode==='solid'?' is-active':'') + '" data-fold-set="bgMode" data-value="solid">단색</button>'
@@ -18581,12 +18626,20 @@
         } catch(_){}
         return;
       }
-      // 색상 반전
+      // 색상 반전 (p20o 재정의: 헤더 배경 ↔ 본문 배경 맞바꾸기)
       if (e.target.closest('[data-fold-invert-colors="1"]')) {
-        var hb = block.getAttribute('data-fold-head-bg') || '#0F3A3A';
-        var hf = block.getAttribute('data-fold-head-fg') || '#F5F5F5';
-        block.setAttribute('data-fold-head-bg', hf);
-        block.setAttribute('data-fold-head-fg', hb);
+        var invHb = block.getAttribute('data-fold-head-bg') || '#0F3A3A';
+        var invBb = block.getAttribute('data-fold-body-bg') || '#F5F5F5';
+        var invHf = block.getAttribute('data-fold-head-fg') || '#F5F5F5';
+        var invBf = block.getAttribute('data-fold-body-fg') || '#0F3A3A';
+        // separate 모드로 전환해서 값 유지되게
+        block.setAttribute('data-fold-color-mode', 'separate');
+        // 헤더 배경 ↔ 본문 배경
+        block.setAttribute('data-fold-head-bg', invBb);
+        block.setAttribute('data-fold-body-bg', invHb);
+        // 글자색도 헤더 ↔ 본문 (배경 반전에 맞게 자연스럽게 함께 교체)
+        block.setAttribute('data-fold-head-fg', invBf);
+        block.setAttribute('data-fold-body-fg', invHf);
         _applyFoldStyles(block);
         renderFoldPopupBody();
         return;
