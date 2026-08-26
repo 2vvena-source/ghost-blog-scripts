@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p24i';
+  var VERSION = 'v2.0-β-p24j';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -16304,118 +16304,286 @@
   }
 
   // 색깔 편집 미니 다이얼로그 (이름 + 색)
+  // p24j: 색깔 편집 미니 다이얼로그 · 사이트 톤으로 전면 재작성
+  //   ★ 사용자 피드백: "이건 너무 당신 디자인 같음. 우리 사이트와 어울리지 않음"
+  //   ★ 개선점:
+  //     - 선·여백 중심 (박스형 border, UPPERCASE 라벨 제거)
+  //     - 인풋은 밑줄만 (border-bottom 1px)
+  //     - 색 원 클릭 = 컬러 피커 (숨김 input)
+  //     - 투명도 슬라이더 추가 (사용자 요청)
+  //     - 100% 면 hex, 100% 미만이면 rgba() 로 value 리턴 (소비자 무변경)
+  //   ★ 재사용 3곳: 글자색 관리창(p24i) · 헤더 편집창 [색깔] 탭 · 형광폜 편집창 [색깔] 탭
   //   ★ 중복 콜백 완전 차단: onDone 은 딱 한 번만 호출된다.
   function _openHeaderColorEditMini(existing, onDone){
     var _fired = false;
     function _fire(result){
       if (_fired) return;
       _fired = true;
+      document.removeEventListener('keydown', _onKey);
       try { overlay.remove(); } catch(_){}
       if (typeof onDone === 'function') onDone(result);
     }
 
+    // ── 초기값 파싱 ──
+    var initValue = (existing && existing.value) || '#0F3A3A';
+    var initName  = (existing && existing.name)  || '';
+    // rgba(...) 인지 hex 인지 판별
+    var initHex = '#0F3A3A';
+    var initAlpha = 100;
+    (function _parseInit(){
+      var s = String(initValue).trim();
+      if (/^#[0-9a-f]{6}$/i.test(s)){
+        initHex = s;
+        initAlpha = 100;
+        return;
+      }
+      var mRgba = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i);
+      if (mRgba){
+        var r = parseInt(mRgba[1], 10);
+        var g = parseInt(mRgba[2], 10);
+        var b = parseInt(mRgba[3], 10);
+        var a = mRgba[4] ? parseFloat(mRgba[4]) : 1;
+        function _h(n){ var x = n.toString(16); return x.length === 1 ? '0'+x : x; }
+        initHex = '#' + _h(r) + _h(g) + _h(b);
+        initAlpha = Math.round(a * 100);
+      }
+    })();
+
+    // ── 오버레이 ──
     var overlay = document.createElement('div');
+    overlay.className = 'ddl-editor-popup';
     overlay.style.cssText = 'position: fixed; inset: 0; z-index: 100020;'
-      + ' background: rgba(15,58,58,0.25);'
+      + ' background: rgba(15,58,58,0.22);'
       + ' display: flex; align-items: center; justify-content: center;'
-      + ' font-family: "Pretendard Variable","Pretendard",sans-serif;';
+      + ' font-family: "Pretendard Variable","Pretendard","Noto Sans KR",sans-serif;'
+      + ' color: var(--color, #0F3A3A);';
 
     var box = document.createElement('div');
-    box.style.cssText = 'background: #fff; border: 1px solid rgba(15,58,58,0.2); border-radius: 6px;'
-      + ' width: 320px; max-width: 92vw; padding: 18px;'
-      + ' box-shadow: 0 10px 30px rgba(0,0,0,0.15); color: var(--color, #0F3A3A);';
-    // ★ 모든 이벤트 종류에서 오버레이로 올라가지 않도록 강하게 차단
+    box.style.cssText = 'background: #fff; border: 1px solid rgba(15,58,58,0.15); border-radius: 6px;'
+      + ' width: 340px; max-width: 92vw; padding: 22px 24px 20px;'
+      + ' box-shadow: 0 10px 30px rgba(0,0,0,0.12);';
     ['click','mousedown','mouseup'].forEach(function(evt){
       box.addEventListener(evt, function(e){ e.stopPropagation(); });
     });
 
+    // ── 제목 (사이트 톤 명조체) ──
     var title = document.createElement('div');
     title.textContent = existing ? '색깔 편집' : '새 색깔';
-    title.style.cssText = 'font-family: "Cafe24Danjunghae","Gowun Batang",serif; font-size: 16px; margin-bottom: 14px;';
+    title.style.cssText = 'font-family: "Cafe24Danjunghae","Gowun Batang","Nanum Myeongjo",serif;'
+      + ' font-size: 20px; font-weight: 400; color: var(--color, #0F3A3A);'
+      + ' padding-bottom: 12px; margin-bottom: 18px;'
+      + ' border-bottom: 1px solid rgba(15,58,58,0.1);';
     box.appendChild(title);
 
+    // ── 이름 입력 (밑줄만) ──
     var nameLbl = document.createElement('div');
     nameLbl.textContent = '이름';
-    nameLbl.style.cssText = 'font-size: 10px; opacity: 0.5; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px;';
+    nameLbl.style.cssText = 'font-size: 11px; color: rgba(15,58,58,0.55); margin-bottom: 4px;';
     box.appendChild(nameLbl);
 
     var nameInput = document.createElement('input');
     nameInput.type = 'text';
-    nameInput.value = (existing && existing.name) || '';
+    nameInput.value = initName;
     nameInput.placeholder = '예: 다크 뻔';
-    nameInput.style.cssText = 'width: 100%; box-sizing: border-box; padding: 6px 8px; margin-bottom: 14px;'
-      + ' border: 1px solid rgba(15,58,58,0.15); border-radius: 4px; font-family: inherit; font-size: 13px; outline: none;';
+    nameInput.style.cssText = 'width: 100%; box-sizing: border-box; padding: 6px 0 8px;'
+      + ' border: none; border-bottom: 1px solid rgba(15,58,58,0.15);'
+      + ' font-family: inherit; font-size: 15px; color: var(--color, #0F3A3A);'
+      + ' outline: none; background: transparent; margin-bottom: 22px;'
+      + ' transition: border-color 120ms ease;';
+    nameInput.addEventListener('focus', function(){ nameInput.style.borderBottomColor = 'var(--point, #FF9A76)'; });
+    nameInput.addEventListener('blur',  function(){ nameInput.style.borderBottomColor = 'rgba(15,58,58,0.15)'; });
     box.appendChild(nameInput);
 
+    // ── 색 선택 (큰 원 + hex 표시) ──
     var colorLbl = document.createElement('div');
     colorLbl.textContent = '색';
-    colorLbl.style.cssText = 'font-size: 10px; opacity: 0.5; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px;';
+    colorLbl.style.cssText = 'font-size: 11px; color: rgba(15,58,58,0.55); margin-bottom: 8px;';
     box.appendChild(colorLbl);
 
     var colorRow = document.createElement('div');
-    colorRow.style.cssText = 'display: flex; align-items: center; gap: 10px; margin-bottom: 18px;';
+    colorRow.style.cssText = 'display: flex; align-items: center; gap: 14px; margin-bottom: 20px;';
 
-    var previewCircle = document.createElement('div');
-    var initColor = (existing && existing.value) || '#0F3A3A';
-    previewCircle.style.cssText = 'width: 40px; height: 40px; border-radius: 50%;'
-      + ' background: ' + initColor + '; border: 1px solid rgba(15,58,58,0.15);';
-    colorRow.appendChild(previewCircle);
+    // 큰 원 (클릭 = 컬러 피커 실행)
+    var circle = document.createElement('div');
+    circle.title = '클릭해서 색 고르기';
+    circle.style.cssText = 'width: 56px; height: 56px; border-radius: 50%;'
+      + ' background: ' + initHex + '; border: 1px solid rgba(15,58,58,0.15);'
+      + ' cursor: pointer; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.06);'
+      + ' transition: transform 120ms ease, box-shadow 120ms ease;';
+    circle.addEventListener('mouseenter', function(){
+      circle.style.transform = 'scale(1.05)';
+      circle.style.boxShadow = '0 2px 6px rgba(0,0,0,0.10)';
+    });
+    circle.addEventListener('mouseleave', function(){
+      circle.style.transform = 'scale(1)';
+      circle.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)';
+    });
 
-    var colorPicker = document.createElement('input');
-    colorPicker.type = 'color';
-    colorPicker.value = /^#[0-9a-f]{6}$/i.test(initColor) ? initColor : '#0F3A3A';
-    colorPicker.style.cssText = 'width: 40px; height: 40px; padding: 2px; border: 1px solid rgba(15,58,58,0.15); border-radius: 4px; cursor: pointer;';
-    colorRow.appendChild(colorPicker);
+    // 숨겨진 컬러 피커
+    var picker = document.createElement('input');
+    picker.type = 'color';
+    picker.value = initHex;
+    picker.style.cssText = 'position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0;';
 
+    circle.addEventListener('click', function(e){
+      e.stopPropagation();
+      picker.click();
+    });
+
+    // hex 표시 (밑줄 인풋 · 편집도 가능)
+    var hexWrap = document.createElement('div');
+    hexWrap.style.cssText = 'flex: 1; min-width: 0;';
+    var hexLbl = document.createElement('div');
+    hexLbl.textContent = 'HEX';
+    hexLbl.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.45); letter-spacing: 0.05em; margin-bottom: 2px;';
+    hexWrap.appendChild(hexLbl);
     var hexInput = document.createElement('input');
     hexInput.type = 'text';
-    hexInput.value = initColor;
-    hexInput.placeholder = '#0F3A3A 또는 rgba(...)';
-    hexInput.style.cssText = 'flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid rgba(15,58,58,0.15); border-radius: 4px; font-family: inherit; font-size: 12px; outline: none;';
-    colorRow.appendChild(hexInput);
+    hexInput.value = initHex;
+    hexInput.style.cssText = 'width: 100%; box-sizing: border-box; padding: 4px 0 6px;'
+      + ' border: none; border-bottom: 1px solid rgba(15,58,58,0.15);'
+      + ' font-family: "Menlo","Consolas",monospace; font-size: 13px; color: var(--color, #0F3A3A);'
+      + ' outline: none; background: transparent; letter-spacing: 0.03em;'
+      + ' transition: border-color 120ms ease;';
+    hexInput.addEventListener('focus', function(){ hexInput.style.borderBottomColor = 'var(--point, #FF9A76)'; });
+    hexInput.addEventListener('blur',  function(){ hexInput.style.borderBottomColor = 'rgba(15,58,58,0.15)'; });
+    hexWrap.appendChild(hexInput);
 
-    colorPicker.addEventListener('input', function(){
-      previewCircle.style.background = colorPicker.value;
-      hexInput.value = colorPicker.value;
+    picker.addEventListener('input', function(){
+      circle.style.background = _computeDisplay(picker.value, alphaSlider.value);
+      hexInput.value = picker.value.toUpperCase();
     });
     hexInput.addEventListener('input', function(){
       var v = hexInput.value.trim();
-      if (v){
-        previewCircle.style.background = v;
-        if (/^#[0-9a-f]{6}$/i.test(v)) colorPicker.value = v;
+      if (/^#?[0-9a-f]{6}$/i.test(v)){
+        var hx = v.startsWith('#') ? v : ('#' + v);
+        circle.style.background = _computeDisplay(hx, alphaSlider.value);
+        picker.value = hx;
       }
     });
+
+    colorRow.appendChild(circle);
+    colorRow.appendChild(picker);
+    colorRow.appendChild(hexWrap);
     box.appendChild(colorRow);
 
+    // ── 투명도 슬라이더 (p24j 신설) ──
+    var alphaTop = document.createElement('div');
+    alphaTop.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;';
+    var alphaLbl = document.createElement('div');
+    alphaLbl.textContent = '투명도';
+    alphaLbl.style.cssText = 'font-size: 11px; color: rgba(15,58,58,0.55);';
+    alphaTop.appendChild(alphaLbl);
+    var alphaVal = document.createElement('div');
+    alphaVal.textContent = initAlpha + '%';
+    alphaVal.style.cssText = 'font-family: "Menlo","Consolas",monospace; font-size: 12px; color: var(--point, #FF9A76); font-weight: 600;';
+    alphaTop.appendChild(alphaVal);
+    box.appendChild(alphaTop);
+
+    var alphaRow = document.createElement('div');
+    alphaRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 24px;';
+
+    var minusBtn = document.createElement('button');
+    minusBtn.type = 'button';
+    minusBtn.textContent = '−';
+    minusBtn.style.cssText = 'width: 24px; height: 24px; padding: 0; background: transparent;'
+      + ' border: 1px solid rgba(15,58,58,0.15); border-radius: 3px; cursor: pointer;'
+      + ' font-family: inherit; font-size: 14px; color: var(--color, #0F3A3A); line-height: 1;';
+    alphaRow.appendChild(minusBtn);
+
+    var alphaSlider = document.createElement('input');
+    alphaSlider.type = 'range';
+    alphaSlider.min = '0'; alphaSlider.max = '100'; alphaSlider.step = '1';
+    alphaSlider.value = String(initAlpha);
+    alphaSlider.style.cssText = 'flex: 1; min-width: 0; accent-color: var(--point, #FF9A76);';
+    alphaRow.appendChild(alphaSlider);
+
+    var plusBtn = document.createElement('button');
+    plusBtn.type = 'button';
+    plusBtn.textContent = '+';
+    plusBtn.style.cssText = 'width: 24px; height: 24px; padding: 0; background: transparent;'
+      + ' border: 1px solid rgba(15,58,58,0.15); border-radius: 3px; cursor: pointer;'
+      + ' font-family: inherit; font-size: 14px; color: var(--color, #0F3A3A); line-height: 1;';
+    alphaRow.appendChild(plusBtn);
+    box.appendChild(alphaRow);
+
+    function _setAlpha(pct){
+      pct = Math.max(0, Math.min(100, pct));
+      alphaSlider.value = String(pct);
+      alphaVal.textContent = pct + '%';
+      circle.style.background = _computeDisplay(picker.value, pct);
+    }
+    alphaSlider.addEventListener('input', function(){ _setAlpha(parseInt(alphaSlider.value, 10)); });
+    minusBtn.addEventListener('click', function(e){ e.stopPropagation(); _setAlpha(parseInt(alphaSlider.value, 10) - 5); });
+    plusBtn.addEventListener('click',  function(e){ e.stopPropagation(); _setAlpha(parseInt(alphaSlider.value, 10) + 5); });
+
+    // hex + alpha → rgba(...) 또는 hex 만
+    function _computeFinal(hex, alpha){
+      alpha = parseInt(alpha, 10);
+      if (isNaN(alpha) || alpha >= 100) return hex;
+      var m = hex.match(/^#?([0-9a-f]{6})$/i);
+      if (!m) return hex;
+      var h = m[1];
+      var r = parseInt(h.substr(0,2), 16);
+      var g = parseInt(h.substr(2,2), 16);
+      var b = parseInt(h.substr(4,2), 16);
+      return 'rgba(' + r + ',' + g + ',' + b + ',' + (alpha/100) + ')';
+    }
+    function _computeDisplay(hex, alpha){
+      return _computeFinal(hex, alpha);
+    }
+    // 초기 원 배경도 alpha 반영
+    circle.style.background = _computeDisplay(initHex, initAlpha);
+
+    // ── 하단 버튼 ──
     var btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display: flex; justify-content: flex-end; gap: 6px;';
+    btnRow.style.cssText = 'display: flex; justify-content: flex-end; gap: 8px;'
+      + ' padding-top: 12px; border-top: 1px solid rgba(15,58,58,0.08);';
 
     var cancelBtn = document.createElement('button');
     cancelBtn.type = 'button';
     cancelBtn.textContent = '취소';
-    cancelBtn.style.cssText = 'padding: 6px 14px; background: transparent; border: 1px solid rgba(15,58,58,0.2); border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 12px; color: var(--color, #0F3A3A);';
+    cancelBtn.style.cssText = 'padding: 6px 16px; background: transparent;'
+      + ' border: 1px solid rgba(15,58,58,0.2); border-radius: 3px; cursor: pointer;'
+      + ' font-family: inherit; font-size: 13px; color: var(--color, #0F3A3A);'
+      + ' transition: background 120ms ease, border-color 120ms ease;';
+    cancelBtn.addEventListener('mouseenter', function(){ cancelBtn.style.background = 'rgba(15,58,58,0.04)'; cancelBtn.style.borderColor = 'rgba(15,58,58,0.35)'; });
+    cancelBtn.addEventListener('mouseleave', function(){ cancelBtn.style.background = 'transparent'; cancelBtn.style.borderColor = 'rgba(15,58,58,0.2)'; });
     cancelBtn.addEventListener('click', function(e){ e.stopPropagation(); _fire(null); });
     btnRow.appendChild(cancelBtn);
 
     var saveBtn = document.createElement('button');
     saveBtn.type = 'button';
     saveBtn.textContent = '저장';
-    saveBtn.style.cssText = 'padding: 6px 14px; background: var(--point, #FF9A76); color: #fff; border: 1px solid var(--point, #FF9A76); border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 12px;';
+    saveBtn.style.cssText = 'padding: 6px 20px; background: var(--point, #FF9A76); color: #fff;'
+      + ' border: 1px solid var(--point, #FF9A76); border-radius: 3px; cursor: pointer;'
+      + ' font-family: inherit; font-size: 13px; font-weight: 600;'
+      + ' transition: background 120ms ease, border-color 120ms ease;';
+    saveBtn.addEventListener('mouseenter', function(){ saveBtn.style.background = 'var(--color, #0F3A3A)'; saveBtn.style.borderColor = 'var(--color, #0F3A3A)'; });
+    saveBtn.addEventListener('mouseleave', function(){ saveBtn.style.background = 'var(--point, #FF9A76)'; saveBtn.style.borderColor = 'var(--point, #FF9A76)'; });
     saveBtn.addEventListener('click', function(e){
       e.stopPropagation();
       var nm = nameInput.value.trim() || (existing && existing.name) || '새 색깔';
-      var vl = hexInput.value.trim() || colorPicker.value;
-      _fire({ name: nm, value: vl });
+      var hx = hexInput.value.trim();
+      if (!hx.startsWith('#') && /^[0-9a-f]{6}$/i.test(hx)) hx = '#' + hx;
+      if (!/^#[0-9a-f]{6}$/i.test(hx)) hx = picker.value;
+      var finalValue = _computeFinal(hx, alphaSlider.value);
+      _fire({ name: nm, value: finalValue });
     });
     btnRow.appendChild(saveBtn);
-
     box.appendChild(btnRow);
 
-    // 배경 클릭 = 취소
+    // ── 이벤트 ──
     overlay.appendChild(box);
+    // 배경 클릭 = 취소
     overlay.addEventListener('click', function(){ _fire(null); });
-    document.body.appendChild(overlay);
+    // ESC = 취소, Enter = 저장 (인풋 밖에서만)
+    function _onKey(e){
+      if (e.key === 'Escape'){ e.preventDefault(); _fire(null); }
+    }
+    document.addEventListener('keydown', _onKey);
 
+    document.body.appendChild(overlay);
     setTimeout(function(){ try { nameInput.focus(); nameInput.select(); } catch(_){} }, 30);
   }
 
