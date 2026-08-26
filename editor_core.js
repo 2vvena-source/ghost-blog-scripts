@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23j';
+  var VERSION = 'v2.0-β-p23k';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2664,6 +2664,89 @@
     '.editor-block[data-marker-scale="85"] li::before { font-size: 0.85em; }',
     '.editor-block[data-marker-scale="115"] li::before { font-size: 1.15em; }',
     '.editor-block[data-marker-scale="130"] li::before { font-size: 1.3em; }',
+
+    /* p23k: 하위 불릿 스타일 (블록별 지정) · data-bullet-sub2 / data-bullet-sub3 */
+    /*         자손 수준별로 다른 list-style 적용. 하위 지정 시 하위 li 폰트도 자동 축소 */
+    /* 2단계 UL/OL — sub2 이 UL 계열이면 UL 자손 스타일, OL 계열이면 OL 자손 */
+    '.editor-block[data-bullet-sub2="disc"] ul ul, .editor-block[data-bullet-sub2="disc"] ol ul { list-style-type: disc; }',
+    '.editor-block[data-bullet-sub2="circle"] ul ul, .editor-block[data-bullet-sub2="circle"] ol ul { list-style-type: circle; }',
+    '.editor-block[data-bullet-sub2="square"] ul ul, .editor-block[data-bullet-sub2="square"] ol ul { list-style-type: square; }',
+    '.editor-block[data-bullet-sub2="decimal"] ul ol, .editor-block[data-bullet-sub2="decimal"] ol ol { list-style-type: decimal; }',
+    '.editor-block[data-bullet-sub2="decimal-zero"] ul ol, .editor-block[data-bullet-sub2="decimal-zero"] ol ol { list-style-type: decimal-leading-zero; }',
+    '.editor-block[data-bullet-sub2="lower-roman"] ul ol, .editor-block[data-bullet-sub2="lower-roman"] ol ol { list-style-type: lower-roman; }',
+    '.editor-block[data-bullet-sub2="upper-roman"] ul ol, .editor-block[data-bullet-sub2="upper-roman"] ol ol { list-style-type: upper-roman; }',
+    '.editor-block[data-bullet-sub2="lower-alpha"] ul ol, .editor-block[data-bullet-sub2="lower-alpha"] ol ol { list-style-type: lower-alpha; }',
+    '.editor-block[data-bullet-sub2="upper-alpha"] ul ol, .editor-block[data-bullet-sub2="upper-alpha"] ol ol { list-style-type: upper-alpha; }',
+    '.editor-block[data-bullet-sub2="hangul-consonant"] ul ol, .editor-block[data-bullet-sub2="hangul-consonant"] ol ol { list-style-type: hangul-consonant; }',
+    '.editor-block[data-bullet-sub2="hangul"] ul ol, .editor-block[data-bullet-sub2="hangul"] ol ol { list-style-type: hangul; }',
+    /* 특수문자 마커 sub2 (□ ◆ ◇ * ※) */
+    '.editor-block[data-bullet-sub2="square-hollow"] ul ul, .editor-block[data-bullet-sub2="square-hollow"] ol ul { list-style: none; padding-left: 1.2em; }',
+    '.editor-block[data-bullet-sub2="square-hollow"] ul ul > li::before, .editor-block[data-bullet-sub2="square-hollow"] ol ul > li::before { content: "\\25A1\\A0"; color: currentColor; margin-left: -1.2em; }',
+    '.editor-block[data-bullet-sub2="diamond-solid"] ul ul, .editor-block[data-bullet-sub2="diamond-solid"] ol ul { list-style: none; padding-left: 1.2em; }',
+    '.editor-block[data-bullet-sub2="diamond-solid"] ul ul > li::before, .editor-block[data-bullet-sub2="diamond-solid"] ol ul > li::before { content: "\\25C6\\A0"; color: currentColor; margin-left: -1.2em; }',
+    '.editor-block[data-bullet-sub2="diamond-hollow"] ul ul, .editor-block[data-bullet-sub2="diamond-hollow"] ol ul { list-style: none; padding-left: 1.2em; }',
+    '.editor-block[data-bullet-sub2="diamond-hollow"] ul ul > li::before, .editor-block[data-bullet-sub2="diamond-hollow"] ol ul > li::before { content: "\\25C7\\A0"; color: currentColor; margin-left: -1.2em; }',
+    '.editor-block[data-bullet-sub2="star"] ul ul, .editor-block[data-bullet-sub2="star"] ol ul { list-style: none; padding-left: 1.2em; }',
+    '.editor-block[data-bullet-sub2="star"] ul ul > li::before, .editor-block[data-bullet-sub2="star"] ol ul > li::before { content: "*\\A0"; color: currentColor; margin-left: -1.2em; }',
+    '.editor-block[data-bullet-sub2="reference"] ul ul, .editor-block[data-bullet-sub2="reference"] ol ul { list-style: none; padding-left: 1.2em; }',
+    '.editor-block[data-bullet-sub2="reference"] ul ul > li::before, .editor-block[data-bullet-sub2="reference"] ol ul > li::before { content: "\\203B\\A0"; color: currentColor; margin-left: -1.2em; }',
+
+    /* 3단계 (2단계를 자손으로 가지는 li 안 UL/OL) — 같은 패턴 */
+    '.editor-block[data-bullet-sub3="disc"] ul ul ul, .editor-block[data-bullet-sub3="disc"] ol ul ul, .editor-block[data-bullet-sub3="disc"] ul ol ul, .editor-block[data-bullet-sub3="disc"] ol ol ul { list-style-type: disc; }',
+    '.editor-block[data-bullet-sub3="circle"] ul ul ul, .editor-block[data-bullet-sub3="circle"] ol ul ul, .editor-block[data-bullet-sub3="circle"] ul ol ul, .editor-block[data-bullet-sub3="circle"] ol ol ul { list-style-type: circle; }',
+    '.editor-block[data-bullet-sub3="square"] ul ul ul, .editor-block[data-bullet-sub3="square"] ol ul ul, .editor-block[data-bullet-sub3="square"] ul ol ul, .editor-block[data-bullet-sub3="square"] ol ol ul { list-style-type: square; }',
+    '.editor-block[data-bullet-sub3="decimal"] ul ul ol, .editor-block[data-bullet-sub3="decimal"] ol ul ol, .editor-block[data-bullet-sub3="decimal"] ul ol ol, .editor-block[data-bullet-sub3="decimal"] ol ol ol { list-style-type: decimal; }',
+    '.editor-block[data-bullet-sub3="decimal-zero"] ul ul ol, .editor-block[data-bullet-sub3="decimal-zero"] ol ul ol, .editor-block[data-bullet-sub3="decimal-zero"] ul ol ol, .editor-block[data-bullet-sub3="decimal-zero"] ol ol ol { list-style-type: decimal-leading-zero; }',
+    '.editor-block[data-bullet-sub3="lower-roman"] ul ul ol, .editor-block[data-bullet-sub3="lower-roman"] ol ul ol, .editor-block[data-bullet-sub3="lower-roman"] ul ol ol, .editor-block[data-bullet-sub3="lower-roman"] ol ol ol { list-style-type: lower-roman; }',
+    '.editor-block[data-bullet-sub3="upper-roman"] ul ul ol, .editor-block[data-bullet-sub3="upper-roman"] ol ul ol, .editor-block[data-bullet-sub3="upper-roman"] ul ol ol, .editor-block[data-bullet-sub3="upper-roman"] ol ol ol { list-style-type: upper-roman; }',
+    '.editor-block[data-bullet-sub3="lower-alpha"] ul ul ol, .editor-block[data-bullet-sub3="lower-alpha"] ol ul ol, .editor-block[data-bullet-sub3="lower-alpha"] ul ol ol, .editor-block[data-bullet-sub3="lower-alpha"] ol ol ol { list-style-type: lower-alpha; }',
+    '.editor-block[data-bullet-sub3="upper-alpha"] ul ul ol, .editor-block[data-bullet-sub3="upper-alpha"] ol ul ol, .editor-block[data-bullet-sub3="upper-alpha"] ul ol ol, .editor-block[data-bullet-sub3="upper-alpha"] ol ol ol { list-style-type: upper-alpha; }',
+
+    /* 하위 지정 시 자연스러운 큰기 축소 (사용자 요구: "위치가 하위에 있으면 글자나 모양이 작아지는 식") */
+    '.editor-block[data-bullet-sub2] ul ul, .editor-block[data-bullet-sub2] ol ol, .editor-block[data-bullet-sub2] ul ol, .editor-block[data-bullet-sub2] ol ul { font-size: 0.92em; }',
+    '.editor-block[data-bullet-sub3] ul ul ul, .editor-block[data-bullet-sub3] ol ol ol, .editor-block[data-bullet-sub3] ul ul ol, .editor-block[data-bullet-sub3] ol ul ol, .editor-block[data-bullet-sub3] ul ol ul, .editor-block[data-bullet-sub3] ol ul ul, .editor-block[data-bullet-sub3] ul ol ol, .editor-block[data-bullet-sub3] ol ol ul { font-size: 0.85em; }',
+
+    /* p23k: 불릿 팝오버 탭 바 스타일 */
+    '.ep-bullet-mini-tabs {',
+    '  display: flex; gap: 4px; margin-bottom: 8px; padding: 3px;',
+    '  background: rgba(15,58,58,0.05); border-radius: 6px;',
+    '}',
+    '.ep-bullet-mini-tab {',
+    '  flex: 1; padding: 6px 8px; background: transparent; border: 0;',
+    '  border-radius: 4px; cursor: pointer;',
+    '  color: rgba(15,58,58,0.65); font-family: "Pretendard Variable","Pretendard",sans-serif;',
+    '  font-size: 11px; font-weight: 500;',
+    '  transition: all 120ms ease;',
+    '}',
+    '.ep-bullet-mini-tab:hover { color: var(--color, #0F3A3A); }',
+    '.ep-bullet-mini-tab.is-active {',
+    '  background: #fff; color: var(--color, #0F3A3A); font-weight: 600;',
+    '  box-shadow: 0 1px 2px rgba(15,58,58,0.06);',
+    '}',
+    '.ep-bullet-mini-tab-badge {',
+    '  display: inline-block; margin-left: 4px; font-size: 9px; opacity: 0.6;',
+    '}',
+    '.ep-bullet-mini-tab.is-active .ep-bullet-mini-tab-badge { color: var(--point, #FF9A76); opacity: 1; font-weight: 600; }',
+    /* 하위 탭 안내 문구 */
+    '.ep-bullet-mini-sub-hint {',
+    '  font-size: 10px; opacity: 0.5; text-align: left; margin: 6px 2px 8px;',
+    '  padding: 6px 8px; background: rgba(255,154,118,0.06); border-radius: 4px;',
+    '  border-left: 2px solid rgba(255,154,118,0.4);',
+    '  line-height: 1.45;',
+    '}',
+    /* "상속" (지정 안함) 버튼 */
+    '.ep-bullet-mini-inherit-btn {',
+    '  grid-column: 1 / -1; padding: 6px 8px;',
+    '  background: transparent; border: 1px dashed rgba(15,58,58,0.25);',
+    '  border-radius: 6px; cursor: pointer;',
+    '  color: rgba(15,58,58,0.7); font-family: inherit; font-size: 11px;',
+    '  transition: all 120ms ease;',
+    '}',
+    '.ep-bullet-mini-inherit-btn:hover { border-color: var(--point, #FF9A76); color: var(--point, #FF9A76); }',
+    '.ep-bullet-mini-inherit-btn.is-active {',
+    '  border-color: var(--point, #FF9A76); background: rgba(255,154,118,0.08);',
+    '  color: var(--color, #0F3A3A); font-weight: 600; border-style: solid;',
+    '}',
 
     ''
   ].join('\n');
@@ -14729,6 +14812,9 @@
     var style = block.getAttribute('data-bullet-style') || '';
     var frame = block.getAttribute('data-frame') || 'none';
     var mscale= block.getAttribute('data-marker-scale') || '';
+    // p23k: 하위 스타일 — 블록별 지정
+    var sub2 = block.getAttribute('data-bullet-sub2') || '';
+    var sub3 = block.getAttribute('data-bullet-sub3') || '';
     if (!style) return;
 
     // 표준 list-style-type 매핑 (브라우저 기본 지원)
@@ -14768,6 +14854,18 @@
     else if (frame === 'square') frameSpec = { w:'1.4em', h:'1.4em', radius:'3px',  fs:'0.75em' };
     else if (frame === 'tall')   frameSpec = { w:'1.1em', h:'1.6em', radius:'3px',  fs:'0.72em' };
 
+    // p23k: 자손 UL/OL 깊이 계산 (block 기준 몇 단계 안인지)
+    //   최상위 UL/OL 은 depth=1, 그 안 UL/OL 은 depth=2, 또 그 안은 depth=3
+    function _listDepth(list){
+      var d = 1;
+      var p = list.parentElement;
+      while (p && p !== block){
+        if (p.tagName === 'UL' || p.tagName === 'OL') d++;
+        p = p.parentElement;
+      }
+      return d;
+    }
+
     // OL 프레임 counter 계산을 수동으로 → counter(bl-frame, decimal|lower-roman|...) 변환
     function _renderCounter(n, kind){
       // 간략한 매핑 (한글초성 / 한글 등은 브라우저 CSS 의존하지 않게 기본 숫자)
@@ -14790,15 +14888,28 @@
     lists.forEach(function(list){
       var tag = list.tagName.toLowerCase();
       var isOL = (tag === 'ol');
-      var stdType = stdMap[style];
-      var markerChar = charMap[style];
+      // p23k: depth 기반 스타일 선택
+      var depth = _listDepth(list);
+      var effectiveStyle = style;
+      if (depth === 2 && sub2) effectiveStyle = sub2;
+      else if (depth === 3 && sub3) effectiveStyle = sub3;
+      // depth >= 4 또는 미지정 → 최상위 스타일 상속
+      var stdType = stdMap[effectiveStyle];
+      var markerChar = charMap[effectiveStyle];
+      // p23k: depth별 큰기 축소 (사용자 요구: "하위로 갈수록 작아지는 식") · sub 지정된 경우에만
+      var depthScale = null;
+      if (depth === 2 && sub2) depthScale = 0.92;
+      else if (depth === 3 && sub3) depthScale = 0.85;
 
       // 기본 모양 수동 주입 (Ghost sanitize 에 살아남도록)
       list.style.margin = '0';
       list.style.paddingLeft = '1.5em';
+      if (depthScale) list.style.fontSize = depthScale + 'em';
 
+      // 프레임은 최상위 (depth=1) 이면서 프레임 지정되었고 OL 일 때만 적용
+      var applyFrame = (depth === 1) && isOL && frameSpec;
       // 프레임 상황 → counter + frame span
-      if (isOL && frameSpec){
+      if (applyFrame){
         list.style.listStyle = 'none';
         list.style.paddingLeft = '0';
         var kids = list.children;
@@ -14830,7 +14941,7 @@
           if (liScale) li.style.fontSize = liScale + 'em';
         }
       }
-      // 문자 마커 상황 (□ ◆ ◇ * ※)
+      // 문자 마커 상황 (□ ◆ ◇ * ※) · effectiveStyle 기반
       else if (markerChar){
         list.style.listStyle = 'none';
         list.style.paddingLeft = '0';
@@ -17643,8 +17754,8 @@
         '<span data-esp-hint style="font-size:10px;opacity:0.5;color:#0F3A3A;text-align:right;">' +
         (opts.hint || '') + '</span>' +
       '</div>' +
-      // 디버그 라인 (상태 변화 시각화 · 사용자 볼 수 있게 별도 줄)
-      '<div data-esp-debug style="margin-top:6px;padding:5px 7px;' +
+      // p23k: 디버그 라인은 숨김 (로직은 유지 · 문제 발생 시 window.__DDL_DBG_SLIDER=true 로 다시 켜기)
+      '<div data-esp-debug style="display:none;margin-top:6px;padding:5px 7px;' +
         'background:rgba(255,154,118,0.08);border:1px dashed rgba(255,154,118,0.35);' +
         'border-radius:4px;font-family:monospace;font-size:10px;color:#0F3A3A;">' +
         '준비됨' +
@@ -17686,8 +17797,11 @@
         debugEl.textContent = 'diag ERR: ' + (err && err.message);
       }
     }
-    // pop 이 레이아웃 되고 다음 프레임에 진단
-    setTimeout(_initialDiag, 50);
+    // p23k: 디버그 플래그 켜졌을 때만 보이게
+    if (window.__DDL_DBG_SLIDER){
+      try { debugEl.style.display = 'block'; } catch(_){}
+      setTimeout(_initialDiag, 50);
+    }
 
     function _syncActivePreset(cur){
       presetBtns.forEach(function(b){
@@ -18581,31 +18695,121 @@
     else block.removeAttribute('data-marker-scale');
   }
 
-  var _bulletState = { style: 'disc', frame: 'none', scale: '' };
+  // p23k: 하위 불릿 스타일 적용 (블록별)
+  //   level = 2 or 3
+  //   style = '' 이면 속성 제거 (부모 스타일 상속)
+  function applyBulletSubStyle(level, style){
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    var node = sel.getRangeAt(0).startContainer;
+    var el   = node.nodeType === 1 ? node : node.parentElement;
+    var block = el && el.closest && el.closest('.editor-block');
+    if (!block) return;
+    var attr = (level === 3) ? 'data-bullet-sub3' : 'data-bullet-sub2';
+    if (style && style !== '') block.setAttribute(attr, style);
+    else block.removeAttribute(attr);
+  }
+
+  // p23k: sub2/sub3 추가 (블록별 하위 스타일) + activeLevel (팝오버 현재 탭)
+  //   sub2 == '' / sub3 == '' 이면 "상속" (부모 스타일 따름)
+  var _bulletState = { style: 'disc', frame: 'none', scale: '', sub2: '', sub3: '', activeLevel: 1 };
+
+  // p23k: 팝오버 열 때 현재 불릿 블록의 sub2/sub3 상태를 읽어오는 helper
+  function _bulletReadCurrentSubs(){
+    try {
+      var sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return { sub2: '', sub3: '' };
+      var node = sel.getRangeAt(0).startContainer;
+      var el   = node.nodeType === 1 ? node : node.parentElement;
+      var block = el && el.closest && el.closest('.editor-block');
+      if (!block) return { sub2: '', sub3: '' };
+      return {
+        sub2: block.getAttribute('data-bullet-sub2') || '',
+        sub3: block.getAttribute('data-bullet-sub3') || ''
+      };
+    } catch(_){ return { sub2: '', sub3: '' }; }
+  }
 
   function openBulletPopover(anchor){
     restoreRange();
 
     if (__activeMiniPopover) { try { __activeMiniPopover.close(); } catch(_){} }
 
+    // p23k: 팝오버 열 때 현재 블록의 sub2/sub3 상태 동기화
+    var _curSubs = _bulletReadCurrentSubs();
+    _bulletState.sub2 = _curSubs.sub2;
+    _bulletState.sub3 = _curSubs.sub3;
+
     var root = document.createElement('div');
     root.className = 'ep-mini-popover ddl-editor-popup';
     root.setAttribute('data-variant', 'bullet');
-    root.style.width = '260px';
-    root.style.minWidth = '260px';
+    root.style.width = '270px';
+    root.style.minWidth = '270px';
 
     var body = document.createElement('div');
     body.className = 'ep-bullet-mini';
     root.appendChild(body);
 
+    // ================================================
+    // p23k: 탭 바 (최상위 · 2단계 · 3단계)
+    // ================================================
+    var tabsBar = document.createElement('div');
+    tabsBar.className = 'ep-bullet-mini-tabs';
+    var tabDefs = [
+      { level: 1, label: '최상위' },
+      { level: 2, label: '2단계' },
+      { level: 3, label: '3단계' }
+    ];
+    var tabButtons = {};
+    tabDefs.forEach(function(td){
+      var tb = document.createElement('button');
+      tb.type = 'button';
+      tb.className = 'ep-bullet-mini-tab';
+      tb.setAttribute('data-tab-level', td.level);
+      // 현재 상태 배지 (지정된 스타일 이름을 간략히)
+      var badge = '';
+      if (td.level === 2 && _bulletState.sub2) badge = _bulletState.sub2;
+      else if (td.level === 3 && _bulletState.sub3) badge = _bulletState.sub3;
+      tb.innerHTML = td.label + (badge ? '<span class="ep-bullet-mini-tab-badge">·지정</span>' : '');
+      if (_bulletState.activeLevel === td.level) tb.classList.add('is-active');
+      tb.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
+      tb.addEventListener('click', function(ev){
+        ev.preventDefault(); ev.stopPropagation();
+        _bulletState.activeLevel = td.level;
+        Object.keys(tabButtons).forEach(function(k){ tabButtons[k].classList.remove('is-active'); });
+        tb.classList.add('is-active');
+        _rebuildRows();
+      });
+      tabButtons[td.level] = tb;
+      tabsBar.appendChild(tb);
+    });
+    body.appendChild(tabsBar);
+
+    // 하위 탭 안내용 · hint
+    var subHintEl = document.createElement('div');
+    subHintEl.className = 'ep-bullet-mini-sub-hint';
+    body.appendChild(subHintEl);
+
+    // 스타일 행들의 컨테이너 (탭 전환 시 재생성)
+    var rowsHost = document.createElement('div');
+    body.appendChild(rowsHost);
+
+    function _currentActiveStyleForLevel(){
+      if (_bulletState.activeLevel === 1) return _bulletState.style;
+      if (_bulletState.activeLevel === 2) return _bulletState.sub2;
+      if (_bulletState.activeLevel === 3) return _bulletState.sub3;
+      return '';
+    }
+
     function makeRow(label, styles){
       var lbl = document.createElement('div');
       lbl.className = 'ep-bullet-mini-label';
       lbl.textContent = label;
-      body.appendChild(lbl);
+      rowsHost.appendChild(lbl);
 
       var row = document.createElement('div');
       row.className = 'ep-bullet-mini-row';
+      var activeStyle = _currentActiveStyleForLevel();
       styles.forEach(function(s){
         var demo = _bulletDemo(s);
         var b = document.createElement('button');
@@ -18613,25 +18817,94 @@
         b.className = 'ep-bullet-mini-btn';
         b.setAttribute('data-style', s);
         b.innerHTML = demo.html + (demo.sub ? '<span class="demo-sub">' + demo.sub + '</span>' : '');
-        if (_bulletState.style === s) b.classList.add('is-active');
+        if (activeStyle === s) b.classList.add('is-active');
         b.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
         b.addEventListener('click', function(ev){
           ev.preventDefault(); ev.stopPropagation();
-          _bulletState.style = s;
-          root.querySelectorAll('.ep-bullet-mini-btn').forEach(function(bb){ bb.classList.remove('is-active'); });
+          rowsHost.querySelectorAll('.ep-bullet-mini-btn').forEach(function(bb){ bb.classList.remove('is-active'); });
           b.classList.add('is-active');
           restoreRange();
-          applyBulletStyle(s, _bulletState.frame);
+          if (_bulletState.activeLevel === 1){
+            _bulletState.style = s;
+            applyBulletStyle(s, _bulletState.frame);
+          } else if (_bulletState.activeLevel === 2){
+            _bulletState.sub2 = s;
+            applyBulletSubStyle(2, s);
+            _refreshTabBadges();
+          } else if (_bulletState.activeLevel === 3){
+            _bulletState.sub3 = s;
+            applyBulletSubStyle(3, s);
+            _refreshTabBadges();
+          }
         });
         row.appendChild(b);
       });
-      body.appendChild(row);
+      rowsHost.appendChild(row);
     }
 
-    makeRow('도형', ['disc','circle','square','square-hollow']);
-    makeRow('도형 추가', ['diamond-solid','diamond-hollow','star','reference']);
-    makeRow('숫자', ['decimal','decimal-zero','lower-roman','upper-roman']);
-    makeRow('기타', ['lower-alpha','upper-alpha','hangul-consonant','hangul']);
+    // "상속 (부모 따름)" 버튼 — 하위 탭에서만 표시
+    function makeInheritBtn(){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ep-bullet-mini-inherit-btn';
+      var active = false;
+      if (_bulletState.activeLevel === 2) active = (_bulletState.sub2 === '');
+      if (_bulletState.activeLevel === 3) active = (_bulletState.sub3 === '');
+      if (active) b.classList.add('is-active');
+      b.textContent = active ? '✔ 지정 안 함 (부모 스타일 따름)' : '지정 안 함 (부모 스타일 따름)';
+      b.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
+      b.addEventListener('click', function(ev){
+        ev.preventDefault(); ev.stopPropagation();
+        restoreRange();
+        if (_bulletState.activeLevel === 2){
+          _bulletState.sub2 = '';
+          applyBulletSubStyle(2, '');
+        } else if (_bulletState.activeLevel === 3){
+          _bulletState.sub3 = '';
+          applyBulletSubStyle(3, '');
+        }
+        _refreshTabBadges();
+        _rebuildRows();
+      });
+      var wrap = document.createElement('div');
+      wrap.className = 'ep-bullet-mini-row';
+      wrap.style.gridTemplateColumns = '1fr';
+      wrap.appendChild(b);
+      rowsHost.appendChild(wrap);
+    }
+
+    function _refreshTabBadges(){
+      Object.keys(tabButtons).forEach(function(k){
+        var lv = parseInt(k, 10);
+        var badge = '';
+        if (lv === 2 && _bulletState.sub2) badge = _bulletState.sub2;
+        else if (lv === 3 && _bulletState.sub3) badge = _bulletState.sub3;
+        var td = tabDefs.filter(function(x){ return x.level === lv; })[0];
+        tabButtons[k].innerHTML = td.label + (badge ? '<span class="ep-bullet-mini-tab-badge">·지정</span>' : '');
+      });
+    }
+
+    function _rebuildRows(){
+      rowsHost.innerHTML = '';
+      if (_bulletState.activeLevel === 1){
+        subHintEl.style.display = 'none';
+      } else {
+        subHintEl.style.display = 'block';
+        subHintEl.innerHTML = _bulletState.activeLevel === 2
+          ? '<b>2단계 하위</b> · Tab 넨러 들어간 항목의 스타일<br>미지정 시 부모 스타일을 상속'
+          : '<b>3단계 하위</b> · Tab 두 번 들어간 항목의 스타일<br>미지정 시 부모 스타일을 상속';
+      }
+      makeRow('도형', ['disc','circle','square','square-hollow']);
+      makeRow('도형 추가', ['diamond-solid','diamond-hollow','star','reference']);
+      makeRow('숫자', ['decimal','decimal-zero','lower-roman','upper-roman']);
+      makeRow('기타', ['lower-alpha','upper-alpha','hangul-consonant','hangul']);
+      // 하위 탭에서만 "상속" 버튼 표시
+      if (_bulletState.activeLevel !== 1){
+        makeInheritBtn();
+      }
+      // 프레임/크기는 최상위 탭에서만 보이게 (footer 변수는 아래에서 선언 → 안전게 가드)
+      try { if (footer){ footer.style.display = (_bulletState.activeLevel === 1) ? 'flex' : 'none'; } } catch(_){}
+    }
 
     var footer = document.createElement('div');
     footer.className = 'ep-bullet-mini-footer';
@@ -18705,6 +18978,9 @@
     footer.appendChild(sizeGroup);
 
     body.appendChild(footer);
+
+    // p23k: footer 가 이제 존재 → 하위 탭이면 숨김 적용
+    if (_bulletState.activeLevel !== 1) footer.style.display = 'none';
 
     var tip = document.createElement('div');
     tip.className = 'ep-bullet-mini-tip';
