@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23y';
+  var VERSION = 'v2.0-β-p23z';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -17894,6 +17894,8 @@
             var innerBox = clone.querySelector && clone.querySelector('.callout-box');
             if (innerBox) enhanceCalloutForSite(innerBox);
           }
+          // p23z: 형광펜 사이트 강화 (원본 블로그에서도 모양 보장)
+          try { enhanceHighlightForSite(clone); } catch(_){}
           // p20k: 콜아웃(+모든 커스텀 블록) 안에 남은 편집기 전용 자산 완전 제거
           //   - 드래그 핸들(⋮⋮): 예전에는 구분선/버튼만 제거해서 중첩 콜아웃에 그대로 남아버림 → 사이트에 노출되는 버그
           //   - 칸이 캐랭터 샜열 그대로 노출되던 원인입니다.
@@ -18004,7 +18006,16 @@
             if (!hasInlineFormat && el && el.querySelector && el.querySelector('[data-inline-format], [style*="letter-spacing"], [style*="line-height"]')) hasInlineFormat = true;
           });
         } catch(_){}
-        var needsWrap = hasAlignOrWidth || hasInlineFormat;
+        // p23z: 형광펜(mark.ddl-hl) 감지 — 형광펜이 있으면 무조건 kg-card 로 감싸서 Ghost 가 style 을 못 지우게
+        var hasHighlight = false;
+        try {
+          innerEls.forEach(function(el){
+            if (hasHighlight) return;
+            if (el && el.querySelector && el.querySelector('mark.ddl-hl')) hasHighlight = true;
+            if (!hasHighlight && el && el.classList && el.classList.contains('ddl-hl')) hasHighlight = true;
+          });
+        } catch(_){}
+        var needsWrap = hasAlignOrWidth || hasInlineFormat || hasHighlight;
         var innerHtmlPlain = '';
         innerEls.forEach(function(el){
           var clone = el.cloneNode(true);
@@ -18012,6 +18023,8 @@
           clone.removeAttribute('spellcheck');
           // p13h: UI 이물질 제거 (input/select/textarea/form/button)
           clone.querySelectorAll('input, select, textarea, form, button').forEach(function(x){ x.parentNode && x.parentNode.removeChild(x); });
+          // p23z: 형광펜 사이트 강화 (원본 블로그에서도 모양 보장)
+          try { enhanceHighlightForSite(clone); } catch(_){}
           if (['INPUT','SELECT','TEXTAREA','FORM','BUTTON'].indexOf(clone.tagName) > -1) return;
           // p13e: base64 오염 이미지 제거 (<img src="&lt;base64String&gt;">)
           clone.querySelectorAll('img').forEach(function(img){
@@ -18108,6 +18121,39 @@
       }
     );
   }
+
+  // p23z: 저장 직전 mark.ddl-hl 각각에 완전한 인라인 style 재부여
+  //   이유: Ghost sanitize 또는 사이트 CSS 없이도 원본 블로그에서 미리보기 그대로 구현되게
+  //   구조: data-hl-mode / data-hl-c1 / data-hl-a1 / data-hl-pos 를 읽어 specToBackground() 결과를 inline style 로 설정
+  function enhanceHighlightForSite(root){
+    if (!root || !root.querySelectorAll) return;
+    var marks = root.querySelectorAll('mark.ddl-hl');
+    marks.forEach(function(mk){
+      var spec = {
+        mode: mk.getAttribute('data-hl-mode') || 'marker',
+        c1:   mk.getAttribute('data-hl-c1')   || '#FFF176',
+        a1:   (function(v){ var n = parseInt(v, 10); return isNaN(n) ? 100 : n; })(mk.getAttribute('data-hl-a1')),
+        pos:  mk.getAttribute('data-hl-pos')  || undefined
+      };
+      var jsonSpec = mk.getAttribute('data-hl-spec');
+      if (jsonSpec){
+        try {
+          var parsed = JSON.parse(jsonSpec);
+          if (parsed && typeof parsed === 'object'){
+            spec = parsed;
+            if (typeof spec.a1 !== 'number') spec.a1 = 100;
+          }
+        } catch(_){}
+      }
+      var bg = (typeof specToBackground === 'function') ? specToBackground(spec) : (spec.c1 || '#FFF176');
+      mk.style.setProperty('background', bg, 'important');
+      mk.style.setProperty('color', 'inherit', 'important');
+      mk.style.setProperty('padding', '0.02em 0.15em', 'important');
+      mk.style.setProperty('border-radius', '2px', 'important');
+      if (spec.c1) mk.style.setProperty('--ddl-hl-c1', spec.c1);
+    });
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.enhanceHighlightForSite = enhanceHighlightForSite; } catch(e){}
   function _highlightRestoreMarkers(root){
     if (!root) return;
     var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
