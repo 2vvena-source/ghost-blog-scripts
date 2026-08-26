@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23c';
+  var VERSION = 'v2.0-β-p23d';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -17747,7 +17747,7 @@
     // 리스트 생성 (execCommand)
     try { document.execCommand(isOL ? 'insertOrderedList' : 'insertUnorderedList'); } catch(_){}
 
-    // 생성된 list 의 상위 editor-block 에 data-* 설정
+    // 생성된 list 의 상위 editor-block 에 data-* 설정 + P>UL 승격
     setTimeout(function(){
       var sel2 = window.getSelection();
       if (!sel2 || sel2.rangeCount === 0) return;
@@ -17760,6 +17760,47 @@
         block = li && li.closest && li.closest('.editor-block');
       }
       if (!block) return;
+
+      // p23d: <p><ul></ul></p> 패턴을 <ul></ul> 로 승격 (P 는 UL 을 담을 수 없음 · HTML 규격)
+      //   execCommand 가 편집기 블록 안 <p> 를 그대로 두고 그 안에 <ul> 을 넣어버려서
+      //   1) 브라우저 렌더 시 P 앞뒤로 빈 <p> 자동 생성 → 사진 속 위/아래 빈 블록
+      //   2) Enter 시 li 부모 구조 이상해서 리스트 자동 이어짐 실패
+      try {
+        var pWithList = block.querySelectorAll('p > ul, p > ol');
+        pWithList.forEach(function(list){
+          var pParent = list.parentElement;
+          if (!pParent || pParent.tagName !== 'P') return;
+          var pGrand = pParent.parentElement;
+          if (!pGrand) return;
+          // P 안 UL 앞 텍스트/요소는 P 로 유지, UL 은 P 뒤로 승격
+          // 여기서는 단순화: P 는 통째로 벗겨내고 UL 만 남김
+          // (P 안에 UL 외 다른 내용이 있으면 그것도 처리해야 하지만,
+          //  execCommand insertUnorderedList 는 P 내용을 li 로 옮기므로 P 는 대개 UL 만 담김)
+          pGrand.insertBefore(list, pParent);
+          // P 가 이제 비었으면 제거, 남은 내용 있으면 유지
+          var remainText = (pParent.textContent || '').replace(/\u200B|\u00A0/g, '').trim();
+          if (remainText.length === 0) {
+            pParent.remove();
+          }
+        });
+      } catch(err){ if (window.__DDL_DBG_BULLET_DOM) console.warn('[BULLET] P>UL 승격 오류:', err); }
+
+      // p23d: block 안 빈 <p> (br 만 있거나 완전 빈) 제거 - block-handle 은 보호
+      try {
+        Array.from(block.children).forEach(function(child){
+          if (child.classList && child.classList.contains('block-handle')) return;
+          if (child.tagName !== 'P') return;
+          var t = (child.textContent || '').replace(/\u200B|\u00A0/g, '').trim();
+          if (t.length > 0) return;
+          // <br> 만 있는지
+          var onlyBr = true;
+          for (var i = 0; i < child.children.length; i++){
+            if (child.children[i].tagName !== 'BR') { onlyBr = false; break; }
+          }
+          if (onlyBr || child.children.length === 0) child.remove();
+        });
+      } catch(err){ if (window.__DDL_DBG_BULLET_DOM) console.warn('[BULLET] 빈 P 정리 오류:', err); }
+
       block.setAttribute('data-bullet-style', style);
       if (applyFrame && applyFrame !== 'none') block.setAttribute('data-frame', applyFrame);
       else block.removeAttribute('data-frame');
