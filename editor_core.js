@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23f';
+  var VERSION = 'v2.0-β-p23g';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -14710,6 +14710,165 @@
     block.style.setProperty('text-align', alignS, 'important');
   }
 
+  // ============================================================
+  // p23g: 불릿 사이트 인라인화
+  // ============================================================
+  //   문제: .editor-block[data-bullet-style="..."] > ul 은 편집기 CSS 를 상속받는데,
+  //           Ghost 사이트에는 그 CSS 가 없으므로 수동으로 각 UL/OL 에 인라인 스타일을 심는다.
+  //   대처:
+  //     1) 표준 list-style-type (disc/circle/square/decimal/decimal-leading-zero/lower-roman/upper-roman/
+  //        lower-alpha/upper-alpha/hangul-consonant/hangul)
+  //         → UL/OL 에 style="list-style-type:..." 부여
+  //     2) ::before 문자 방식 (square-hollow / diamond-solid / diamond-hollow / star / reference)
+  //         → UL 에 list-style:none 인라인 + 각 <li> 앞에 <span class="ddl-bl-mk">□</span> 로 실제 문자 삽입
+  //     3) 프레임 (circle/square/tall) → OL 에 list-style:none 인라인 + 각 <li> 앞에
+  //         <span class="ddl-bl-frame">n</span> 감싸기 + display:flex 부여 + 테두리 자체도 inline style 로 그린다.
+  //   이 함수는 clone 에서만 동작하므로 원본 편집기 DOM 은 건들지 않는다.
+  function enhanceBulletForSite(block){
+    if (!block) return;
+    var style = block.getAttribute('data-bullet-style') || '';
+    var frame = block.getAttribute('data-frame') || 'none';
+    var mscale= block.getAttribute('data-marker-scale') || '';
+    if (!style) return;
+
+    // 표준 list-style-type 매핑 (브라우저 기본 지원)
+    var stdMap = {
+      'disc':              'disc',
+      'circle':            'circle',
+      'square':            'square',
+      'decimal':           'decimal',
+      'decimal-zero':      'decimal-leading-zero',
+      'lower-roman':       'lower-roman',
+      'upper-roman':       'upper-roman',
+      'lower-alpha':       'lower-alpha',
+      'upper-alpha':       'upper-alpha',
+      'hangul-consonant':  'hangul-consonant',
+      'hangul':            'hangul'
+    };
+    // 문자 마커 매핑 (::before content)
+    var charMap = {
+      'square-hollow':     '□',
+      'diamond-solid':     '◆',
+      'diamond-hollow':    '◇',
+      'star':              '*',
+      'reference':         '※'
+    };
+
+    // OL 에 한해 프레임 처리
+    var lists = block.querySelectorAll('ul, ol');
+    if (!lists || lists.length === 0) return;
+
+    // 마커 크기 스케일 → li font-size 적용용
+    var scaleMap = { '70': 0.7, '85': 0.85, '115': 1.15, '130': 1.3 };
+    var liScale  = scaleMap[mscale] || null;
+
+    // 프레임 스타일링
+    var frameSpec = null;
+    if (frame === 'circle')      frameSpec = { w:'1.4em', h:'1.4em', radius:'50%',  fs:'0.75em' };
+    else if (frame === 'square') frameSpec = { w:'1.4em', h:'1.4em', radius:'3px',  fs:'0.75em' };
+    else if (frame === 'tall')   frameSpec = { w:'1.1em', h:'1.6em', radius:'3px',  fs:'0.72em' };
+
+    // OL 프레임 counter 계산을 수동으로 → counter(bl-frame, decimal|lower-roman|...) 변환
+    function _renderCounter(n, kind){
+      // 간략한 매핑 (한글초성 / 한글 등은 브라우저 CSS 의존하지 않게 기본 숫자)
+      if (!kind || kind === 'decimal') return String(n);
+      if (kind === 'decimal-zero') return (n < 10 ? '0' : '') + n;
+      if (kind === 'lower-roman' || kind === 'upper-roman'){
+        var romans = ['','i','ii','iii','iv','v','vi','vii','viii','ix','x','xi','xii','xiii','xiv','xv','xvi','xvii','xviii','xix','xx'];
+        var s = romans[n] || String(n);
+        return kind === 'upper-roman' ? s.toUpperCase() : s;
+      }
+      if (kind === 'lower-alpha' || kind === 'upper-alpha'){
+        var alpha = ['','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
+        var s2 = alpha[n] || String(n);
+        return kind === 'upper-alpha' ? s2.toUpperCase() : s2;
+      }
+      // hangul·hangul-consonant 은 브라우저 지원 불교형 → 숫자로 fallback
+      return String(n);
+    }
+
+    lists.forEach(function(list){
+      var tag = list.tagName.toLowerCase();
+      var isOL = (tag === 'ol');
+      var stdType = stdMap[style];
+      var markerChar = charMap[style];
+
+      // 기본 모양 수동 주입 (Ghost sanitize 에 살아남도록)
+      list.style.margin = '0';
+      list.style.paddingLeft = '1.5em';
+
+      // 프레임 상황 → counter + frame span
+      if (isOL && frameSpec){
+        list.style.listStyle = 'none';
+        list.style.paddingLeft = '0';
+        var kids = list.children;
+        for (var i = 0; i < kids.length; i++){
+          var li = kids[i];
+          if (!li || li.tagName !== 'LI') continue;
+          // 이미 마커 span 이 있으면 skip (재진입 상황)
+          if (li.firstElementChild && li.firstElementChild.classList && li.firstElementChild.classList.contains('ddl-bl-frame')) continue;
+          li.style.display = 'flex';
+          li.style.alignItems = 'flex-start';
+          li.style.gap = '0.5em';
+          li.style.paddingLeft = '0';
+          var mk = document.createElement('span');
+          mk.className = 'ddl-bl-frame';
+          mk.textContent = _renderCounter(i + 1, stdType || 'decimal');
+          mk.style.flex = '0 0 auto';
+          mk.style.width = frameSpec.w;
+          mk.style.height = frameSpec.h;
+          mk.style.boxSizing = 'border-box';
+          mk.style.display = 'inline-flex';
+          mk.style.alignItems = 'center';
+          mk.style.justifyContent = 'center';
+          mk.style.border = '1px solid currentColor';
+          mk.style.borderRadius = frameSpec.radius;
+          mk.style.fontSize = frameSpec.fs;
+          mk.style.lineHeight = '1';
+          mk.style.marginTop = '0.35em';
+          li.insertBefore(mk, li.firstChild);
+          if (liScale) li.style.fontSize = liScale + 'em';
+        }
+      }
+      // 문자 마커 상황 (□ ◆ ◇ * ※)
+      else if (markerChar){
+        list.style.listStyle = 'none';
+        list.style.paddingLeft = '0';
+        var kids2 = list.children;
+        for (var j = 0; j < kids2.length; j++){
+          var li2 = kids2[j];
+          if (!li2 || li2.tagName !== 'LI') continue;
+          if (li2.firstElementChild && li2.firstElementChild.classList && li2.firstElementChild.classList.contains('ddl-bl-mk')) continue;
+          li2.style.display = 'flex';
+          li2.style.alignItems = 'flex-start';
+          li2.style.gap = '0.4em';
+          li2.style.paddingLeft = '0';
+          var mk2 = document.createElement('span');
+          mk2.className = 'ddl-bl-mk';
+          mk2.textContent = markerChar;
+          mk2.style.flex = '0 0 auto';
+          mk2.style.opacity = '1';
+          li2.insertBefore(mk2, li2.firstChild);
+          if (liScale) li2.style.fontSize = liScale + 'em';
+        }
+      }
+      // 표준 list-style-type 상황
+      else if (stdType){
+        list.style.listStyleType = stdType;
+        if (liScale){
+          var kids3 = list.children;
+          for (var k = 0; k < kids3.length; k++){
+            var li3 = kids3[k];
+            if (li3 && li3.tagName === 'LI') li3.style.fontSize = liScale + 'em';
+          }
+        }
+      }
+    });
+
+    // 블록 자체에 무해한 기본 마진 (사이트 스킨 영향 최소화)
+    block.style.margin = block.style.margin || '0.5em 0';
+  }
+
   function enhanceCalloutForSite(box){
     if (!box) return;
     // p13h: 폭만 인라인 저장 (정렬은 블록 레벨에서 처리 예정)
@@ -14890,7 +15049,11 @@
       //   이전 버그: b.children 필터로 head/body 두 자식이 분해되어 enhanceFoldForSite 가 실제로 스타일을 못 심음 → 사이트 렌더 붕괴
       if (hasFoldBlock) innerEls = [b];
       var hasTable = false, hasFold = false;
-      var isCustom = (blockType === 'callout' || hasCalloutBox || blockType === 'image' || hasImageFig || blockType === 'divider' || hasDivider || blockType === 'button' || hasButton || blockType === 'fold' || hasFoldBlock);
+      // p23g: 불릿 블록 감지 (data-bullet-style 속성 or UL/OL 직계 자식)
+      var hasBulletList = !!(b.getAttribute('data-bullet-style')) ||
+                          !!(b.querySelector && b.querySelector(':scope > ul, :scope > ol'));
+      if (hasBulletList) innerEls = [b]; // 블록 자체를 통째로 저장 (콜아웃 방식)
+      var isCustom = (blockType === 'callout' || hasCalloutBox || blockType === 'image' || hasImageFig || blockType === 'divider' || hasDivider || blockType === 'button' || hasButton || blockType === 'fold' || hasFoldBlock || hasBulletList);
       // p13f: 감지 시 data-block-type 자동 교정
       if (hasCalloutBox && blockType !== 'callout') {
         log('[collectPostData] 콜아웃 감지, data-block-type 교정:', blockType, '→ callout');
@@ -14986,6 +15149,23 @@
             clone.removeAttribute('contenteditable');
             clone.querySelectorAll('[contenteditable]').forEach(function(x){ x.removeAttribute('contenteditable'); });
           }
+          // p23g: 불릿 블록 사이트 반영 (data-bullet-style / 프레임 / 특수문자 마커)
+          try {
+            if (clone.getAttribute && clone.getAttribute('data-bullet-style')){
+              enhanceBulletForSite(clone);
+              // 블록을 통째로 저장하므로 편집기 전용 클래스만 정리 (data-* 은 유지 - 재진입 복원용)
+              if (clone.classList){
+                clone.classList.remove('is-editing-focus');
+                clone.classList.remove('is-selected');
+              }
+            } else {
+              // 안에 중첩된 불릿 블록도 처리 (콜아웃/접은글 안 등)
+              var innerBl = clone.querySelectorAll && clone.querySelectorAll('.editor-block[data-bullet-style]');
+              if (innerBl && innerBl.length){
+                innerBl.forEach(function(bb){ enhanceBulletForSite(bb); });
+              }
+            }
+          } catch(_){}
           // p16b/f/g: 구분선 (clone.outerHTML 이 최종 저장 HTML 이 됨)
           if (clone.classList && clone.classList.contains('ep-divider-block')) {
             enhanceDividerForSite(clone);
@@ -15017,7 +15197,19 @@
         parts.push('<!--kg-card-begin: html-->\n' + innerHtml + '\n<!--kg-card-end: html-->');
       } else {
         // p14d 오류 4 수정: 블록에 data-align 또는 data-width-pct 있으면 kg-card html 마커로 감싸 Ghost 가 임의 제거하지 못하게 함
+        // p23g: 인라인 style (letter-spacing / line-height 등) 또는 span[data-inline-format] 이 있는 경우도 감싸도록 확장
+        //         (Ghost sanitizer 가 style 속성을 벗겨내지 않도록)
         var hasAlignOrWidth = (b.getAttribute('data-align') && b.getAttribute('data-align') !== 'left') || (b.getAttribute('data-width-pct') && b.getAttribute('data-width-pct') !== '100');
+        // 블록 안 편집 요소의 inline style (letter-spacing / line-height) 감지
+        var hasInlineFormat = false;
+        try {
+          innerEls.forEach(function(el){
+            if (hasInlineFormat) return;
+            if (el && el.style && (el.style.letterSpacing || el.style.lineHeight)) hasInlineFormat = true;
+            if (!hasInlineFormat && el && el.querySelector && el.querySelector('[data-inline-format], [style*="letter-spacing"], [style*="line-height"]')) hasInlineFormat = true;
+          });
+        } catch(_){}
+        var needsWrap = hasAlignOrWidth || hasInlineFormat;
         var innerHtmlPlain = '';
         innerEls.forEach(function(el){
           var clone = el.cloneNode(true);
@@ -15038,13 +15230,13 @@
           });
           // 클론이 통째로 base64 오염 figure면 스킵
           if (clone.tagName === 'FIGURE' && clone.querySelector('img[src*="<"]')) return;
-          if (hasAlignOrWidth) {
+          if (needsWrap) {
             innerHtmlPlain += clone.outerHTML;
           } else {
             parts.push(clone.outerHTML);
           }
         });
-        if (hasAlignOrWidth && innerHtmlPlain) {
+        if (needsWrap && innerHtmlPlain) {
           parts.push('<!--kg-card-begin: html-->\n' + innerHtmlPlain + '\n<!--kg-card-end: html-->');
         }
       }
@@ -17256,8 +17448,17 @@
 
   // 자간 적용: 선택 범위 있으면 span 감싸기 (execCommand 안 씁)
   //   value = em 수치 (0 = 기본, 음수 가능)
-  function _applyLetterSpacing(valueEm){
+  //   p23g: frozenSelSpan / frozenTarget 인자 추가
+  //     - 슬라이더 드래그 중 selection 이 사라져도 안정적으로 같은 span 을 계속 갱신
+  //     - 선택 없으면 frozenTarget 을 사용
+  function _applyLetterSpacing(valueEm, ctx){
+    ctx = ctx || {};
     try { if (typeof restoreRange === 'function') restoreRange(); } catch(_){}
+    // 이미 만들어둔 span 을 계속 쓰는 경우 (드래그 중)
+    if (ctx.frozenSelSpan && ctx.frozenSelSpan.isConnected){
+      ctx.frozenSelSpan.style.letterSpacing = valueEm + 'em';
+      return ctx.frozenSelSpan;
+    }
     var hasSel = _lsHasSelection();
     if (hasSel){
       // span 감싸기
@@ -17276,20 +17477,23 @@
         sel.removeAllRanges();
         sel.addRange(newRange);
         try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
-      } catch(err){ console.warn('[LS-apply]', err); }
+        return span;
+      } catch(err){ console.warn('[LS-apply]', err); return null; }
     } else {
       // 블록 전체에 부여
-      var t = _lsGetTargetBlock();
+      var t = ctx.frozenTarget || _lsGetTargetBlock();
       if (t && t.editable){
         t.editable.style.letterSpacing = valueEm + 'em';
       }
+      return null;
     }
   }
 
   // 줄간격 적용: 항상 대상 블록 안 편집 요소에 line-height 인라인
-  function _applyLineHeight(value){
+  //   p23g: frozenTarget 인자 추가 (팝오버 열 때 캡처해둔 불변 대상) → 슬라이더 드래그 중에도 안정 적용
+  function _applyLineHeight(value, frozenTarget){
     try { if (typeof restoreRange === 'function') restoreRange(); } catch(_){}
-    var t = _lsGetTargetBlock();
+    var t = frozenTarget || _lsGetTargetBlock();
     if (!t || !t.editable) return;
     t.editable.style.lineHeight = String(value);
   }
@@ -17444,6 +17648,8 @@
 
   function openLetterSpacingPopover(anchorBtn){
     var cur = _readCurrentLetterSpacing();
+    // p23g: 팝오버 열 시점의 대상을 클로저로 잡아둔다 (슬라이더 드래그 중 selection 유실 대비)
+    var _ctx = { frozenTarget: _lsGetTargetBlock(), frozenSelSpan: null };
     _openSliderPopover(anchorBtn, {
       kind:    'letter-spacing',
       title:   '자간',
@@ -17459,13 +17665,18 @@
         { label: '넓게',   value:  0.15 }
       ],
       hint: '텍스트 선택 시 그 부분만',
-      onChange: function(v){ _applyLetterSpacing(v); },
+      onChange: function(v){
+        var span = _applyLetterSpacing(v, _ctx);
+        if (span && !_ctx.frozenSelSpan) _ctx.frozenSelSpan = span;
+      },
       onReset:  function(){
         // 선택 있으면 span 복원 (푸는 건 복잡하니 0 으로 설정) · 없으면 블록 style 제거
-        if (_lsHasSelection()){
-          _applyLetterSpacing(0);
+        if (_ctx.frozenSelSpan && _ctx.frozenSelSpan.isConnected){
+          _ctx.frozenSelSpan.style.letterSpacing = '0em';
+        } else if (_lsHasSelection()){
+          _applyLetterSpacing(0, _ctx);
         } else {
-          var t = _lsGetTargetBlock();
+          var t = _ctx.frozenTarget || _lsGetTargetBlock();
           if (t && t.editable) t.editable.style.letterSpacing = '';
         }
       }
@@ -17474,6 +17685,8 @@
 
   function openLineHeightPopover(anchorBtn){
     var cur = _readCurrentLineHeight();
+    // p23g: 팝오버 열 시점의 대상 블록을 클로저에 계속 보관 → 슬라이더 드래그 중 버그 방지 핵심 수정
+    var _frozenTarget = _lsGetTargetBlock();
     _openSliderPopover(anchorBtn, {
       kind:    'line-height',
       title:   '줄간격',
@@ -17489,9 +17702,9 @@
         { label: '아주넓', value: 2.5 }
       ],
       hint: '블록 전체 적용',
-      onChange: function(v){ _applyLineHeight(v); },
+      onChange: function(v){ _applyLineHeight(v, _frozenTarget); },
       onReset:  function(){
-        var t = _lsGetTargetBlock();
+        var t = _frozenTarget || _lsGetTargetBlock();
         if (t && t.editable) t.editable.style.lineHeight = '';
       }
     });
