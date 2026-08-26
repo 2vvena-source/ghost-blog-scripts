@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p24g';
+  var VERSION = 'v2.0-β-p24h';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -15225,6 +15225,7 @@
     var currentTab = 'props';
 
     // p24g: apply-hl 모드 — 선택된 글자 안 mark.ddl-hl 을 찾아서 그 서식으로 초기값 설정
+    // p24h: range 안 모든 노드를 순회하면서 mark.ddl-hl 을 찾도록 강화 (startContainer 만 보면 놓침)
     var _savedApplyRange = null;
     var _initialSpecFromSelection = null;
     if (editorMode === 'apply-hl'){
@@ -15236,13 +15237,40 @@
           var _sel = window.getSelection();
           if (_sel && _sel.rangeCount > 0) _savedApplyRange = _sel.getRangeAt(0).cloneRange();
         }
-        // 선택 샜작점에서 mark.ddl-hl 찾기
+        // p24h: range 범위 안에서 mark.ddl-hl 찾기 — 여러 방식으로 시도
+        var _mkFound = null;
         if (_savedApplyRange){
+          // (1) startContainer 의 부모에서 closest
           var _startNode = _savedApplyRange.startContainer;
           if (_startNode && _startNode.nodeType === 3) _startNode = _startNode.parentElement;
-          if (_startNode){
-            var _mkFound = _startNode.closest && _startNode.closest('mark.ddl-hl');
-            if (_mkFound){
+          if (_startNode && _startNode.closest){
+            _mkFound = _startNode.closest('mark.ddl-hl');
+          }
+          // (2) 안 찾혔으면 — range 안을 순회하면서 mark.ddl-hl 찾기
+          if (!_mkFound){
+            try {
+              var _commonAn = _savedApplyRange.commonAncestorContainer;
+              if (_commonAn && _commonAn.nodeType === 3) _commonAn = _commonAn.parentElement;
+              if (_commonAn && _commonAn.querySelectorAll){
+                // range 안과 곹유하는 mark.ddl-hl 가 있는지 찾기
+                var _mks = _commonAn.querySelectorAll('mark.ddl-hl');
+                for (var _i = 0; _i < _mks.length; _i++){
+                  if (_savedApplyRange.intersectsNode && _savedApplyRange.intersectsNode(_mks[_i])){
+                    _mkFound = _mks[_i];
+                    break;
+                  }
+                }
+              }
+              // (3) 그래도 안 찾으면 — endContainer 에서도 시도
+              if (!_mkFound){
+                var _endNode = _savedApplyRange.endContainer;
+                if (_endNode && _endNode.nodeType === 3) _endNode = _endNode.parentElement;
+                if (_endNode && _endNode.closest) _mkFound = _endNode.closest('mark.ddl-hl');
+              }
+            } catch(_){}
+          }
+
+          if (_mkFound){
               // data-hl-spec (JSON) 이 있으면 우선 사용
               var _specJson = _mkFound.getAttribute('data-hl-spec');
               if (_specJson){
@@ -15264,7 +15292,6 @@
               }
               _initialSpecFromSelection = JSON.parse(JSON.stringify(current.spec));
             }
-          }
         }
         // 선택이 mark 안이 아니면 — localStorage 의 마지막 spec 을 초기값으로
         if (!_initialSpecFromSelection){
@@ -22302,7 +22329,7 @@
         '<div style="font-size:12px;opacity:0.6;margin-bottom:8px;letter-spacing:0.03em;">기타</div>' +
         '<div class="ddl-set-hub">' +
           _card('shortcut',   '단축키',              '편집기 전용 키보드 단축키 설정') +
-          _card('list',       '목록 기본값',        '순서 없는 / 수 있는 / 체크리스트 기본 스타일') +
+          /* p24h: 목록 기본값 허브 삭제 (미구현이라 노출하지 않음) */
         '</div>' +
         /* p22r: 루비(윗글씨) 위치 슬라이더 · 원 글자 위쪽 여백을 얼마나 채울지 */
         '<div style="margin-top:14px;padding:10px 12px;background:rgba(15,58,58,0.03);border-radius:6px;">' +
@@ -22383,7 +22410,8 @@
           return;
         }
         // 나머지는 아직 구현 안 됨 — 토스트만
-        var name = { highlight:'형광펜', shortcut:'단축키', list:'목록 기본값' }[hub] || hub;
+        // p24h: 'list' 는 위 카드에서 삭제됨. 남은 미구현 허브만 매핑
+        var name = { highlight:'형광펜', shortcut:'단축키' }[hub] || hub;
         _showStubToast(name + ' — 다음 배포에서 지원됩니다');
       });
     });
@@ -23632,11 +23660,77 @@
     arr.unshift({ color: color });
     if (arr.length > 20) arr = arr.slice(0, 20);   // 최대 20개
     saveUserTextColors(arr);
+    // p24h: 그룹 라이브러리 동기화 — 기본 "내 색" 그룹에 동일하게 추가
+    try { _tcAddColorToDefaultGroup(color); } catch(_){}
   }
   function removeUserTextColor(color){
     var arr = loadUserTextColors();
     arr = arr.filter(function(it){ return it.color !== color; });
     saveUserTextColors(arr);
+    // p24h: 그룹 라이브러리 에서도 제거 (이름 같은 모든 그룹에서)
+    try { _tcRemoveColorFromAllGroups(color); } catch(_){}
+  }
+
+  // ============================================================
+  // p24h: 글자색 그룹 라이브러리 (형광폜/헤더와 동일 구조)
+  //   저장: localStorage['ddl.textColorGroups']
+  //   구조: { version:1, groups: [{ id, name, isBuiltin, colors: [{ id, color, name, isFavorite }] }] }
+  //   기존 하위 배열(ddl_user_text_colors)과 상호 동기화: addUserTextColor/removeUserTextColor 가 여기도 반영
+  // ============================================================
+  var TC_GROUP_LIB_KEY = 'ddl.textColorGroups';
+
+  function _tcUid(prefix){ return (prefix || 'tc') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6); }
+
+  function _loadTextColorGroupLib(){
+    try {
+      var raw = localStorage.getItem(TC_GROUP_LIB_KEY);
+      if (raw){
+        var lib = JSON.parse(raw);
+        if (lib && Array.isArray(lib.groups)) return lib;
+      }
+    } catch(_){}
+    // 최초 진입 — 기존 배열을 "내 색" 그룹으로 이송하여 초기화
+    var seedColors = [];
+    try {
+      var oldArr = loadUserTextColors();
+      oldArr.forEach(function(it){
+        if (it && it.color){
+          seedColors.push({ id: _tcUid('tcc'), color: it.color, name: '', isFavorite: false });
+        }
+      });
+    } catch(_){}
+    var lib = {
+      version: 1,
+      groups: [
+        { id: 'tcg-default', name: '내 색', isBuiltin: true, colors: seedColors }
+      ]
+    };
+    _saveTextColorGroupLib(lib);
+    return lib;
+  }
+  function _saveTextColorGroupLib(lib){
+    try { localStorage.setItem(TC_GROUP_LIB_KEY, JSON.stringify(lib)); } catch(_){}
+  }
+  function _tcAddColorToDefaultGroup(color){
+    if (!color) return;
+    var lib = _loadTextColorGroupLib();
+    var g = lib.groups[0];
+    // 기본 그룹 가져오기 (없으면 만들기)
+    if (!g){
+      g = { id: 'tcg-default', name: '내 색', isBuiltin: true, colors: [] };
+      lib.groups.unshift(g);
+    }
+    // 중복 제거 (같은 color 가 있으면 앞으로 이동)
+    g.colors = g.colors.filter(function(c){ return c.color !== color; });
+    g.colors.unshift({ id: _tcUid('tcc'), color: color, name: '', isFavorite: false });
+    _saveTextColorGroupLib(lib);
+  }
+  function _tcRemoveColorFromAllGroups(color){
+    var lib = _loadTextColorGroupLib();
+    lib.groups.forEach(function(g){
+      g.colors = (g.colors || []).filter(function(c){ return c.color !== color; });
+    });
+    _saveTextColorGroupLib(lib);
   }
 
   // 현재 선택된 텍스트에서 사용된 색 자동 감지 ("이 페이지 사용 색")
@@ -23809,7 +23903,11 @@
       },
       manageLabel: '이 그룹 관리',
       onManage: function(){
-        _showStubToast('그룹 관리 — 다음 배포에서 지원됩니다');
+        // p24h: 글자색 그룹 관리창 연결
+        try { mp.close(); } catch(_){}
+        try {
+          if (typeof openTextColorGroupManager === 'function') openTextColorGroupManager();
+        } catch(err){ console.warn('[tc-manager]', err); }
       },
       clearLabel: '색깔 지우기',
       onClear: function(){
@@ -23826,6 +23924,240 @@
     window.__DDL_EDITOR.applyTextColor    = applyTextColor;
     window.__DDL_EDITOR.clearTextColor    = clearTextColor;
   } catch(_){}
+
+  // ============================================================
+  // p24h: 글자색 그룹 관리창
+  //   — 형광폜/헤더 관리창과 동일 곱질
+  //   — 좀 그룹 리스트 + [+ 새 그룹]
+  //   — 우 색 카드 그리드 + [+ 새 색] + (사용자 그룹) 그룹 삭제
+  //   — 기본 그룹(내 색)은 삭제 불가
+  // ============================================================
+  function openTextColorGroupManager(){
+    var currentGroupId = null;
+
+    var popup = window.__DDL_EDITOR.createBlockPopup({
+      title: '글자색 그룹 관리',
+      width: '780px',
+      draggable: true,
+      tabs: []
+    });
+    popup.show();
+    var body = popup.getBody('__single') || popup.body;
+    if (!body) return;
+    body.style.padding = '0';
+
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'display: flex; min-height: 480px; max-height: 72vh;';
+    body.appendChild(wrap);
+
+    // 왖측 그룹 리스트
+    var left = document.createElement('div');
+    left.style.cssText = 'width: 220px; flex-shrink: 0; border-right: 1px solid rgba(15,58,58,0.08);'
+      + ' display: flex; flex-direction: column; background: rgba(15,58,58,0.02);';
+    wrap.appendChild(left);
+
+    var leftList = document.createElement('div');
+    leftList.className = 'ddl-scroll-invisible';
+    leftList.style.cssText = 'flex: 1; overflow-y: auto; padding: 8px 6px;';
+    left.appendChild(leftList);
+
+    var newGroupBtn = document.createElement('button');
+    newGroupBtn.type = 'button';
+    newGroupBtn.textContent = '+ 새 그룹';
+    newGroupBtn.style.cssText = 'margin: 6px 8px 8px; padding: 8px 10px; font-size: 12px;'
+      + ' background: transparent; border: 1px dashed rgba(15,58,58,0.25); border-radius: 5px; cursor: pointer;'
+      + ' color: var(--color, #0F3A3A); font-family: inherit;';
+    newGroupBtn.addEventListener('mouseenter', function(){ newGroupBtn.style.borderColor = 'var(--point, #FF9A76)'; newGroupBtn.style.color = 'var(--point, #FF9A76)'; });
+    newGroupBtn.addEventListener('mouseleave', function(){ newGroupBtn.style.borderColor = 'rgba(15,58,58,0.25)'; newGroupBtn.style.color = 'var(--color, #0F3A3A)'; });
+    newGroupBtn.addEventListener('click', function(){
+      var name = prompt('새 그룹 이름', '새 색 그룹');
+      if (!name) return;
+      name = name.trim();
+      if (!name) return;
+      var lib = _loadTextColorGroupLib();
+      if (lib.groups.some(function(g){ return g.name === name; })){
+        _showStubToast('이미 있는 그룹 이름입니다');
+        return;
+      }
+      var newG = { id: _tcUid('tcg'), name: name, isBuiltin: false, colors: [] };
+      lib.groups.push(newG);
+      _saveTextColorGroupLib(lib);
+      currentGroupId = newG.id;
+      _renderAll();
+    });
+    left.appendChild(newGroupBtn);
+
+    // 오른쪽 상세
+    var right = document.createElement('div');
+    right.style.cssText = 'flex: 1; display: flex; flex-direction: column; overflow: hidden;';
+    wrap.appendChild(right);
+
+    var rightHeader = document.createElement('div');
+    rightHeader.style.cssText = 'padding: 12px 16px; border-bottom: 1px solid rgba(15,58,58,0.08);'
+      + ' display: flex; align-items: center; justify-content: space-between;';
+    right.appendChild(rightHeader);
+
+    var rightBody = document.createElement('div');
+    rightBody.className = 'ddl-scroll-invisible';
+    rightBody.style.cssText = 'flex: 1; overflow-y: auto; padding: 16px;';
+    right.appendChild(rightBody);
+
+    function _renderLeftList(){
+      leftList.innerHTML = '';
+      var lib = _loadTextColorGroupLib();
+      if (!currentGroupId && lib.groups[0]) currentGroupId = lib.groups[0].id;
+      lib.groups.forEach(function(g){
+        var item = document.createElement('button');
+        item.type = 'button';
+        var isActive = g.id === currentGroupId;
+        item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; width: 100%;'
+          + ' padding: 8px 10px; margin-bottom: 2px; border-radius: 4px; cursor: pointer;'
+          + ' background: ' + (isActive ? '#fff' : 'transparent') + ';'
+          + ' border: 1px solid ' + (isActive ? 'rgba(15,58,58,0.15)' : 'transparent') + ';'
+          + ' color: var(--color, #0F3A3A); font-family: inherit; font-size: 13px; text-align: left;';
+        var nm = document.createElement('span');
+        nm.textContent = g.name;
+        nm.style.cssText = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+        var badge = document.createElement('span');
+        badge.textContent = (g.colors || []).length;
+        badge.style.cssText = 'font-size: 10px; opacity: 0.5; margin-left: 8px; flex-shrink: 0;';
+        item.appendChild(nm);
+        item.appendChild(badge);
+        item.addEventListener('click', function(){
+          currentGroupId = g.id;
+          _renderAll();
+        });
+        leftList.appendChild(item);
+      });
+    }
+
+    function _renderRight(){
+      rightHeader.innerHTML = '';
+      rightBody.innerHTML = '';
+      var lib = _loadTextColorGroupLib();
+      var g = lib.groups.filter(function(x){ return x.id === currentGroupId; })[0];
+      if (!g){
+        rightBody.innerHTML = '<div style="padding: 40px; text-align: center; color: rgba(15,58,58,0.4); font-size: 13px;">그룹을 선택하세요</div>';
+        return;
+      }
+
+      // 헤더: 이름 (사용자 그룹이면 수정 가능) + 그룹 삭제 버튼
+      var gName = document.createElement('div');
+      gName.style.cssText = 'font-family: "Cafe24Danjunghae","Gowun Batang",serif; font-size: 18px; color: var(--color, #0F3A3A);';
+      if (g.isBuiltin){
+        gName.textContent = g.name;
+      } else {
+        var editableInput = document.createElement('input');
+        editableInput.type = 'text';
+        editableInput.value = g.name;
+        editableInput.style.cssText = 'font-family: inherit; font-size: 18px; color: var(--color, #0F3A3A); border: none; background: transparent; outline: none; width: 260px;';
+        editableInput.addEventListener('change', function(){
+          var v = editableInput.value.trim();
+          if (v){
+            var lib2 = _loadTextColorGroupLib();
+            var gg = lib2.groups.filter(function(x){ return x.id === g.id; })[0];
+            if (gg){ gg.name = v; _saveTextColorGroupLib(lib2); _renderLeftList(); }
+          }
+        });
+        gName.appendChild(editableInput);
+      }
+      rightHeader.appendChild(gName);
+
+      if (!g.isBuiltin){
+        var delGroupBtn = document.createElement('button');
+        delGroupBtn.type = 'button';
+        delGroupBtn.textContent = '그룹 삭제';
+        delGroupBtn.style.cssText = 'background: transparent; border: 1px solid rgba(211,51,51,0.4);'
+          + ' color: #d33; padding: 4px 10px; border-radius: 4px; cursor: pointer;'
+          + ' font-family: inherit; font-size: 11px;';
+        delGroupBtn.addEventListener('click', function(){
+          if (!confirm('그룹 "' + g.name + '" 을 삭제할까요? (그룹 안 색도 사라집니다)')) return;
+          var lib2 = _loadTextColorGroupLib();
+          lib2.groups = lib2.groups.filter(function(x){ return x.id !== g.id; });
+          _saveTextColorGroupLib(lib2);
+          currentGroupId = lib2.groups[0] ? lib2.groups[0].id : null;
+          _renderAll();
+        });
+        rightHeader.appendChild(delGroupBtn);
+      }
+
+      // 색 카드 그리드
+      var grid = document.createElement('div');
+      grid.style.cssText = 'display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;';
+      (g.colors || []).forEach(function(c){
+        var card = document.createElement('div');
+        card.style.cssText = 'position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px;'
+          + ' padding: 10px 6px; border-radius: 6px; background: #fff;'
+          + ' border: 1px solid rgba(15,58,58,0.12);';
+        var sw = document.createElement('div');
+        sw.style.cssText = 'width: 40px; height: 40px; border-radius: 5px; background: ' + c.color + ';'
+          + ' border: 1px solid rgba(15,58,58,0.15);';
+        card.appendChild(sw);
+        var lbl = document.createElement('div');
+        lbl.textContent = c.name || c.color;
+        lbl.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.6); text-align: center;'
+          + ' overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;';
+        card.appendChild(lbl);
+
+        var delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.textContent = '×';
+        delBtn.style.cssText = 'position: absolute; top: 2px; right: 4px; background: transparent; border: none;'
+          + ' font-size: 12px; color: rgba(15,58,58,0.4); cursor: pointer; padding: 0;';
+        delBtn.addEventListener('mouseenter', function(){ delBtn.style.color = '#d33'; });
+        delBtn.addEventListener('mouseleave', function(){ delBtn.style.color = 'rgba(15,58,58,0.4)'; });
+        delBtn.addEventListener('click', function(){
+          var lib2 = _loadTextColorGroupLib();
+          var gg = lib2.groups.filter(function(x){ return x.id === g.id; })[0];
+          if (gg){
+            gg.colors = (gg.colors || []).filter(function(cc){ return cc.id !== c.id; });
+            _saveTextColorGroupLib(lib2);
+            _renderAll();
+          }
+        });
+        card.appendChild(delBtn);
+        grid.appendChild(card);
+      });
+      // "+ 새 색" 카드
+      var addCard = document.createElement('button');
+      addCard.type = 'button';
+      addCard.textContent = '+';
+      addCard.style.cssText = 'padding: 20px 6px; border-radius: 6px; background: transparent;'
+        + ' border: 1px dashed rgba(15,58,58,0.25); color: rgba(15,58,58,0.4);'
+        + ' font-size: 20px; cursor: pointer; font-family: inherit; min-height: 74px;';
+      addCard.addEventListener('mouseenter', function(){ addCard.style.borderColor = 'var(--point, #FF9A76)'; addCard.style.color = 'var(--point, #FF9A76)'; });
+      addCard.addEventListener('mouseleave', function(){ addCard.style.borderColor = 'rgba(15,58,58,0.25)'; addCard.style.color = 'rgba(15,58,58,0.4)'; });
+      addCard.addEventListener('click', function(){
+        var input = document.createElement('input');
+        input.type = 'color';
+        input.value = '#0F3A3A';
+        input.style.position = 'fixed';
+        input.style.left = '-9999px';
+        document.body.appendChild(input);
+        input.addEventListener('change', function(){
+          var newColor = input.value;
+          try { document.body.removeChild(input); } catch(_){}
+          if (!newColor) return;
+          var lib2 = _loadTextColorGroupLib();
+          var gg = lib2.groups.filter(function(x){ return x.id === g.id; })[0];
+          if (gg){
+            // 중복 제거
+            gg.colors = (gg.colors || []).filter(function(cc){ return cc.color !== newColor; });
+            gg.colors.unshift({ id: _tcUid('tcc'), color: newColor, name: '', isFavorite: false });
+            _saveTextColorGroupLib(lib2);
+            _renderAll();
+          }
+        });
+        input.click();
+      });
+      grid.appendChild(addCard);
+      rightBody.appendChild(grid);
+    }
+
+    function _renderAll(){ _renderLeftList(); _renderRight(); }
+    _renderAll();
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.openTextColorGroupManager = openTextColorGroupManager; } catch(_){}
 
   // ═══════════════════════════════════════════════════════════
   // β-2. 인라인 서식 프리셋
