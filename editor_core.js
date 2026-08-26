@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23s';
+  var VERSION = 'v2.0-β-p23t';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -11997,73 +11997,290 @@
       if (activeTab === 'props') renderTabContent();
     };
 
+    // p23t: 색깔 탭 = 헤더 전용 색상 프리셋 라이브러리 (그룹 + 카드 갤러리 + 새 색 등록/편집/삭제)
+    //   - 저장소: window.__DDL_EDITOR.loadHeaderColorLibrary / saveHeaderColorLibrary (ddl.headerColorLibrary)
+    //   - 기본 그룹(딥그린·살구·흐림 50/25%)은 삭제 불가 (isBuiltin)
+    //   - 사용자 그룹은 자유롭게 추가/이름변경/삭제
+    //   - 각 그룹 안에서 색깔 카드 추가/편집/삭제, ★ 즐겨찾기
+    //   - 상단 뷰 스위처: 전체 / ★ / 이 글에서 (폰트 갤러리와 동일 패턴)
     function renderColorTab(){
-      // 현재 색 표시
+      // === 1. 현재 색 표시 (큰 원) ===
       var current_color = current.style.color || 'var(--color, #0F3A3A)';
       var big = document.createElement('div');
-      big.style.cssText = 'width: 80px; height: 80px; border-radius: 50%; margin: 8px auto 12px;'
-        + ' background: ' + current_color + '; border: 1px solid rgba(15,58,58,0.15);';
+      big.style.cssText = 'width: 64px; height: 64px; border-radius: 50%; margin: 4px auto 8px;'
+        + ' background: ' + current_color + '; border: 1px solid rgba(15,58,58,0.15);'
+        + ' box-shadow: 0 1px 3px rgba(0,0,0,0.06);';
       tabContent.appendChild(big);
 
       var caption = document.createElement('div');
-      caption.style.cssText = 'text-align: center; font-size: 11px; opacity: 0.55; margin-bottom: 14px;';
+      caption.style.cssText = 'text-align: center; font-size: 11px; opacity: 0.55; margin-bottom: 12px;';
       caption.textContent = '현재 글자색';
       tabContent.appendChild(caption);
 
-      // 팔레트 (4색 스와치, 크게)
-      var palLabel = document.createElement('div');
-      palLabel.style.cssText = 'font-size: 10px; opacity: 0.5; letter-spacing: 0.06em; margin-bottom: 8px; text-transform: uppercase;';
-      palLabel.textContent = '기본 팔레트';
-      tabContent.appendChild(palLabel);
+      // 뷰 상태 (그룹별 렌더러가 참조)
+      var colorView = renderColorTab.__view || 'all';
 
-      var palRow = document.createElement('div');
-      palRow.style.cssText = 'display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap;';
-      var swatches = [
-        { label: '기본 (딥그린)', value: 'var(--color, #0F3A3A)', bg: '#0F3A3A' },
-        { label: '포인트 (살구)',  value: 'var(--point, #FF9A76)', bg: '#FF9A76' },
-        { label: '흐림 50%',        value: 'rgba(15,58,58,0.5)',     bg: 'rgba(15,58,58,0.5)' },
-        { label: '흐림 25%',        value: 'rgba(15,58,58,0.25)',    bg: 'rgba(15,58,58,0.25)' }
-      ];
-      swatches.forEach(function(sw){
-        var wrap = document.createElement('div');
-        wrap.style.cssText = 'display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;';
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.title = sw.label;
-        var isActive = (current.style.color === sw.value);
-        b.style.cssText = 'width: 36px; height: 36px; border-radius: 50%; padding: 0; cursor: pointer;'
-          + ' background:' + sw.bg + ';'
-          + ' border: 2px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.15)') + ';'
-          + ' box-shadow: ' + (isActive ? '0 0 0 2px rgba(255,154,118,0.25)' : 'none') + ';'
-          + ' transition: transform 120ms;';
-        b.addEventListener('mouseenter', function(){ b.style.transform = 'scale(1.08)'; });
-        b.addEventListener('mouseleave', function(){ b.style.transform = 'scale(1)'; });
-        b.addEventListener('click', function(){
-          current.style.color = sw.value;
-          big.style.background = sw.bg;
-          renderPreview();
-          renderColorTab();  // 스와치 상태 갱신
+      // === 2. 상단 헤더 + 뷰 스위처 (폰트 갤러리와 동일) ===
+      var colHeader = document.createElement('div');
+      colHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin: 4px 0 8px;';
+
+      var colHeaderLabel = document.createElement('div');
+      colHeaderLabel.style.cssText = 'font-size: 12px; color: rgba(15,58,58,0.6);';
+      colHeaderLabel.textContent = '색깔';
+      colHeader.appendChild(colHeaderLabel);
+
+      var viewSwitcher = document.createElement('div');
+      viewSwitcher.style.cssText = 'display: inline-flex; gap: 0; border: 1px solid rgba(15,58,58,0.12); border-radius: 4px; overflow: hidden;';
+      [
+        { key: 'all',       label: '전체' },
+        { key: 'favorite',  label: '★' },
+        { key: 'inContent', label: '이 글에서' }
+      ].forEach(function(v){
+        var vb = document.createElement('button');
+        vb.type = 'button';
+        vb.textContent = v.label;
+        var isActive = colorView === v.key;
+        vb.style.cssText = 'padding: 3px 10px; font-size: 10px; cursor: pointer; border: none;'
+          + ' background: ' + (isActive ? 'rgba(255,154,118,0.15)' : 'transparent') + ';'
+          + ' color: ' + (isActive ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.55)') + ';'
+          + ' font-weight: ' + (isActive ? '600' : '400') + ';';
+        vb.addEventListener('click', function(){
+          renderColorTab.__view = v.key;
+          renderColorTab();
         });
-        var cap = document.createElement('div');
-        cap.textContent = sw.label;
-        cap.style.cssText = 'font-size: 10px; opacity: 0.55; text-align: center;';
-        wrap.appendChild(b);
-        wrap.appendChild(cap);
-        palRow.appendChild(wrap);
+        viewSwitcher.appendChild(vb);
       });
-      tabContent.appendChild(palRow);
+      colHeader.appendChild(viewSwitcher);
+      tabContent.appendChild(colHeader);
 
-      // 직접 색 선택 (color picker)
+      // === 3. 라이브러리 로드 + 뷰 필터 ===
+      var lib = _loadHeaderColorLibrary();
+
+      // 현재 문서에서 사용 중인 색상값 (inContent 필터용)
+      function _collectUsedColorValues(){
+        var used = {};
+        try {
+          if (typeof contentEl !== 'undefined' && contentEl){
+            contentEl.querySelectorAll('[style*="color"]').forEach(function(el){
+              var c = el.style && el.style.color;
+              if (c) used[c.trim().toLowerCase()] = true;
+            });
+          }
+        } catch(_){}
+        return used;
+      }
+      var usedSet = colorView === 'inContent' ? _collectUsedColorValues() : null;
+
+      function _passView(c){
+        if (colorView === 'favorite') return !!c.isFavorite;
+        if (colorView === 'inContent'){
+          if (!usedSet) return true;
+          var v = (c.value || '').trim().toLowerCase();
+          return !!usedSet[v];
+        }
+        return true;
+      }
+
+      // === 4. 그룹별 섹션 렌더링 ===
+      var anyGroupShown = false;
+      lib.groups.forEach(function(group){
+        var visibleColors = (group.colors || []).filter(_passView);
+        // 필터 뷰에서 색이 없는 그룹은 접기 (전체에서는 빈 그룹도 표시해서 편집 가능)
+        if (colorView !== 'all' && visibleColors.length === 0) return;
+        anyGroupShown = true;
+
+        var section = document.createElement('div');
+        section.style.cssText = 'margin-bottom: 12px; border-bottom: 1px solid rgba(15,58,58,0.04); padding-bottom: 8px;';
+
+        // 그룹 헤더 (이름 + 이름변경/삭제)
+        var groupHead = document.createElement('div');
+        groupHead.style.cssText = 'display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;';
+
+        var groupName = document.createElement('div');
+        groupName.style.cssText = 'font-size: 11px; letter-spacing: 0.04em; color: rgba(15,58,58,0.7); font-weight: 600;';
+        groupName.textContent = group.name + (group.isBuiltin ? ' · 기본' : '');
+        groupHead.appendChild(groupName);
+
+        var groupActions = document.createElement('div');
+        groupActions.style.cssText = 'display: flex; gap: 4px;';
+
+        if (!group.isBuiltin){
+          var renameBtn = document.createElement('button');
+          renameBtn.type = 'button';
+          renameBtn.textContent = '이름';
+          renameBtn.title = '그룹 이름 변경';
+          renameBtn.style.cssText = 'font-size: 10px; padding: 2px 6px; background: transparent; border: 1px solid rgba(15,58,58,0.15); border-radius: 3px; cursor: pointer; color: rgba(15,58,58,0.6);';
+          renameBtn.addEventListener('click', function(){
+            var nv = prompt('그룹 이름 변경', group.name);
+            if (nv && nv.trim()){
+              group.name = nv.trim();
+              _saveHeaderColorLibrary(lib);
+              renderColorTab();
+            }
+          });
+          groupActions.appendChild(renameBtn);
+
+          var delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.textContent = '삭제';
+          delBtn.title = '그룹 전체 삭제';
+          delBtn.style.cssText = 'font-size: 10px; padding: 2px 6px; background: transparent; border: 1px solid rgba(15,58,58,0.15); border-radius: 3px; cursor: pointer; color: rgba(15,58,58,0.55);';
+          delBtn.addEventListener('click', function(){
+            if (confirm('그룹 "' + group.name + '" 을(를) 삭제할까요?\n그룹 안 색깔들도 함께 삭제됩니다.')){
+              lib.groups = lib.groups.filter(function(g){ return g.id !== group.id; });
+              _saveHeaderColorLibrary(lib);
+              renderColorTab();
+            }
+          });
+          groupActions.appendChild(delBtn);
+        }
+        groupHead.appendChild(groupActions);
+        section.appendChild(groupHead);
+
+        // 색상 카드 그리드
+        var grid = document.createElement('div');
+        grid.style.cssText = 'display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;';
+
+        var colorsToShow = colorView === 'all' ? (group.colors || []) : visibleColors;
+
+        colorsToShow.forEach(function(c){
+          var card = document.createElement('div');
+          var isActive = current.style.color === c.value;
+          card.style.cssText = 'position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px;'
+            + ' padding: 5px 3px; border-radius: 5px; cursor: pointer;'
+            + ' background: ' + (isActive ? 'rgba(255,154,118,0.08)' : 'transparent') + ';'
+            + ' border: 1px solid ' + (isActive ? 'var(--point, #FF9A76)' : 'transparent') + ';';
+
+          var sw = document.createElement('div');
+          sw.style.cssText = 'width: 26px; height: 26px; border-radius: 50%;'
+            + ' background: ' + c.value + ';'
+            + ' border: 1px solid rgba(15,58,58,0.15);';
+          card.appendChild(sw);
+
+          var lbl = document.createElement('div');
+          lbl.textContent = c.name || '';
+          lbl.style.cssText = 'font-size: 9px; color: rgba(15,58,58,0.55); text-align: center;'
+            + ' max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+          card.appendChild(lbl);
+
+          // 즐겨찾기 별 (우상단)
+          var favMark = document.createElement('button');
+          favMark.type = 'button';
+          favMark.textContent = c.isFavorite ? '★' : '☆';
+          favMark.title = '즐겨찾기';
+          favMark.style.cssText = 'position: absolute; top: 1px; right: 3px; background: transparent; border: none; cursor: pointer;'
+            + ' font-size: 9px; padding: 0; line-height: 1;'
+            + ' color: ' + (c.isFavorite ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.3)') + ';';
+          favMark.addEventListener('click', function(e){
+            e.stopPropagation();
+            c.isFavorite = !c.isFavorite;
+            _saveHeaderColorLibrary(lib);
+            renderColorTab();
+          });
+          card.appendChild(favMark);
+
+          card.addEventListener('mouseenter', function(){
+            if (!isActive) card.style.background = 'rgba(15,58,58,0.03)';
+          });
+          card.addEventListener('mouseleave', function(){
+            if (!isActive) card.style.background = 'transparent';
+          });
+          card.addEventListener('click', function(){
+            current.style.color = c.value;
+            renderPreview();
+            renderColorTab();
+          });
+          // 우클릭: 편집·삭제 미니 메뉴 (기본 색은 편집만, 삭제 불가)
+          card.addEventListener('contextmenu', function(e){
+            e.preventDefault();
+            _openHeaderColorCardMenu(e.clientX, e.clientY, group, c, lib, renderColorTab, function(){
+              // 편집 후 콜백: 만약 현재 선택된 색이 이 색이었다면 값 갱신
+              if (current.style.color === c.value){
+                // c.value 는 이미 갱신됨
+                current.style.color = c.value;
+                renderPreview();
+              }
+            });
+          });
+
+          grid.appendChild(card);
+        });
+
+        // [+ 새 색깔] 추가 카드 (기본 그룹에도 넣게 함 — 사용자 요청: 기본 색은 지우지 말되 추가는 자유)
+        var addCard = document.createElement('button');
+        addCard.type = 'button';
+        addCard.title = '새 색깔 추가';
+        addCard.style.cssText = 'display: flex; align-items: center; justify-content: center;'
+          + ' padding: 6px; border-radius: 5px; cursor: pointer;'
+          + ' background: transparent; border: 1px dashed rgba(15,58,58,0.25);'
+          + ' color: rgba(15,58,58,0.5); font-size: 14px; min-height: 44px;';
+        addCard.innerHTML = '+';
+        addCard.addEventListener('mouseenter', function(){ addCard.style.borderColor = 'var(--point, #FF9A76)'; addCard.style.color = 'var(--point, #FF9A76)'; });
+        addCard.addEventListener('mouseleave', function(){ addCard.style.borderColor = 'rgba(15,58,58,0.25)'; addCard.style.color = 'rgba(15,58,58,0.5)'; });
+        addCard.addEventListener('click', function(){
+          _openHeaderColorEditMini(null, function(newColor){
+            if (!newColor) return;
+            group.colors = group.colors || [];
+            group.colors.push({
+              id: _uidHColor(),
+              name: newColor.name || '새 색깔',
+              value: newColor.value,
+              isBuiltin: false,
+              isFavorite: false
+            });
+            _saveHeaderColorLibrary(lib);
+            renderColorTab();
+          });
+        });
+        grid.appendChild(addCard);
+
+        section.appendChild(grid);
+        tabContent.appendChild(section);
+      });
+
+      if (!anyGroupShown){
+        var em = document.createElement('div');
+        em.style.cssText = 'padding: 20px; text-align: center; color: rgba(15,58,58,0.4); font-size: 11px;';
+        em.textContent = colorView === 'favorite' ? '즐겨찾기한 색깔이 없어요.' : '이 글에서 사용 중인 색깔이 없어요.';
+        tabContent.appendChild(em);
+      }
+
+      // === 5. [+ 새 그룹] ===
+      var newGroupBtn = document.createElement('button');
+      newGroupBtn.type = 'button';
+      newGroupBtn.textContent = '+ 새 그룹 만들기';
+      newGroupBtn.style.cssText = 'display: block; margin: 6px 0 12px; padding: 6px 10px; width: 100%;'
+        + ' background: transparent; border: 1px dashed rgba(15,58,58,0.2); border-radius: 5px;'
+        + ' color: rgba(15,58,58,0.6); font-size: 11px; cursor: pointer; font-family: inherit;';
+      newGroupBtn.addEventListener('mouseenter', function(){ newGroupBtn.style.borderColor = 'var(--point, #FF9A76)'; newGroupBtn.style.color = 'var(--point, #FF9A76)'; });
+      newGroupBtn.addEventListener('mouseleave', function(){ newGroupBtn.style.borderColor = 'rgba(15,58,58,0.2)'; newGroupBtn.style.color = 'rgba(15,58,58,0.6)'; });
+      newGroupBtn.addEventListener('click', function(){
+        var nm = prompt('새 그룹 이름', '내 색깔');
+        if (nm && nm.trim()){
+          lib.groups.push({
+            id: _uidHColor('grp'),
+            name: nm.trim(),
+            isBuiltin: false,
+            colors: []
+          });
+          _saveHeaderColorLibrary(lib);
+          renderColorTab();
+        }
+      });
+      tabContent.appendChild(newGroupBtn);
+
+      // === 6. 직접 색 선택 (프리셋 저장 없이 원샷 적용) ===
       var pickerRow = document.createElement('div');
       pickerRow.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(15,58,58,0.06);';
       var pickerLabel = document.createElement('div');
-      pickerLabel.style.cssText = 'font-size: 12px; color: rgba(15,58,58,0.6); flex: 1;';
-      pickerLabel.textContent = '직접 색 선택';
+      pickerLabel.style.cssText = 'font-size: 11px; color: rgba(15,58,58,0.5); flex: 1;';
+      pickerLabel.textContent = '직접 색 선택 (저장 없이 이번만)';
       pickerRow.appendChild(pickerLabel);
       var picker = document.createElement('input');
       picker.type = 'color';
-      picker.value = '#0F3A3A';
-      picker.style.cssText = 'width: 32px; height: 32px; border: 1px solid rgba(15,58,58,0.15); border-radius: 4px; cursor: pointer; padding: 2px;';
+      var _pickerInit = current.style.color;
+      picker.value = /^#[0-9a-f]{6}$/i.test(_pickerInit || '') ? _pickerInit : '#0F3A3A';
+      picker.style.cssText = 'width: 28px; height: 28px; border: 1px solid rgba(15,58,58,0.15); border-radius: 4px; cursor: pointer; padding: 2px;';
       picker.addEventListener('input', function(){
         current.style.color = picker.value;
         big.style.background = picker.value;
@@ -12071,12 +12288,6 @@
       });
       pickerRow.appendChild(picker);
       tabContent.appendChild(pickerRow);
-
-      // 안내: 향후 다음 라운드에 콜아웃 팔레트 시스템 이식 예정
-      var hint = document.createElement('div');
-      hint.style.cssText = 'margin-top: 14px; padding: 10px; background: rgba(15,58,58,0.04); border-radius: 6px; font-size: 11px; opacity: 0.6; line-height: 1.5;';
-      hint.textContent = '💡 다음 라운드에 콜아웃/구분선의 팔레트 시스템(노션 연한색 · 사이트 연한색 등)이 이 탭에 이식될 예정입니다.';
-      tabContent.appendChild(hint);
     }
 
     // ============================
@@ -13507,6 +13718,241 @@
     document.removeEventListener('keydown', _onEsc);
   }
 
+  // ============================================================
+  // p23t: 헤더 전용 색상 프리셋 라이브러리
+  //   저장소: localStorage['ddl.headerColorLibrary']
+  //     = { version:1, groups:[ { id, name, isBuiltin, colors:[ { id, name, value, isBuiltin, isFavorite } ] } ] }
+  //   기본 그룹(기본)은 4색 시드, 삭제 불가
+  // ============================================================
+  var HCOLOR_LIB_KEY = 'ddl.headerColorLibrary';
+
+  var HCOLOR_BUILTINS_GROUP = {
+    id: 'grp-basic',
+    name: '기본',
+    isBuiltin: true,
+    colors: [
+      { id: 'hc-basic-deep',   name: '딥그린',   value: 'var(--color, #0F3A3A)', isBuiltin: true, isFavorite: true },
+      { id: 'hc-basic-point',  name: '살구 포인트', value: 'var(--point, #FF9A76)', isBuiltin: true, isFavorite: true },
+      { id: 'hc-basic-mid',    name: '흐림 50%',   value: 'rgba(15,58,58,0.5)',    isBuiltin: true, isFavorite: false },
+      { id: 'hc-basic-light',  name: '흐림 25%',   value: 'rgba(15,58,58,0.25)',   isBuiltin: true, isFavorite: false }
+    ]
+  };
+
+  function _uidHColor(prefix){ return (prefix || 'hc') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6); }
+
+  function _loadHeaderColorLibrary(){
+    try {
+      var raw = localStorage.getItem(HCOLOR_LIB_KEY);
+      var data = raw ? JSON.parse(raw) : null;
+      if (!data || !Array.isArray(data.groups)) data = { version: 1, groups: [] };
+      // 기본 그룹 없으면 맨 앞에 시드
+      var hasBasic = data.groups.some(function(g){ return g.id === HCOLOR_BUILTINS_GROUP.id; });
+      if (!hasBasic){
+        data.groups.unshift(JSON.parse(JSON.stringify(HCOLOR_BUILTINS_GROUP)));
+      } else {
+        // 기본 색 중 빠진 것 보완 (사용자가 수정했으면 기존 유지)
+        var basic = data.groups.filter(function(g){ return g.id === HCOLOR_BUILTINS_GROUP.id; })[0];
+        HCOLOR_BUILTINS_GROUP.colors.forEach(function(bc){
+          if (!basic.colors.some(function(c){ return c.id === bc.id; })){
+            basic.colors.push(JSON.parse(JSON.stringify(bc)));
+          }
+        });
+      }
+      return data;
+    } catch(err){
+      console.warn('[hcolor-lib] load fail', err);
+      return { version: 1, groups: [JSON.parse(JSON.stringify(HCOLOR_BUILTINS_GROUP))] };
+    }
+  }
+
+  function _saveHeaderColorLibrary(data){
+    try {
+      localStorage.setItem(HCOLOR_LIB_KEY, JSON.stringify(data));
+    } catch(err){ console.warn('[hcolor-lib] save fail', err); }
+  }
+
+  // 우클릭 메뉴: 색깔 카드에서 편집/삭제
+  function _openHeaderColorCardMenu(x, y, group, color, lib, onChanged, afterEdit){
+    var old = document.getElementById('ddl-hcolor-card-menu');
+    if (old) old.remove();
+
+    var menu = document.createElement('div');
+    menu.id = 'ddl-hcolor-card-menu';
+    menu.style.cssText = 'position: fixed; z-index: 100010;'
+      + ' background: #fff; border: 1px solid rgba(15,58,58,0.15); border-radius: 5px;'
+      + ' box-shadow: 0 4px 12px rgba(0,0,0,0.12); padding: 4px; min-width: 130px;'
+      + ' font-family: "Pretendard Variable","Pretendard",sans-serif; font-size: 12px;';
+    menu.style.left = Math.min(x, window.innerWidth - 150) + 'px';
+    menu.style.top  = Math.min(y, window.innerHeight - 120) + 'px';
+
+    function mkItem(label, danger, onClick){
+      var it = document.createElement('button');
+      it.type = 'button';
+      it.textContent = label;
+      it.style.cssText = 'display: block; width: 100%; text-align: left; padding: 6px 10px;'
+        + ' background: transparent; border: none; cursor: pointer; border-radius: 3px;'
+        + ' color: ' + (danger ? '#d33' : 'var(--color, #0F3A3A)') + '; font-family: inherit; font-size: inherit;';
+      it.addEventListener('mouseenter', function(){ it.style.background = danger ? 'rgba(211,51,51,0.06)' : 'rgba(15,58,58,0.05)'; });
+      it.addEventListener('mouseleave', function(){ it.style.background = 'transparent'; });
+      it.addEventListener('click', function(){
+        menu.remove();
+        onClick();
+      });
+      return it;
+    }
+
+    menu.appendChild(mkItem('✏  편집', false, function(){
+      _openHeaderColorEditMini(color, function(updated){
+        if (!updated) return;
+        color.name  = updated.name;
+        color.value = updated.value;
+        _saveHeaderColorLibrary(lib);
+        if (typeof afterEdit === 'function') afterEdit();
+        if (typeof onChanged === 'function') onChanged();
+      });
+    }));
+
+    if (!color.isBuiltin){
+      menu.appendChild(mkItem('🗑  삭제', true, function(){
+        if (confirm('색깔 "' + (color.name || '') + '"을(를) 삭제할까요?')){
+          group.colors = group.colors.filter(function(c){ return c.id !== color.id; });
+          _saveHeaderColorLibrary(lib);
+          if (typeof onChanged === 'function') onChanged();
+        }
+      }));
+    } else {
+      var readonly = document.createElement('div');
+      readonly.textContent = '기본 색은 삭제할 수 없어요';
+      readonly.style.cssText = 'padding: 6px 10px; color: rgba(15,58,58,0.4); font-size: 10px;';
+      menu.appendChild(readonly);
+    }
+
+    document.body.appendChild(menu);
+
+    setTimeout(function(){
+      var closer = function(ev){
+        if (!menu.contains(ev.target)){
+          menu.remove();
+          document.removeEventListener('mousedown', closer, true);
+        }
+      };
+      document.addEventListener('mousedown', closer, true);
+    }, 50);
+  }
+
+  // 색깔 편집 미니 다이얼로그 (이름 + 색)
+  function _openHeaderColorEditMini(existing, onDone){
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position: fixed; inset: 0; z-index: 100020;'
+      + ' background: rgba(15,58,58,0.25);'
+      + ' display: flex; align-items: center; justify-content: center;'
+      + ' font-family: "Pretendard Variable","Pretendard",sans-serif;';
+
+    var box = document.createElement('div');
+    box.style.cssText = 'background: #fff; border: 1px solid rgba(15,58,58,0.2); border-radius: 6px;'
+      + ' width: 320px; max-width: 92vw; padding: 18px;'
+      + ' box-shadow: 0 10px 30px rgba(0,0,0,0.15); color: var(--color, #0F3A3A);';
+    box.addEventListener('click', function(e){ e.stopPropagation(); });
+
+    var title = document.createElement('div');
+    title.textContent = existing ? '색깔 편집' : '새 색깔';
+    title.style.cssText = 'font-family: "Cafe24Danjunghae","Gowun Batang",serif; font-size: 16px; margin-bottom: 14px;';
+    box.appendChild(title);
+
+    // 이름 입력
+    var nameLbl = document.createElement('div');
+    nameLbl.textContent = '이름';
+    nameLbl.style.cssText = 'font-size: 10px; opacity: 0.5; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px;';
+    box.appendChild(nameLbl);
+
+    var nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = (existing && existing.name) || '';
+    nameInput.placeholder = '예: 른 바다';
+    nameInput.style.cssText = 'width: 100%; box-sizing: border-box; padding: 6px 8px; margin-bottom: 14px;'
+      + ' border: 1px solid rgba(15,58,58,0.15); border-radius: 4px; font-family: inherit; font-size: 13px; outline: none;';
+    box.appendChild(nameInput);
+
+    // 색 선택 (미리보기 + color picker + HEX 입력)
+    var colorLbl = document.createElement('div');
+    colorLbl.textContent = '색';
+    colorLbl.style.cssText = 'font-size: 10px; opacity: 0.5; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px;';
+    box.appendChild(colorLbl);
+
+    var colorRow = document.createElement('div');
+    colorRow.style.cssText = 'display: flex; align-items: center; gap: 10px; margin-bottom: 18px;';
+
+    var previewCircle = document.createElement('div');
+    var initColor = (existing && existing.value) || '#0F3A3A';
+    previewCircle.style.cssText = 'width: 40px; height: 40px; border-radius: 50%;'
+      + ' background: ' + initColor + '; border: 1px solid rgba(15,58,58,0.15);';
+    colorRow.appendChild(previewCircle);
+
+    var colorPicker = document.createElement('input');
+    colorPicker.type = 'color';
+    colorPicker.value = /^#[0-9a-f]{6}$/i.test(initColor) ? initColor : '#0F3A3A';
+    colorPicker.style.cssText = 'width: 40px; height: 40px; padding: 2px; border: 1px solid rgba(15,58,58,0.15); border-radius: 4px; cursor: pointer;';
+    colorRow.appendChild(colorPicker);
+
+    var hexInput = document.createElement('input');
+    hexInput.type = 'text';
+    hexInput.value = initColor;
+    hexInput.placeholder = '#0F3A3A 또는 rgba(...)';
+    hexInput.style.cssText = 'flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid rgba(15,58,58,0.15); border-radius: 4px; font-family: inherit; font-size: 12px; outline: none;';
+    colorRow.appendChild(hexInput);
+
+    colorPicker.addEventListener('input', function(){
+      previewCircle.style.background = colorPicker.value;
+      hexInput.value = colorPicker.value;
+    });
+    hexInput.addEventListener('input', function(){
+      var v = hexInput.value.trim();
+      if (v){
+        previewCircle.style.background = v;
+        if (/^#[0-9a-f]{6}$/i.test(v)) colorPicker.value = v;
+      }
+    });
+
+    box.appendChild(colorRow);
+
+    // 버튼
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display: flex; justify-content: flex-end; gap: 6px;';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = '취소';
+    cancelBtn.style.cssText = 'padding: 6px 14px; background: transparent; border: 1px solid rgba(15,58,58,0.2); border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 12px; color: var(--color, #0F3A3A);';
+    cancelBtn.addEventListener('click', function(){
+      overlay.remove();
+      if (typeof onDone === 'function') onDone(null);
+    });
+    btnRow.appendChild(cancelBtn);
+
+    var saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.textContent = '저장';
+    saveBtn.style.cssText = 'padding: 6px 14px; background: var(--point, #FF9A76); color: #fff; border: 1px solid var(--point, #FF9A76); border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 12px;';
+    saveBtn.addEventListener('click', function(){
+      var nm = nameInput.value.trim() || (existing && existing.name) || '새 색깔';
+      var vl = hexInput.value.trim() || colorPicker.value;
+      overlay.remove();
+      if (typeof onDone === 'function') onDone({ name: nm, value: vl });
+    });
+    btnRow.appendChild(saveBtn);
+
+    box.appendChild(btnRow);
+
+    overlay.appendChild(box);
+    overlay.addEventListener('click', function(){
+      overlay.remove();
+      if (typeof onDone === 'function') onDone(null);
+    });
+    document.body.appendChild(overlay);
+
+    setTimeout(function(){ try { nameInput.focus(); nameInput.select(); } catch(_){} }, 30);
+  }
+
   // API 노출
   try {
     window.__DDL_EDITOR = window.__DDL_EDITOR || {};
@@ -13520,6 +13966,8 @@
     window.__DDL_EDITOR.generateSiteFontCSS   = _generateSiteFontCSS;
     window.__DDL_EDITOR.buildFontSelectOptions = _buildFontSelectOptions;   // p20a
     window.__DDL_EDITOR.openFontPicker         = openFontPicker;             // p20b
+    window.__DDL_EDITOR.loadHeaderColorLibrary  = _loadHeaderColorLibrary;   // p23t
+    window.__DDL_EDITOR.saveHeaderColorLibrary  = _saveHeaderColorLibrary;   // p23t
   } catch(_){}
 
   // 부팅 시 자동 로드 (편집기 페이지)
