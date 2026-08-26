@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22q';
+  var VERSION = 'v2.0-β-p22r';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -17085,6 +17085,21 @@
   //   툴바 스타일 선택 + 프리셋 관리 카드 4개 (헤더 / 인라인 서식 / 형광펜 / 코드 스타일) + 단축키 카드
   //   프리셋 카드는 대부분 "다음 라운드" 안내. 인라인 서식만 이미 구현되어 있으므로 openPresetModal 바로 연결.
   //   내부 스크롤은 보이지 않도록 만듦 (.ddl-scroll-invisible)
+  // p22r: 루비 위치(offset) 사용자 설정 · CSS 변수로 반영
+  function _applyRubyOffset(pct){
+    try {
+      if (pct == null) {
+        var stored = localStorage.getItem('ddl.rubyOffset');
+        pct = stored != null ? parseFloat(stored) : 55;
+      }
+      if (isNaN(pct)) pct = 55;
+      document.documentElement.style.setProperty('--ddl-ruby-offset', pct + '%');
+    } catch(_){}
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.applyRubyOffset = _applyRubyOffset; } catch(_){}
+  // 부팅 시 즉시 1회 반영 (localStorage 값 기반)
+  try { _applyRubyOffset(); } catch(_){}
+
   function openDdlSettings(){
     var old = document.getElementById('ddl-settings-modal');
     if (old) { old.remove(); return; }
@@ -17140,6 +17155,18 @@
           _card('shortcut',   '단축키',              '편집기 전용 키보드 단축키 설정') +
           _card('list',       '목록 기본값',        '순서 없는 / 수 있는 / 체크리스트 기본 스타일') +
         '</div>' +
+        /* p22r: 루비(윗글씨) 위치 슬라이더 · 원 글자 위쪽 여백을 얼마나 채울지 */
+        '<div style="margin-top:14px;padding:10px 12px;background:rgba(15,58,58,0.03);border-radius:6px;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+            '<span style="font-size:12px;font-weight:600;color:#0F3A3A;">루비 위치 (위↔아래)</span>' +
+            '<span id="ddl-ruby-offset-val" style="font-size:11px;color:rgba(15,58,58,0.6);font-variant-numeric:tabular-nums;">--</span>' +
+          '</div>' +
+          '<input id="ddl-ruby-offset-slider" type="range" min="0" max="100" step="5" value="55" style="width:100%;accent-color:#FF9A76;" />' +
+          '<div style="display:flex;justify-content:space-between;font-size:10px;color:rgba(15,58,58,0.4);margin-top:2px;">' +
+            '<span>위</span><span>기본</span><span>아래</span>' +
+          '</div>' +
+          '<div style="font-size:10.5px;color:rgba(15,58,58,0.55);margin-top:6px;line-height:1.5;">루비 텍스트(윗글씨)가 원 글자에서 얼마나 떨어질지 조절합니다. 값을 올리면 원 글자에 가깝게, 낮추면 멀어집니다.</div>' +
+        '</div>' +
       '</div>' +
       // 4. 버전
       '<div style="margin-top:20px;padding-top:12px;border-top:1px solid rgba(15,58,58,0.06);font-size:11px;color:rgba(15,58,58,0.4);text-align:center;">' +
@@ -17160,6 +17187,27 @@
         setTimeout(openDdlSettings, 10);
       });
     });
+
+    // p22r: 루비 위치 슬라이더 - 실시간 반영 + 저장
+    try {
+      var _rubyStored = localStorage.getItem('ddl.rubyOffset');
+      var _rubyInit = _rubyStored != null ? parseFloat(_rubyStored) : 55;
+      if (isNaN(_rubyInit)) _rubyInit = 55;
+      var _rubySlider = box.querySelector('#ddl-ruby-offset-slider');
+      var _rubyLabel  = box.querySelector('#ddl-ruby-offset-val');
+      if (_rubySlider && _rubyLabel){
+        _rubySlider.value = _rubyInit;
+        _rubyLabel.textContent = _rubyInit + '%';
+        _rubySlider.addEventListener('input', function(){
+          var v = parseFloat(_rubySlider.value);
+          _rubyLabel.textContent = v + '%';
+          _applyRubyOffset(v);
+        });
+        _rubySlider.addEventListener('change', function(){
+          try { localStorage.setItem('ddl.rubyOffset', String(_rubySlider.value)); } catch(_){}
+        });
+      }
+    } catch(err){ console.warn('[RUBY-OFFSET-UI]', err); }
 
     // 허브 카드 라우팅
     box.querySelectorAll('.ddl-set-card').forEach(function(c){
@@ -19781,7 +19829,7 @@
     '  left: 50% !important;',
     '  bottom: 100% !important;',
     /* p22p: translateY 로 아래로 밀어 원 텍스트에 가깝게 배치 (사용자 요청: 너무 위에 붕 뜸) */
-    '  transform: translateX(-50%) translateY(55%) !important;',
+    '  transform: translateX(-50%) translateY(var(--ddl-ruby-offset, 55%)) !important;',
     '  font-size: 0.5em !important;',
     '  line-height: 1 !important;',
     '  white-space: nowrap !important;',
@@ -19796,7 +19844,7 @@
     '  left: 50% !important;',
     '  bottom: 100% !important;',
     /* p22p: HTML 서식 있는 루비도 동일하게 아래로 이동 */
-    '  transform: translateX(-50%) translateY(55%) !important;',
+    '  transform: translateX(-50%) translateY(var(--ddl-ruby-offset, 55%)) !important;',
     '  font-size: 0.5em !important;',
     '  line-height: 1 !important;',
     '  white-space: nowrap !important;',
