@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p24a';
+  var VERSION = 'v2.0-β-p24b';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2690,12 +2690,25 @@
     '  border-top-left-radius: 6px; border-top-right-radius: 6px;',
     '}',
     '.ep-mini-header-left { display: flex; align-items: center; gap: 6px; }',
+    /* p24b: 확장가능 모드 — title 라벨 전체가 클릭 버튼으로 인식 되게 */
+    '.ep-mini-header-left.is-clickable {',
+    '  cursor: pointer; padding: 2px 8px; margin: -2px -4px; border-radius: 4px;',
+    '  transition: background 120ms ease, color 120ms ease;',
+    '  user-select: none;',
+    '}',
+    '.ep-mini-header-left.is-clickable:hover {',
+    '  background: rgba(255,154,118,0.10); color: var(--point, #FF9A76);',
+    '}',
+    '.ep-mini-header-left.is-clickable:hover .ep-mini-expand-btn {',
+    '  color: var(--point, #FF9A76);',
+    '}',
     '.ep-mini-expand-btn {',
     '  background: transparent; border: none;',
     '  color: rgba(15,58,58,0.5); cursor: pointer;',
-    '  padding: 2px 4px; font-size: 12px; line-height: 1; border-radius: 3px;',
+    '  padding: 4px 6px; font-size: 12px; line-height: 1; border-radius: 3px;',
+    '  min-width: 22px; min-height: 22px;',
     '}',
-    '.ep-mini-expand-btn:hover { color: var(--point, #FF9A76); background: rgba(255,154,118,0.08); }',
+    '.ep-mini-expand-btn:hover { color: var(--point, #FF9A76); background: rgba(255,154,118,0.16); }',
     '.ep-mini-close {',
     '  background: transparent; border: none;',
     '  color: rgba(15,58,58,0.5); cursor: pointer;',
@@ -9896,6 +9909,23 @@
           if (onExpand) onExpand(api);
         });
         hLeft.appendChild(expBtn);
+        // p24b: title 라벨 전체가 클릭 버튼으로 인식 되게 (사용자: "이름 전체가 선택되게 해주세요")
+        hLeft.classList.add('is-clickable');
+        hLeft.title = '전용 편집창 열기';
+        hLeft.setAttribute('role', 'button');
+        hLeft.setAttribute('tabindex', '0');
+        hLeft.addEventListener('click', function(e){
+          // expBtn 이 따로 stopPropagation 으로 이미 멈춤 — 여기는 헤더 난지 영역 클릭만 담당
+          e.stopPropagation();
+          if (onExpand) onExpand(api);
+        });
+        hLeft.addEventListener('keydown', function(e){
+          if (e.key === 'Enter' || e.key === ' '){
+            e.preventDefault();
+            e.stopPropagation();
+            if (onExpand) onExpand(api);
+          }
+        });
       }
       var closeBtn = document.createElement('button');
       closeBtn.type = 'button';
@@ -11386,6 +11416,31 @@
     var editorMode = options.mode || 'save-preset';
     var current = JSON.parse(JSON.stringify(preset || {}));
     if (!current.style) current.style = _headerDefaults('p');
+
+    // p24b: 즉시 적용 모드는 마지막에 [적용] 한 값을 다시 초기값으로 사용
+    //   · 사용자가 색·서식만 살짝 바꾸고 다시 열어도 이전 설정 유지
+    //   · save-preset 모드는 원본 preset 그대로 (프리셋 편집은 원본 유지가 원칙)
+    try {
+      if (editorMode === 'apply-format'){
+        var lastF = localStorage.getItem('ddl.lastAppliedFormat');
+        if (lastF){
+          var pf = JSON.parse(lastF);
+          if (pf && typeof pf === 'object'){
+            // 저장된 값이 있는 필드만 덮어쓰기 (없는 필드는 defaults 유지)
+            ['fontFamily','fontSize','fontWeight','letterSpacing','lineHeight','color'].forEach(function(k){
+              if (pf[k]) current.style[k] = pf[k];
+            });
+          }
+        }
+      } else if (editorMode === 'apply-color'){
+        var lastC = localStorage.getItem('ddl.lastAppliedColor');
+        if (lastC){
+          // 마지막 색은 단순 hex/rgba 문자열
+          current.style.color = lastC;
+        }
+      }
+    } catch(_){}
+
     var initialSnapshot = JSON.parse(JSON.stringify(current));
     var currentTab = options.initialTab || 'props';
 
@@ -11572,6 +11627,18 @@
             _applyStyleToRange(range, current.style);
           }
         } catch(err){ console.warn('[apply-format]', err); }
+        // p24b: 마지막 적용 서식을 저장 → 다음에 창 열 때 초기값으로 재사용
+        try {
+          var pack = {
+            fontFamily:    current.style.fontFamily    || '',
+            fontSize:      current.style.fontSize      || '',
+            fontWeight:    current.style.fontWeight    || '',
+            letterSpacing: current.style.letterSpacing || '',
+            lineHeight:    current.style.lineHeight    || '',
+            color:         current.style.color         || ''
+          };
+          localStorage.setItem('ddl.lastAppliedFormat', JSON.stringify(pack));
+        } catch(_){}
         closeDialog();
       }}));
     } else if (editorMode === 'apply-color'){
@@ -11608,6 +11675,8 @@
                 }
               } catch(_){}
             }
+            // p24b: 마지막 적용 색을 저장 → 다음에 창 열 때 초기값으로 재사용
+            try { if (current.style.color) localStorage.setItem('ddl.lastAppliedColor', current.style.color); } catch(_){}
           } catch(err){ console.warn('[apply-color watcher]', err); }
         }
       }, 200);
