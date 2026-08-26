@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22b';
+  var VERSION = 'v2.0-β-p22c';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2136,11 +2136,14 @@
     '  --ep-mini-width:     296px;',
     '  --ep-mini-z:         9500;',
     '}',
-    /* 팝오버 셸 */
+    /* 팝오버 셸 · p22c: min-width 강제 · 좁아지는 버그 방지 */
     '.ep-mini-popover {',
     '  position: fixed;',
     '  z-index: var(--ep-mini-z);',
-    '  width: var(--ep-mini-width);',
+    '  width: var(--ep-mini-width) !important;',
+    '  min-width: var(--ep-mini-width) !important;',
+    '  max-width: calc(100vw - 16px);',
+    '  box-sizing: border-box;',
     '  background: #fff;',
     '  border: 1px solid rgba(15,58,58,0.25);',
     '  border-radius: 6px;',
@@ -9253,23 +9256,28 @@
     function positionRelativeToAnchor(){
       if (!anchor || !anchor.getBoundingClientRect) return;
       var rect = anchor.getBoundingClientRect();
-      // 팝오버 크기는 렌더 후 측정
-      var pw = root.offsetWidth || 296;
-      var ph = root.offsetHeight || 200;
       var vw = window.innerWidth;
       var vh = window.innerHeight;
       var gap = 6;
+
+      // p22c: 팝오버 너비는 CSS 고정값(296) 사용 · offsetWidth 면 좁아질 수 있음
+      //   화면이 너무 좁으면(<312) max-width로 즐어듦을 허용
+      var TARGET_W = 296;
+      var pw = Math.min(TARGET_W, vw - 16);
+      var ph = root.offsetHeight || 240;
 
       // 기본: 앵커 좌하단
       var left = rect.left;
       var top  = rect.bottom + gap;
 
-      // 좌우 auto-flip
+      // 좌우 auto-flip · 법야 미를 오른쪽 벤벽으로 계산
       if (left + pw > vw - 8) {
+        // 앵커 오른쪽 끝 기준으로 왜쪽 정렬으로 변경
         left = rect.right - pw;
-        if (left < 8) left = Math.max(8, vw - pw - 8);
       }
       if (left < 8) left = 8;
+      // p22c: 강제 보정 · 오른쪽으로 넘어가면 무조건 오른쪽 범위 밖 밀입
+      if (left + pw > vw - 8) left = Math.max(8, vw - pw - 8);
 
       // 상하 auto-flip
       if (top + ph > vh - 8) {
@@ -9277,12 +9285,12 @@
         if (altTop >= 8) {
           top = altTop;
         } else {
-          // 위·아래 모두 안 맞으면 최대한 화면 안에 밀어넣기
           top = Math.max(8, vh - ph - 8);
         }
       }
       root.style.left = left + 'px';
       root.style.top  = top + 'px';
+      try { if (window.__DDL_DBG_MINI_POPOVER) console.log('[MINI-POP] pos', {left: left, top: top, pw: pw, ph: ph, anchor: rect}); } catch(_){}
     }
 
     // ── 외부 클릭 · Escape 처리 ──────────────────────────
@@ -16777,36 +16785,41 @@
     var _svg_font_up   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><text x="3" y="17" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="14" fill="#0F3A3A" stroke="none">A</text><path d="M17 6v8"/><polyline points="14,9 17,6 20,9"/></svg>';
     var _svg_font_down = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><text x="3" y="17" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="14" fill="#0F3A3A" stroke="none">A</text><path d="M17 6v8"/><polyline points="14,11 17,14 20,11"/></svg>';
     var _svg_code      = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,7 4,12 9,17"/><polyline points="15,7 20,12 15,17"/></svg>';
+    // p22c: TOOLBAR_SPEC_v2 순서로 완전 재편 · 15개 순서 준수
+    //   1.헤더▾ 2.B 3.I 4.U 5.S 6.정렬▾ 7.글자색▾ 8.형광펜▾
+    //   9.불릿▾ 10.첨자▾ 11.A+ 12.A− 13.<> 14.서식▾ 15.⚙
+    //   그룹 구분선: 헤더 | BIUS | 정렬·글·형 | 불·첨 | A+A−<> | 서식·⚙
     bar.innerHTML =
-      '<button data-cmd="bold" title="볼드" style="font-weight:800;">B</button>' +
-      '<button data-cmd="italic" title="이탤릭" style="font-style:italic; font-family:serif;">I</button>' +
+      // 1. 헤더▾
+      '<button data-cmd="heading-expand" title="헤더 (H1-H6)" style="font-weight:700;">H<span style="font-size:0.7em;">▾</span></button>' +
+      '<span class="ftb-sep"></span>' +
+      // 2-5. B / I / U / S
+      '<button data-cmd="bold" title="굵게" style="font-weight:800;">B</button>' +
+      '<button data-cmd="italic" title="기울임" style="font-style:italic; font-family:serif;">I</button>' +
       '<button data-cmd="underline" title="밑줄" style="text-decoration:underline;">U</button>' +
       '<button data-cmd="strikeThrough" title="취소선" style="text-decoration:line-through;">S</button>' +
       '<span class="ftb-sep"></span>' +
-      '<button data-cmd="sup" title="위첨자" style="font-size:0.85em;">X<sup style="font-size:0.7em;">2</sup></button>' +
-      '<button data-cmd="sub" title="아래첨자" style="font-size:0.85em;">X<sub style="font-size:0.7em;">2</sub></button>' +
-      '<button data-cmd="emphasis" title="방점(강조점)" style="font-family:Cafe24Danjunghae,Gowun Batang,serif;">·가·</button>' +
-      '<button data-cmd="ruby" title="루비 (윗글씨 삽입)">' + _svg_ruby + '</button>' +
-      '<span class="ftb-sep"></span>' +
-      '<button data-cmd="highlight-quick" title="형광펜 (마지막 색)">' + _svg_hl + '</button>' +
-      '<button data-cmd="highlight-palette" title="형광펜 색 선택" style="font-size:0.75em;">▾</button>' +
-      '<span class="ftb-sep"></span>' +
-      '<button data-cmd="createLink" title="링크">' + _svg_link + '</button>' +
-      '<button data-cmd="removeFormat" title="서식 지우기">' + _svg_clear + '</button>' +
-      '<span class="ftb-sep"></span>' +
-      '<button data-cmd="heading-expand" title="헤딩 (H1-H6)" style="font-weight:700;">H<span style="font-size:0.7em;">▸</span></button>' + '<button data-cmd="align-expand" title="정렬"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg></button>' +
-      /* p22b: 글자색 A 버튼 (정렬 오른쪽) */
+      // 6. 정렬▾
+      '<button data-cmd="align-expand" title="정렬"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg></button>' +
+      // 7. 글자색▾ (A + 살구색 하단 바)
       '<button data-cmd="text-color" class="ftb-textcolor" title="글자색"><span class="tc-letter">A</span><span class="tc-bar"></span></button>' +
-      '<button data-cmd="list-expand" title="목록"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg></button>' + '<span class="ftb-sep"></span>' +
-      // p19m: 글자 크기 ±2px 단계 조절
-      '<button data-cmd="font-size-down" title="글자 크기 준임 (-2px)">' + _svg_font_down + '</button>' +
-      '<button data-cmd="font-size-up"   title="글자 크기 키움 (+2px)">' + _svg_font_up   + '</button>' +
-      // p19m: 인라인 코드 버튼
+      // 8. 형광펜▾ (기존: 마지막 색 적용 + 팔레트 열기 → p22c: 통합 확장)
+      '<button data-cmd="highlight-expand" title="형광펜">' + _svg_hl + '</button>' +
+      '<span class="ftb-sep"></span>' +
+      // 9. 불릿▾ (기존 list-expand 를 사용)
+      '<button data-cmd="list-expand" title="불릿/목록"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg></button>' +
+      // 10. 첨자▾ (위·아래·루비·강조점 4개 통합)
+      '<button data-cmd="supsub-expand" title="첨자·루비·강조점" style="font-size:0.85em;">X<sup style="font-size:0.7em;">²</sup></button>' +
+      '<span class="ftb-sep"></span>' +
+      // 11-12. A+ / A−
+      '<button data-cmd="font-size-up"   title="글자 크게">' + _svg_font_up   + '</button>' +
+      '<button data-cmd="font-size-down" title="글자 작게">' + _svg_font_down + '</button>' +
+      // 13. <>
       '<button data-cmd="inline-code" title="인라인 코드">' + _svg_code + '</button>' +
       '<span class="ftb-sep"></span>' +
-      '<button data-cmd="open-presets" title="인라인 서식 프리셋" style="display:inline-flex; align-items:center; gap:0.25em;">' + _svg_star + '<span>서식</span></button>' +
-      // p19l: 툴바 안 ⚙ 톱니 (오른쪽 끝)
-      '<span class="ftb-sep"></span>' +
+      // 14. 서식▾
+      '<button data-cmd="open-presets" title="서식 프리셋" style="display:inline-flex; align-items:center; gap:0.25em;">' + _svg_star + '<span>서식</span></button>' +
+      // 15. ⚙ (설정)
       '<button data-cmd="open-settings" class="ftb-gear" title="편집기 설정">' + _gearSvg(14) + '</button>';
 
     // p19l: 톱니 클릭 → 설정창 (bar 내부 이벤트 위임)
@@ -17038,6 +17051,17 @@
         e.preventDefault(); e.stopPropagation();
         saveRange();
         openTextColorMini(btn);
+      } else if (cmd === 'highlight-expand') {
+        // p22c: 형광펜 유지 (기존 highlight-palette 재사용)
+        e.preventDefault(); e.stopPropagation();
+        saveRange();
+        if (typeof openPalette === 'function') openPalette(btn);
+        else _showStubToast('형광펜 — 준비 중');
+      } else if (cmd === 'supsub-expand') {
+        // p22c: 첨자·루비·강조점 4개 통합 미니
+        e.preventDefault(); e.stopPropagation();
+        saveRange();
+        openSupSubMini(btn);
       } else if (cmd === 'heading-expand') {
         // p19m: H▸ 드롭다운 (껍데기 - 설정 안내)
         e.preventDefault(); e.stopPropagation();
@@ -17052,8 +17076,46 @@
       }
       updateBar();
     });
-    log('플로팅 툴바 설치 (p19m + p22b · 글자색 A 버튼 추가)');
+    log('플로팅 툴바 설치 (p19m + p22b/p22c · 툴바 15개 순서 재편 + 첨자 통합)');
   }
+
+  // ═══════════════════════════════════════════════════════════
+  // p22c. 첨자 통합 미니 (위첨자·아래첨자·루비·강조점 4개 버튼)
+  // ═══════════════════════════════════════════════════════════
+  function openSupSubMini(anchor){
+    // buttons variant 사용 · 4개 버튼
+    var mp = window.__DDL_EDITOR.createMiniPopover({
+      anchor: anchor,
+      title: '첨자·루비·강조점',
+      variant: 'buttons',
+      buttons: [
+        { html: 'X<sup style="font-size:0.7em;">2</sup>', title: '위첨자' },
+        { html: 'X<sub style="font-size:0.7em;">2</sub>', title: '아래첨자' },
+        { html: _svg_rubyMini(),                          title: '루비' },
+        { html: '<span style="font-family:Cafe24Danjunghae,Gowun Batang,serif;">·가·</span>', title: '강조점(방점)' }
+      ],
+      onPick: function(btn, ctx){
+        restoreRange();
+        try {
+          if (ctx.itemIndex === 0)      { if (typeof toggleSupSub === 'function') toggleSupSub('sup'); }
+          else if (ctx.itemIndex === 1) { if (typeof toggleSupSub === 'function') toggleSupSub('sub'); }
+          else if (ctx.itemIndex === 2) { if (typeof insertRuby === 'function') insertRuby(); }
+          else if (ctx.itemIndex === 3) { if (typeof toggleEmphasisDot === 'function') toggleEmphasisDot(); }
+        } catch(err) {
+          try { if (window.__DDL_DBG_TB_CMD) console.warn('[SUPSUB]', err); } catch(_){}
+        }
+        mp.close();
+      }
+    });
+    mp.open();
+  }
+
+  // 루비 아이콘 · 이미 위에 있지만 미니용으로 간략하게 재생성
+  function _svg_rubyMini(){
+    return '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#0F3A3A" stroke-width="1.4" stroke-linecap="round"><line x1="5" y1="3" x2="15" y2="3"/><text x="10" y="16" text-anchor="middle" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="11" fill="#0F3A3A" stroke="none">가</text></svg>';
+  }
+
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.openSupSubMini = openSupSubMini; } catch(_){}
 
   // ═══════════════════════════════════════════════════════════
   // p22b. 글자색 미니 팝오버 (createMiniPopover 실전 첫 배선)
