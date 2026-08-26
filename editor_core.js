@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22s';
+  var VERSION = 'v2.0-β-p22t';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2563,7 +2563,7 @@
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  border: 1px solid currentColor; border-radius: 50%;',
     '  font-size: 0.75em; line-height: 1; padding: 0;',
-    '  margin-top: 0.28em; position: static;',
+    '  margin-top: 0.4em; position: static;',
     '}',
     '.editor-block[data-frame="square"] ol { list-style: none; counter-reset: bl-frame; padding-left: 0; }',
     '.editor-block[data-frame="square"] ol > li {',
@@ -2576,7 +2576,7 @@
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  border: 1px solid currentColor; border-radius: 3px;',
     '  font-size: 0.75em; line-height: 1; padding: 0;',
-    '  margin-top: 0.28em; position: static;',
+    '  margin-top: 0.4em; position: static;',
     '}',
     '.editor-block[data-frame="tall"] ol { list-style: none; counter-reset: bl-frame; padding-left: 0; }',
     '.editor-block[data-frame="tall"] ol > li {',
@@ -2589,7 +2589,7 @@
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  border: 1px solid currentColor; border-radius: 3px;',
     '  font-size: 0.72em; line-height: 1; padding: 0;',
-    '  margin-top: 0.15em; position: static;',
+    '  margin-top: 0.3em; position: static;',
     '}',
     /* 프레임이 적용된 ol — counter marker 변수를 data-bullet-style 에서 설정 */
     '.editor-block[data-bullet-style="decimal"] { --bl-marker: decimal; }',
@@ -16245,6 +16245,45 @@
       + '<button type="button" data-rcmd="clearFormat" class="pop-btn" title="서식 지우기" style="margin-left:auto;">✕서식</button>';
     wrap.appendChild(toolbar);
 
+    // p22t: 크기 + 위치 슬라이더 (개별 루비마다 다른 값 가능)
+    // 초기값: 전역 설정에서 읽어옴 (편집기 설정 팝오버의 값)
+    var _rubyInitOffset = 55;
+    try { var _s = localStorage.getItem('ddl.rubyOffset'); if (_s != null && !isNaN(parseFloat(_s))) _rubyInitOffset = parseFloat(_s); } catch(_){}
+    var _rubyInitSize = 50;  // 0.5em = 50%
+    var slidersBox = document.createElement('div');
+    slidersBox.style.cssText = 'margin-top:12px; padding:10px 12px; background:rgba(15,58,58,0.03); border-radius:6px; display:flex; flex-direction:column; gap:10px;';
+    slidersBox.innerHTML = ''
+      + '<div>'
+      +   '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">'
+      +     '<span style="font-size:11.5px; font-weight:600; color:#0F3A3A;">루비 크기</span>'
+      +     '<span data-rlbl="size" style="font-size:11px; color:rgba(15,58,58,0.6); font-variant-numeric:tabular-nums;">' + _rubyInitSize + '%</span>'
+      +   '</div>'
+      +   '<input data-rslider="size" type="range" min="30" max="90" step="5" value="' + _rubyInitSize + '" style="width:100%; accent-color:#FF9A76;" />'
+      +   '<div style="display:flex; justify-content:space-between; font-size:9.5px; color:rgba(15,58,58,0.4); margin-top:1px;"><span>작게</span><span>기본</span><span>크게</span></div>'
+      + '</div>'
+      + '<div>'
+      +   '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">'
+      +     '<span style="font-size:11.5px; font-weight:600; color:#0F3A3A;">루비 위치 (위↔아래)</span>'
+      +     '<span data-rlbl="offset" style="font-size:11px; color:rgba(15,58,58,0.6); font-variant-numeric:tabular-nums;">' + _rubyInitOffset + '%</span>'
+      +   '</div>'
+      +   '<input data-rslider="offset" type="range" min="0" max="100" step="5" value="' + _rubyInitOffset + '" style="width:100%; accent-color:#FF9A76;" />'
+      +   '<div style="display:flex; justify-content:space-between; font-size:9.5px; color:rgba(15,58,58,0.4); margin-top:1px;"><span>위</span><span>기본</span><span>아래</span></div>'
+      + '</div>';
+    wrap.appendChild(slidersBox);
+
+    // 슬라이더 이벤트 - editable 요소에 데이터셋으로 값 저장 (확인 클릭 시 읽음)
+    editable.dataset.rubySize = String(_rubyInitSize);
+    editable.dataset.rubyOffset = String(_rubyInitOffset);
+    slidersBox.addEventListener('input', function(e){
+      var s = e.target.getAttribute && e.target.getAttribute('data-rslider');
+      if (!s) return;
+      var v = parseFloat(e.target.value);
+      var lbl = slidersBox.querySelector('[data-rlbl="' + s + '"]');
+      if (lbl) lbl.textContent = v + '%';
+      if (s === 'size') editable.dataset.rubySize = String(v);
+      else if (s === 'offset') editable.dataset.rubyOffset = String(v);
+    });
+
     // p22m: p19j-fix3 원본 복원 — 이전에 실수로 'toolbar' 가 'bar' 로 오타 나서
     //   mousedown preventDefault 방어가 실종 → B/I/U 클릭 시 selection 소실 → 루비 서식 안 먹힘.
     toolbar.addEventListener('mousedown', function(e){ e.preventDefault(); });
@@ -16327,6 +16366,16 @@
       el.setAttribute('title', rubyHtml.replace(/<[^>]+>/g,''));
       el.style.background = 'transparent';
       el.style.color = 'inherit';
+      // p22t: 편집창 슬라이더 값 반영 (개별 루비별 크기·위치 저장)
+      try {
+        var _mo = document.querySelector('.ep-ruby-editable');
+        if (_mo){
+          var _sz = parseFloat(_mo.dataset.rubySize);
+          var _of = parseFloat(_mo.dataset.rubyOffset);
+          if (!isNaN(_sz)) el.style.setProperty('--ddl-ruby-size', (_sz / 100) + 'em');
+          if (!isNaN(_of)) el.style.setProperty('--ddl-ruby-offset', _of + '%');
+        }
+      } catch(_){}
       // HTML 이면 편집 중 시각화용 rt-span 삽입 (저장 시 제거됨)
       if (rubyHtml.indexOf('<') >= 0) {
         var _rtSpan = document.createElement('span');
@@ -19848,7 +19897,7 @@
     '  bottom: 100% !important;',
     /* p22p: translateY 로 아래로 밀어 원 텍스트에 가깝게 배치 (사용자 요청: 너무 위에 붕 뜸) */
     '  transform: translateX(-50%) translateY(var(--ddl-ruby-offset, 55%)) !important;',
-    '  font-size: 0.5em !important;',
+    '  font-size: var(--ddl-ruby-size, 0.5em) !important;',
     '  line-height: 1 !important;',
     '  white-space: nowrap !important;',
     '  opacity: 0.85 !important;',
@@ -19863,7 +19912,7 @@
     '  bottom: 100% !important;',
     /* p22p: HTML 서식 있는 루비도 동일하게 아래로 이동 */
     '  transform: translateX(-50%) translateY(var(--ddl-ruby-offset, 55%)) !important;',
-    '  font-size: 0.5em !important;',
+    '  font-size: var(--ddl-ruby-size, 0.5em) !important;',
     '  line-height: 1 !important;',
     '  white-space: nowrap !important;',
     '  opacity: 0.85 !important;',
