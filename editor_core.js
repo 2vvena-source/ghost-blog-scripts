@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23g';
+  var VERSION = 'v2.0-β-p23h';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -17451,13 +17451,25 @@
   //   p23g: frozenSelSpan / frozenTarget 인자 추가
   //     - 슬라이더 드래그 중 selection 이 사라져도 안정적으로 같은 span 을 계속 갱신
   //     - 선택 없으면 frozenTarget 을 사용
+  //   p23h: **슬라이더 focus 누락 버그 핵심 수정**
+  //     - restoreRange() 를 무조건 불러서 슬라이더가 focus 를 잃고 드래그가 끊기는 문제
+  //     - frozenTarget/frozenSelSpan 이 있으면 restoreRange 스킵 (selection 은 슬라이더에 두고 target 으로만 적용)
   function _applyLetterSpacing(valueEm, ctx){
     ctx = ctx || {};
-    try { if (typeof restoreRange === 'function') restoreRange(); } catch(_){}
+    var hasFrozen = !!(ctx.frozenSelSpan || ctx.frozenTarget);
+    // p23h: frozen 가 없을 때만 restoreRange 호출 (프리셋 버튼 등)
+    if (!hasFrozen){
+      try { if (typeof restoreRange === 'function') restoreRange(); } catch(_){}
+    }
     // 이미 만들어둔 span 을 계속 쓰는 경우 (드래그 중)
     if (ctx.frozenSelSpan && ctx.frozenSelSpan.isConnected){
       ctx.frozenSelSpan.style.letterSpacing = valueEm + 'em';
       return ctx.frozenSelSpan;
+    }
+    // p23h: frozenTarget 있으면 그 블록 사용 (선택 상태 안 보고)
+    if (ctx.frozenTarget && ctx.frozenTarget.editable && ctx.frozenTarget.editable.isConnected){
+      ctx.frozenTarget.editable.style.letterSpacing = valueEm + 'em';
+      return null;
     }
     var hasSel = _lsHasSelection();
     if (hasSel){
@@ -17490,11 +17502,15 @@
   }
 
   // 줄간격 적용: 항상 대상 블록 안 편집 요소에 line-height 인라인
-  //   p23g: frozenTarget 인자 추가 (팝오버 열 때 캡처해둔 불변 대상) → 슬라이더 드래그 중에도 안정 적용
+  //   p23g: frozenTarget 인자 추가 (팝오버 열 때 캡처해둔 불변 대상)
+  //   p23h: **슬라이더 focus 누락 버그 핵심 수정**
+  //     - frozenTarget 있으면 restoreRange 스킵 → 슬라이더 focus 유지 → 드래그 뒤김 없이 적용
   function _applyLineHeight(value, frozenTarget){
-    try { if (typeof restoreRange === 'function') restoreRange(); } catch(_){}
+    if (!frozenTarget){
+      try { if (typeof restoreRange === 'function') restoreRange(); } catch(_){}
+    }
     var t = frozenTarget || _lsGetTargetBlock();
-    if (!t || !t.editable) return;
+    if (!t || !t.editable || !t.editable.isConnected) return;
     t.editable.style.lineHeight = String(value);
   }
 
@@ -17590,10 +17606,11 @@
     pop.style.top  = (r.bottom + 6) + 'px';
     pop.style.left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left)) + 'px';
 
-    // 팝오버 안서 mousedown 때 매번 선택 보존 (직접 톤응 방지)
+    // p23h: 팝오버 mousedown · INPUT 은 완전히 방해 안 함 (슬라이더 드래그 보장)
+    //   버튼 등 기타 요소만 preventDefault 로 편집기 selection 보호
     pop.addEventListener('mousedown', function(e){
-      // 입력/버튼에서는 기본 동작 허용 (range 유지 안되면 restoreRange 사용)
-      if (e.target.tagName === 'INPUT') return;
+      if (e.target.tagName === 'INPUT') return;  // 슬라이더/기타 input 은 완전 통과
+      // 버튼이면 기본 동작 막지 말고 selection 만 보존 (데 focus 훔치 안됨)
       e.preventDefault();
     });
 
