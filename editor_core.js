@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p24e';
+  var VERSION = 'v2.0-β-p24f';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -14502,10 +14502,205 @@
   function _applyHighlightPreset(preset){
     try {
       if (typeof applyHighlightColor === 'function' && preset && preset.spec){
-        applyHighlightColor(preset.spec);
+        // p24f: preset.id 를 spec 에 실어서 전달 → applyHighlightColor 가 mark 에 data-hl-preset 붙임 → "이 글에서" 탭 동작
+        var specWithId = Object.assign({}, preset.spec);
+        if (preset.id) specWithId.presetId = preset.id;
+        applyHighlightColor(specWithId);
       }
     } catch(err){ console.warn('[hl-preset-apply]', err); }
   }
+
+  // ============================================================
+  // p24f: 형광폜 프리셋 갤러리 ("모든 프리셋 보기" 버튼으로 열림)
+  //   — 관리창이 아니라 "적용용 전체 카드 갤러리"
+  //   — 그룹별 대표 3개만 보이는 미니와 달리 여기는 전체 프리셋이 다 보임
+  //   — 카드 클릭 = 즉시 적용 + 창 닫힘
+  // ============================================================
+  function openHighlighterPresetGallery(){
+    var lib = _loadHighlightLibrary();
+    var filter = 'all'; // 'all' | 'fav' | 'used'
+
+    var popup = window.__DDL_EDITOR.createBlockPopup({
+      title: '형광폜 프리셋 모두 보기',
+      width: '760px',
+      draggable: true,
+      tabs: [{ key: 'main', label: '' }]
+    });
+    popup.open();
+
+    var body = popup.getBody('main');
+    if (!body) return;
+    body.style.padding = '0';
+
+    // 상단 필터 탭바
+    var topbar = document.createElement('div');
+    topbar.style.cssText = 'display: flex; justify-content: space-between; align-items: center;'
+      + ' padding: 10px 14px; border-bottom: 1px solid rgba(15,58,58,0.08); background: #fff;';
+
+    var tabs = document.createElement('div');
+    tabs.style.cssText = 'display: inline-flex; gap: 4px;';
+    var tabButtons = {};
+    [
+      { key:'all',  label:'전체' },
+      { key:'fav',  label:'★ 즐겨찾기' },
+      { key:'used', label:'이 글에서' }
+    ].forEach(function(td){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = td.label;
+      b.style.cssText = 'padding: 5px 14px; font-size: 12px; cursor: pointer;'
+        + ' background: transparent; border: none; border-radius: 4px;'
+        + ' color: rgba(15,58,58,0.55); font-family: inherit;';
+      if (filter === td.key){
+        b.style.background = 'rgba(255,154,118,0.15)';
+        b.style.color = 'var(--point, #FF9A76)';
+        b.style.fontWeight = '600';
+      }
+      b.addEventListener('click', function(){
+        filter = td.key;
+        Object.keys(tabButtons).forEach(function(k){
+          var tb = tabButtons[k];
+          var active = k === filter;
+          tb.style.background = active ? 'rgba(255,154,118,0.15)' : 'transparent';
+          tb.style.color      = active ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.55)';
+          tb.style.fontWeight = active ? '600' : '400';
+        });
+        _render();
+      });
+      tabButtons[td.key] = b;
+      tabs.appendChild(b);
+    });
+    topbar.appendChild(tabs);
+
+    // 관리창 열기 버튼 (우측)
+    var mgBtn = document.createElement('button');
+    mgBtn.type = 'button';
+    mgBtn.textContent = '프리셋 관리 →';
+    mgBtn.style.cssText = 'background: transparent; border: none; cursor: pointer;'
+      + ' font-size: 11px; color: var(--point, #FF9A76); padding: 4px 8px; border-radius: 4px; font-family: inherit;';
+    mgBtn.addEventListener('mouseenter', function(){ mgBtn.style.background = 'rgba(255,154,118,0.08)'; });
+    mgBtn.addEventListener('mouseleave', function(){ mgBtn.style.background = 'transparent'; });
+    mgBtn.addEventListener('click', function(){
+      try { popup.close(); } catch(_){}
+      try {
+        if (typeof openHighlighterPresetManager === 'function') openHighlighterPresetManager();
+      } catch(_){}
+    });
+    topbar.appendChild(mgBtn);
+
+    body.appendChild(topbar);
+
+    // 스크롤 영역
+    var scroll = document.createElement('div');
+    scroll.className = 'ddl-scroll-invisible';
+    scroll.style.cssText = 'padding: 14px 18px; max-height: 68vh; overflow-y: auto; background: #F5F5F5;';
+    body.appendChild(scroll);
+
+    // "이 글에서" 필터용 — 현재 문서에 사용 중인 preset ID 수집
+    function _collectUsedHlPresetIds(){
+      var used = {};
+      try {
+        if (typeof contentEl !== 'undefined' && contentEl){
+          contentEl.querySelectorAll('mark.ddl-hl[data-hl-preset]').forEach(function(el){
+            var pid = el.getAttribute('data-hl-preset');
+            if (pid) used[pid] = true;
+          });
+        }
+      } catch(_){}
+      return used;
+    }
+
+    function _makeGalleryCard(group, preset){
+      var card = document.createElement('button');
+      card.type = 'button';
+      card.style.cssText = 'position: relative; display: flex; flex-direction: column; gap: 6px;'
+        + ' padding: 10px 8px; border-radius: 6px; cursor: pointer;'
+        + ' background: #fff; border: 1px solid rgba(15,58,58,0.12);'
+        + ' text-align: center; font-family: inherit; transition: border-color 120ms, background 120ms;';
+
+      var prev = document.createElement('div');
+      prev.style.cssText = 'font-size: 15px; line-height: 1.4; padding: 6px 4px;';
+      var mkSpan = document.createElement('mark');
+      mkSpan.textContent = '가나다 ABC';
+      mkSpan.style.cssText = 'background: ' + _hlSpecToPreview(preset.spec) + ' !important;'
+        + ' padding: 1px 4px; color: inherit;';
+      prev.appendChild(mkSpan);
+      card.appendChild(prev);
+
+      var lbl = document.createElement('div');
+      lbl.textContent = preset.name || '(이름 없음)';
+      lbl.style.cssText = 'font-size: 11px; color: var(--color, #0F3A3A);'
+        + ' overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+      card.appendChild(lbl);
+
+      if (preset.isFavorite){
+        var favMark = document.createElement('span');
+        favMark.textContent = '★';
+        favMark.style.cssText = 'position: absolute; top: 4px; right: 6px; font-size: 10px; color: var(--point, #FF9A76);';
+        card.appendChild(favMark);
+      }
+
+      card.addEventListener('mouseenter', function(){ card.style.borderColor = 'var(--point, #FF9A76)'; card.style.background = 'rgba(255,154,118,0.04)'; });
+      card.addEventListener('mouseleave', function(){ card.style.borderColor = 'rgba(15,58,58,0.12)'; card.style.background = '#fff'; });
+      card.addEventListener('click', function(){
+        try { _applyHighlightPreset(preset); } catch(_){}
+        try { popup.close(); } catch(_){}
+      });
+
+      return card;
+    }
+
+    function _render(){
+      scroll.innerHTML = '';
+      var usedSet = filter === 'used' ? _collectUsedHlPresetIds() : null;
+
+      function _passView(p){
+        if (filter === 'fav')  return !!p.isFavorite;
+        if (filter === 'used') return !!(usedSet && usedSet[p.id]);
+        return true;
+      }
+
+      var anyRendered = false;
+      lib.groups.forEach(function(group){
+        var visible = (group.presets || []).filter(_passView);
+        if (visible.length === 0) return;
+
+        var section = document.createElement('div');
+        section.style.cssText = 'margin-bottom: 18px;';
+
+        var head = document.createElement('div');
+        head.style.cssText = 'font-size: 12px; color: rgba(15,58,58,0.55); letter-spacing: 0.04em;'
+          + ' margin-bottom: 8px; padding: 0 2px; display: flex; align-items: center; gap: 8px;';
+        var hName = document.createElement('span');
+        hName.textContent = group.name;
+        hName.style.cssText = 'font-weight: 600; color: var(--color, #0F3A3A);';
+        head.appendChild(hName);
+        var hCount = document.createElement('span');
+        hCount.textContent = '· ' + visible.length + '개';
+        head.appendChild(hCount);
+        section.appendChild(head);
+
+        var grid = document.createElement('div');
+        grid.style.cssText = 'display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;';
+        visible.forEach(function(p){ grid.appendChild(_makeGalleryCard(group, p)); });
+        section.appendChild(grid);
+        scroll.appendChild(section);
+        anyRendered = true;
+      });
+
+      if (!anyRendered){
+        var em = document.createElement('div');
+        em.style.cssText = 'padding: 40px; text-align: center; color: rgba(15,58,58,0.45); font-size: 13px;';
+        if (filter === 'fav')       em.textContent = '★ 즐겨찾기한 프리셋이 아직 없어요.';
+        else if (filter === 'used') em.textContent = '이 글에서 사용 중인 프리셋이 없어요. (프리셋 카드를 클릭해서 적용해보세요)';
+        else                        em.textContent = '등록된 형광폜 프리셋이 없어요.';
+        scroll.appendChild(em);
+      }
+    }
+
+    _render();
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.openHighlighterPresetGallery = openHighlighterPresetGallery; } catch(e){}
 
   // ============================================================
   // p23x: 형광펜 프리셋 관리창 (헤더 관리창과 동일 계층)
@@ -18445,6 +18640,7 @@
       mk.style.setProperty('color', 'inherit', 'important');
       mk.style.setProperty('padding', '0.02em 0.15em', 'important');
       mk.style.setProperty('border-radius', '2px', 'important');
+      // p24f: data-hl-preset 은 mark 에 이미 붙어있음 — 사이트로 넘어갈 때도 그대로 유지됨 (명시적 no-op 유지 로직)
       // p24e: --ddl-hl-c1 변수도 alpha 반영 (이중 방어)
       if (spec.c1){
         var _cvarSite = spec.c1;
@@ -19628,6 +19824,10 @@
     var _mode = (spec && spec.mode) || 'marker';
     if (_mode === 'solid') _mode = 'marker';
     m.setAttribute('data-hl-mode', _mode);
+    // p24f: preset.id 가 spec 에 실려오면 mark 에 표시 → "이 글에서" 탭 동작
+    if (spec && spec.presetId){
+      m.setAttribute('data-hl-preset', spec.presetId);
+    }
     if (spec && spec.c1){
       m.setAttribute('data-hl-c1', spec.c1);        // 원본 hex 그대로 보존
       // p24e: --ddl-hl-c1 변수 자체를 alpha 반영된 rgba 로 설정
