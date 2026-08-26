@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23n';
+  var VERSION = 'v2.0-β-p23o';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -17717,16 +17717,40 @@
       return used;
     }
 
-    // 미리보기 텍스트 인라인 스타일 생성
+    // p23o: 미리보기 텍스트 인라인 스타일
+    //   실제 fontSize 를 반영하되, 카드가 너무 커지지 않도록 범위 클램프 (10~18px)
     function _previewStyle(item){
       var s = '';
       if (item.fontFamily)    s += 'font-family:' + item.fontFamily + ';';
-      // 미리보기는 팀지 프리뷰 적절 크기로 감소 적용 (오직 보이도록)
+      // 프리셋의 fontSize 를 10~18px 범위 안으로 클램프
+      if (item.fontSize){
+        var m = String(item.fontSize).match(/^(\d+(?:\.\d+)?)\s*(px|em|rem)?$/);
+        if (m){
+          var v = parseFloat(m[1]);
+          var unit = m[2] || 'px';
+          // em/rem 은 16 곱해서 px 추정치
+          var px = unit === 'px' ? v : v * 16;
+          // 대보기용으로 10~18px 범위
+          if (px < 10) px = 10;
+          if (px > 18) px = 18;
+          s += 'font-size:' + px + 'px;';
+        }
+      }
       if (item.fontWeight)    s += 'font-weight:' + item.fontWeight + ';';
       if (item.letterSpacing) s += 'letter-spacing:' + item.letterSpacing + ';';
       if (item.lineHeight)    s += 'line-height:' + item.lineHeight + ';';
       if (item.color)         s += 'color:' + item.color + ';';
       return s;
+    }
+
+    // p23o: 그룹별 고정 샘플 텍스트 — 이름이 아니라 폰트/크기/색이 어떻게 나오는지 보여주는 샘플
+    //   참고 이미지의 "가나다 ABC" 스타일
+    function _headingSampleText(gk){
+      if (gk === 'p') return '가나다 본문 ABC';
+      if (gk === 'h1' || gk === 'h2' || gk === 'h3' || gk === 'h4' || gk === 'h5' || gk === 'h6'){
+        return '가나다 ABC';
+      }
+      return '가나다 ABC';
     }
 
     // p23n: 하나의 카드 DOM 생성
@@ -17736,16 +17760,17 @@
       card.setAttribute('data-preset-id', item.id || '');
       card.setAttribute('data-group', groupKey);
 
+      // 미리보기: 그룹별 고정 샘플 텍스트 (이름 아니음) — 스타일이 실제 이렇게 보임을 감지가능하도록
       var prev = document.createElement('div');
       prev.className = 'ep-heading-mini-card-preview';
       prev.setAttribute('style', _previewStyle(item));
-      prev.textContent = item.name || '제목 예시';
+      prev.textContent = _headingSampleText(groupKey);
       card.appendChild(prev);
 
+      // 소제목: 프리셋 이름 (사용자가 부여한 이름)
       var meta = document.createElement('div');
       meta.className = 'ep-heading-mini-card-meta';
       var groupLabel = HEADER_GROUP_LABELS[groupKey] || groupKey;
-      // 3열 이므로 공간 좁음 → 그룹 또는 이름 하나만 표시
       meta.textContent = item.name || groupLabel;
       card.appendChild(meta);
 
