@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23q';
+  var VERSION = 'v2.0-β-p23s';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1973,6 +1973,200 @@
     '}',
     '.ep-heading-mini-empty a {',
     '  color: var(--point, #FF9A76); cursor: pointer; text-decoration: underline;',
+    '}',
+    /* p23r: 미니 팝오버 하단 "모든 프리셋 보기" 안내 (모든 프리셋 열람이 필요할 때) */
+    '.ep-heading-mini-more {',
+    '  border-top: 1px solid rgba(15,58,58,0.08);',
+    '  padding: 8px 12px;',
+    '  display: flex; align-items: center; justify-content: space-between;',
+    '  background: rgba(15,58,58,0.02);',
+    '}',
+    '.ep-heading-mini-more-btn {',
+    '  background: transparent; border: 0; padding: 4px 6px;',
+    '  color: var(--color, #0F3A3A); font-family: inherit; font-size: 11px;',
+    '  cursor: pointer;',
+    '  transition: color 120ms ease;',
+    '  display: inline-flex; align-items: center; gap: 4px;',
+    '}',
+    '.ep-heading-mini-more-btn:hover { color: var(--point, #FF9A76); }',
+    '.ep-heading-mini-more-count { font-size: 10px; opacity: 0.55; }',
+
+    /* p23r: 헤더 프리셋 큰 창 (Picker) · 2열 그리드 + 검색 + 적용 버튼 */
+    '.ep-hp-picker-mask {',
+    '  position: fixed; inset: 0; z-index: 99990;',
+    '  background: rgba(15,58,58,0.25);',
+    '  display: flex; align-items: center; justify-content: center;',
+    '  animation: mtb-in 140ms ease-out;',
+    '}',
+    '.ep-hp-picker {',
+    '  width: 640px; max-width: calc(100vw - 40px);',
+    '  max-height: calc(100vh - 60px);',
+    '  background: #fff; border-radius: 14px;',
+    '  box-shadow: 0 20px 60px rgba(15,58,58,0.25);',
+    '  display: flex; flex-direction: column;',
+    '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
+    '  overflow: hidden;',
+    '}',
+    /* 상단 링은 헤더 */
+    '.ep-hp-picker-head {',
+    '  padding: 14px 18px 10px;',
+    '  border-bottom: 1px solid rgba(15,58,58,0.08);',
+    '  display: flex; align-items: center; gap: 10px;',
+    '}',
+    '.ep-hp-picker-title {',
+    '  font-family: "Cafe24Danjunghae","Gowun Batang",serif;',
+    '  font-size: 15px; color: var(--color, #0F3A3A); flex: 0 0 auto;',
+    '}',
+    '.ep-hp-picker-search {',
+    '  flex: 1; padding: 6px 10px;',
+    '  border: 1px solid rgba(15,58,58,0.15); border-radius: 6px;',
+    '  background: #fafafa;',
+    '  color: var(--color, #0F3A3A);',
+    '  font-family: inherit; font-size: 12px;',
+    '  outline: none;',
+    '}',
+    '.ep-hp-picker-search:focus { border-color: var(--point, #FF9A76); background: #fff; }',
+    '.ep-hp-picker-close {',
+    '  background: transparent; border: 0; width: 28px; height: 28px;',
+    '  cursor: pointer;',
+    '  color: rgba(15,58,58,0.55); font-size: 18px;',
+    '  border-radius: 6px;',
+    '  display: inline-flex; align-items: center; justify-content: center;',
+    '  transition: all 120ms ease;',
+    '}',
+    '.ep-hp-picker-close:hover { background: rgba(15,58,58,0.06); color: var(--color, #0F3A3A); }',
+    /* 필터 탭 */
+    '.ep-hp-picker-tabs {',
+    '  display: flex; gap: 4px; padding: 8px 18px;',
+    '  border-bottom: 1px solid rgba(15,58,58,0.08);',
+    '  background: rgba(15,58,58,0.015);',
+    '}',
+    '.ep-hp-picker-tab {',
+    '  padding: 6px 12px; border: 0; background: transparent;',
+    '  border-radius: 6px; cursor: pointer;',
+    '  color: rgba(15,58,58,0.6);',
+    '  font-family: inherit; font-size: 12px; font-weight: 500;',
+    '  transition: all 120ms ease;',
+    '}',
+    '.ep-hp-picker-tab:hover { color: var(--color, #0F3A3A); background: rgba(15,58,58,0.04); }',
+    '.ep-hp-picker-tab.is-active {',
+    '  background: rgba(255,154,118,0.14); color: var(--point, #FF9A76); font-weight: 600;',
+    '}',
+    /* 스크롤 영역 */
+    '.ep-hp-picker-body {',
+    '  flex: 1; overflow-y: auto; padding: 12px 18px;',
+    '  scrollbar-width: thin;',
+    '  scrollbar-color: rgba(15,58,58,0.15) transparent;',
+    '}',
+    '.ep-hp-picker-body::-webkit-scrollbar { width: 8px; }',
+    '.ep-hp-picker-body::-webkit-scrollbar-track { background: transparent; }',
+    '.ep-hp-picker-body::-webkit-scrollbar-thumb { background: rgba(15,58,58,0.14); border-radius: 4px; }',
+    '.ep-hp-picker-body::-webkit-scrollbar-thumb:hover { background: rgba(15,58,58,0.24); }',
+    /* 그룹 섹션 */
+    '.ep-hp-picker-section { margin-top: 14px; }',
+    '.ep-hp-picker-section:first-child { margin-top: 4px; }',
+    '.ep-hp-picker-section-label {',
+    '  display: flex; align-items: center; gap: 8px;',
+    '  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;',
+    '  color: rgba(15,58,58,0.5);',
+    '  padding: 0 4px 8px; text-transform: uppercase;',
+    '}',
+    '.ep-hp-picker-section-label::after {',
+    '  content: ""; flex: 1; height: 1px;',
+    '  background: linear-gradient(to right, rgba(15,58,58,0.12), transparent);',
+    '}',
+    /* 2열 그리드 */
+    '.ep-hp-picker-grid {',
+    '  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;',
+    '}',
+    '.ep-hp-picker-card {',
+    '  position: relative; padding: 12px 14px 10px;',
+    '  background: #fff;',
+    '  border: 1.5px solid rgba(15,58,58,0.1);',
+    '  border-radius: 10px; cursor: pointer;',
+    '  transition: all 140ms ease;',
+    '  display: flex; flex-direction: column; gap: 4px;',
+    '  min-height: 68px;',
+    '  overflow: hidden;',
+    '}',
+    '.ep-hp-picker-card:hover {',
+    '  border-color: rgba(255,154,118,0.5); background: rgba(255,154,118,0.03);',
+    '  transform: translateY(-1px); box-shadow: 0 4px 12px rgba(255,154,118,0.14);',
+    '}',
+    '.ep-hp-picker-card.is-selected {',
+    '  border-color: var(--point, #FF9A76); background: rgba(255,154,118,0.08);',
+    '  box-shadow: 0 0 0 3px rgba(255,154,118,0.18);',
+    '}',
+    /* 카드 좌측 그룹 색 바 */
+    '.ep-hp-picker-card::before {',
+    '  content: ""; position: absolute; left: 0; top: 0; bottom: 0;',
+    '  width: 4px; background: transparent;',
+    '  border-top-left-radius: 10px; border-bottom-left-radius: 10px;',
+    '  transition: background 140ms ease;',
+    '}',
+    '.ep-hp-picker-card[data-group="h1"]::before { background: rgba(15,58,58,0.5); }',
+    '.ep-hp-picker-card[data-group="h2"]::before { background: rgba(15,58,58,0.4); }',
+    '.ep-hp-picker-card[data-group="h3"]::before { background: rgba(15,58,58,0.3); }',
+    '.ep-hp-picker-card[data-group="h4"]::before { background: rgba(15,58,58,0.22); }',
+    '.ep-hp-picker-card[data-group="h5"]::before { background: rgba(15,58,58,0.16); }',
+    '.ep-hp-picker-card[data-group="h6"]::before { background: rgba(15,58,58,0.12); }',
+    '.ep-hp-picker-card[data-group="p"]::before  { background: rgba(255,154,118,0.35); }',
+    '.ep-hp-picker-card.is-selected::before { background: var(--point, #FF9A76); }',
+    '.ep-hp-picker-card-preview {',
+    '  font-size: 15px; color: #0F3A3A; line-height: 1.2;',
+    '  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
+    '  padding-left: 6px;',
+    '}',
+    '.ep-hp-picker-card-meta {',
+    '  font-size: 10px; color: rgba(15,58,58,0.5);',
+    '  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
+    '  padding-left: 6px;',
+    '}',
+    '.ep-hp-picker-card-fav {',
+    '  position: absolute; top: 6px; right: 6px;',
+    '  width: 18px; height: 18px; border: 0; background: transparent;',
+    '  cursor: pointer; padding: 0;',
+    '  font-size: 12px; line-height: 1;',
+    '  color: rgba(15,58,58,0.22);',
+    '  border-radius: 3px;',
+    '  transition: all 120ms ease;',
+    '  display: inline-flex; align-items: center; justify-content: center;',
+    '  z-index: 2;',
+    '}',
+    '.ep-hp-picker-card-fav:hover { color: var(--point, #FF9A76); background: rgba(255,154,118,0.12); transform: scale(1.15); }',
+    '.ep-hp-picker-card-fav.is-fav { color: var(--point, #FF9A76); }',
+    /* 하단 푸터 */
+    '.ep-hp-picker-foot {',
+    '  padding: 12px 18px;',
+    '  border-top: 1px solid rgba(15,58,58,0.08);',
+    '  display: flex; align-items: center; justify-content: space-between; gap: 10px;',
+    '  background: rgba(15,58,58,0.015);',
+    '}',
+    '.ep-hp-picker-foot-info { font-size: 11px; color: rgba(15,58,58,0.55); }',
+    '.ep-hp-picker-foot-info b { color: var(--color, #0F3A3A); font-weight: 600; }',
+    '.ep-hp-picker-btn {',
+    '  padding: 8px 16px; border-radius: 6px;',
+    '  font-family: inherit; font-size: 12px; font-weight: 500;',
+    '  cursor: pointer;',
+    '  transition: all 140ms ease;',
+    '}',
+    '.ep-hp-picker-btn.is-primary {',
+    '  background: var(--point, #FF9A76); color: #fff; border: 1px solid var(--point, #FF9A76);',
+    '}',
+    '.ep-hp-picker-btn.is-primary:hover:not(:disabled) {',
+    '  background: #ff8a5f; border-color: #ff8a5f;',
+    '}',
+    '.ep-hp-picker-btn.is-primary:disabled {',
+    '  background: rgba(15,58,58,0.12); border-color: transparent; color: rgba(15,58,58,0.4); cursor: not-allowed;',
+    '}',
+    '.ep-hp-picker-btn.is-secondary {',
+    '  background: transparent; color: var(--color, #0F3A3A);',
+    '  border: 1px solid rgba(15,58,58,0.2);',
+    '}',
+    '.ep-hp-picker-btn.is-secondary:hover { border-color: var(--color, #0F3A3A); }',
+    '.ep-hp-picker-empty {',
+    '  padding: 40px 20px; text-align: center;',
+    '  font-size: 12px; color: rgba(15,58,58,0.5); line-height: 1.6;',
     '}',
 
     // p23f: 자간 · 줄간격 슬라이더 팝오버 (ep-mini-popover-legacy 기반 + 세로 배치)
@@ -17935,6 +18129,26 @@
 
     _renderGrid();
 
+    // p23s: 하단 "모든 프리셋 보기 →" 푸터 — 전체 프리셋 갤러리를 연다
+    var footer = document.createElement('div');
+    footer.className = 'ep-heading-mini-more';
+    var totalCount = 0;
+    Object.keys(data).forEach(function(k){
+      if (data[k] && data[k].items) totalCount += data[k].items.length;
+    });
+    var moreBtn = document.createElement('button');
+    moreBtn.type = 'button';
+    moreBtn.className = 'ep-heading-mini-more-btn';
+    moreBtn.innerHTML = '모든 프리셋 보기 <span class="ep-heading-mini-more-count">(' + totalCount + ')</span> →';
+    moreBtn.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    moreBtn.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      pop.remove();
+      try { openHeaderPresetGallery(); } catch(err){ console.warn('gallery open failed', err); }
+    });
+    footer.appendChild(moreBtn);
+    pop.appendChild(footer);
+
     document.body.appendChild(pop);
 
     // 위치: anchor 아래 (그리드 크기 고정 380px)
@@ -17995,23 +18209,50 @@
       block.setAttribute('data-block-type', targetTag.toLowerCase());
     }
 
-    // p23q: 인라인 스타일 부여 · module 유틸리티 사용 · color 는 var(...) 을 hex 로 변환
-    //   사용자 지난 라운드 지적: "누르면 색깔 적용 안됨. 폰트종류와 굵기만 적용됨"
-    //   원인: item.style.color = 'var(--color, #0F3A3A)' 이 값이 그대로 newEl.style.color 에 들어감.
-    //         Ghost sanitizer 또는 편집기 CSS 변수 정의 범위 이슈로 var(...) 적용 실패.
-    //   해결: _resolveColorValue 로 hex 값만 추출해서 직접 심음 → 사이트에서도 무조건 표시.
+    // p23s: **인라인 스타일 + 자식 color 강제 초기화**
+    //   p23r 이후에도 색상이 반영 안 되는 단 하나의 이유:
+    //   이미 본문 안 <span style="color:..."> 등이 들어있으면 부모 h3 의 color 를 덤음.
+    //   문서 적읜: 프리셋은 사용자가 마지막에 누른 것이므로
+    //         자식 요소의 color 도 모두 제거하여 프리셋이 이기도록 함.
+    //         (font-family / font-size / font-weight 도 동일 적용)
+    //   단, 형광펜(mark) / 루비(rt) 등 보존해야 할 요소는 확장에서 제외.
     var st = _resolvePresetStyle(item);
-    var s = newEl.style;
-    if (st.fontFamily)    s.fontFamily    = st.fontFamily;
-    if (st.fontSize)      s.fontSize      = st.fontSize;
-    if (st.fontWeight)    s.fontWeight    = st.fontWeight;
+    function _setImp(prop, val){
+      if (val == null || val === '') return;
+      try { newEl.style.setProperty(prop, String(val), 'important'); } catch(_){}
+    }
+    if (st.fontFamily)    _setImp('font-family',    st.fontFamily);
+    if (st.fontSize)      _setImp('font-size',      st.fontSize);
+    if (st.fontWeight)    _setImp('font-weight',    String(st.fontWeight));
     if (st.color){
       var _c = _resolveColorValue(st.color);
-      if (_c) s.color = _c;
+      if (_c) _setImp('color', _c);
     }
-    if (st.letterSpacing) s.letterSpacing = st.letterSpacing;
-    if (st.lineHeight)    s.lineHeight    = String(st.lineHeight);
-    if (st.marginBottom)  s.marginBottom  = st.marginBottom;
+    if (st.letterSpacing) _setImp('letter-spacing', st.letterSpacing);
+    if (st.lineHeight)    _setImp('line-height',    String(st.lineHeight));
+    if (st.marginBottom)  _setImp('margin-bottom',  st.marginBottom);
+
+    // p23s: 자식 요소 color/font-* 강제 초기화
+    //   이게 핵심. 이거 없으면 span 이 부모 h3 을 덤어서 프리셋 색이 안 보임.
+    try {
+      var _resetTargets = newEl.querySelectorAll('span, font, b, i, u, strong, em');
+      _resetTargets.forEach(function(child){
+        // 형광펜, 루비 등 특수 마크업은 건드리지 않음
+        if (child.classList && (child.classList.contains('ddl-hl') || child.classList.contains('ddl-ruby'))) return;
+        if (child.tagName === 'MARK' || child.tagName === 'RUBY' || child.tagName === 'RT') return;
+        // 인라인 style 에서 color, font-family, font-size, font-weight 제거
+        if (child.style){
+          if (child.style.color)       child.style.removeProperty('color');
+          if (child.style.fontFamily)  child.style.removeProperty('font-family');
+          if (child.style.fontSize)    child.style.removeProperty('font-size');
+          if (child.style.fontWeight)  child.style.removeProperty('font-weight');
+          // style 이 빈 문자열이면 속성 자체 제거
+          if (!child.getAttribute('style')) child.removeAttribute('style');
+        }
+        // <font color="..."> 데이터 속성도 제거
+        if (child.hasAttribute && child.hasAttribute('color')) child.removeAttribute('color');
+      });
+    } catch(_){}
 
     // 프리셋 ID 상태 · "이 글에서" 필터용
     if (item.id) newEl.setAttribute('data-header-preset', item.id);
@@ -18030,6 +18271,340 @@
 
   // p23m: 기존 stub 이름 호환성 유지 (다른 곳에서 호출하는 데 있으면 새 함수로 리다이렉트)
   function openHeadingPopoverStub(anchorBtn){ return openHeadingMiniPopover(anchorBtn); }
+
+  // ============================================================
+  // p23s: 프리셋 전체 갤러리 (큰 창, 2열)
+  // ============================================================
+  //   사용자 지난 라운드 지적:
+  //     "백망 프리셋을 추가해도 미니 팝오버는 3종만 보이니, 전체를 보고 찾아 적용할 방법이 필요"
+  //   구조:
+  //     · 상단: 검색박스 + 그룹 필터 탭(전체, ★, h1, h2, ...) + 닫기 버튼
+  //     · 본문: 2열 그리드로 카드 나열 — 미리보기(샘플 텍스트) + 이름 + 상태 버튼
+  //     · 선택된 카드에만 "적용" / "★삭제" 버튼 활성화
+  //     · 하단: 선택된 카드 이름 표시 + 적용이 큰 버튼
+  function openHeaderPresetGallery(){
+    var old = document.getElementById('ep-heading-gallery-modal');
+    if (old) { old.remove(); return; }
+
+    var data = loadHeaderPresets();
+    var filter = 'all';       // 'all' | 'fav' | 'h1'~'h6' | 'p' | '<user group>'
+    var searchText = '';
+    var selectedGK = null;    // 선택된 카드 그룹입니다
+    var selectedItem = null;  // 선택된 item 참조
+
+    // 오버레이 배경
+    var overlay = document.createElement('div');
+    overlay.id = 'ep-heading-gallery-modal';
+    overlay.className = 'ep-hp-picker-mask ddl-editor-popup';
+    overlay.addEventListener('mousedown', function(e){
+      // 오버레이 바로 누른 경우 닫기
+      if (e.target === overlay){
+        overlay.remove();
+      }
+    });
+
+    // 모달 리자
+    var modal = document.createElement('div');
+    modal.className = 'ep-hp-picker';
+    overlay.appendChild(modal);
+
+    // ===== 상단 헤더 =====
+    var header = document.createElement('div');
+    header.className = 'ep-hp-picker-head';
+
+    var title = document.createElement('div');
+    title.className = 'ep-hp-picker-title';
+    title.textContent = '헤더 프리셋 전체';
+    header.appendChild(title);
+
+    var searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = '프리셋 이름으로 검색…';
+    searchInput.className = 'ep-hp-picker-search';
+    searchInput.addEventListener('input', function(){
+      searchText = String(searchInput.value || '').toLowerCase().trim();
+      _renderGallery();
+    });
+    // 입력자 마우스다운 이벤트가 오버레이 닫기로 이어지지 않도록
+    searchInput.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+    header.appendChild(searchInput);
+
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'ep-hp-picker-close';
+    closeBtn.textContent = '✕';
+    closeBtn.title = '닫기';
+    closeBtn.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    closeBtn.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      overlay.remove();
+    });
+    header.appendChild(closeBtn);
+
+    modal.appendChild(header);
+
+    // ===== 그룹 탭 줄 =====
+    var tabbar = document.createElement('div');
+    tabbar.className = 'ep-hp-picker-tabs';
+    var tabBtns = {};
+    function _buildTabs(){
+      tabbar.innerHTML = '';
+      tabBtns = {};
+      var tabDefs = [
+        { key: 'all', label: '전체' },
+        { key: 'fav', label: '★ 즐겨찾기' }
+      ];
+      // 빌트인 그룹 순서대로 추가
+      HEADER_BUILTIN_GROUPS.forEach(function(gk){
+        tabDefs.push({ key: gk, label: (HEADER_GROUP_LABELS[gk] || gk.toUpperCase()) });
+      });
+      // 사용자 그룹
+      Object.keys(data).forEach(function(gk){
+        if (HEADER_BUILTIN_GROUPS.indexOf(gk) !== -1) return;
+        tabDefs.push({ key: gk, label: gk });
+      });
+
+      tabDefs.forEach(function(td){
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'ep-hp-picker-tab';
+        b.textContent = td.label;
+        if (filter === td.key) b.classList.add('is-active');
+        b.addEventListener('mousedown', function(e){ e.preventDefault(); });
+        b.addEventListener('click', function(e){
+          e.preventDefault(); e.stopPropagation();
+          filter = td.key;
+          Object.keys(tabBtns).forEach(function(k){ tabBtns[k].classList.remove('is-active'); });
+          b.classList.add('is-active');
+          _renderGallery();
+        });
+        tabBtns[td.key] = b;
+        tabbar.appendChild(b);
+      });
+    }
+    _buildTabs();
+    modal.appendChild(tabbar);
+
+    // ===== 본문 (2열 그리드) =====
+    var body = document.createElement('div');
+    body.className = 'ep-hp-picker-body';
+    modal.appendChild(body);
+
+    // ===== 하단 푸터 (선택된 프리셋 + 적용 버튼) =====
+    var footer = document.createElement('div');
+    footer.className = 'ep-hp-picker-foot';
+
+    var selInfo = document.createElement('div');
+    selInfo.className = 'ep-hp-picker-foot-info';
+    selInfo.textContent = '카드를 클릭해 선택하세요.';
+    footer.appendChild(selInfo);
+
+    var applyBtn = document.createElement('button');
+    applyBtn.type = 'button';
+    applyBtn.className = 'ep-hp-picker-btn is-primary';
+    applyBtn.textContent = '현재 블록에 적용';
+    applyBtn.disabled = true;
+    applyBtn.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    applyBtn.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      if (!selectedItem || !selectedGK) return;
+      try { if (typeof restoreRange === 'function') restoreRange(); } catch(_){}
+      try {
+        applyHeaderPresetToBlock(selectedGK, selectedItem);
+      } catch(err){ console.warn('applyHeaderPreset err', err); }
+      // 적용 후 닫지 않고 사용자가 연속 적용해볼 수 있게 둘다 — 간단한 피드백
+      applyBtn.classList.add('is-flashed');
+      var _orig = applyBtn.textContent;
+      applyBtn.textContent = '✓ 적용됨';
+      setTimeout(function(){
+        applyBtn.classList.remove('is-flashed');
+        applyBtn.textContent = _orig;
+      }, 900);
+    });
+    footer.appendChild(applyBtn);
+
+    modal.appendChild(footer);
+
+    function _updateSel(){
+      if (!selectedItem){
+        selInfo.textContent = '카드를 클릭해 선택하세요.';
+        applyBtn.disabled = true;
+      } else {
+        var gLabel = HEADER_GROUP_LABELS[selectedGK] || selectedGK;
+        selInfo.innerHTML = '<b>' + gLabel + '</b> → <b>' + (selectedItem.name || '이름 없음') + '</b>';
+        applyBtn.disabled = false;
+      }
+    }
+
+    function _makeGalleryCard(groupKey, item){
+      var card = document.createElement('div');
+      card.className = 'ep-hp-picker-card';
+      card.setAttribute('data-preset-id', item.id || '');
+      card.setAttribute('data-group', groupKey);
+      if (selectedItem && selectedItem.id === item.id){
+        card.classList.add('is-selected');
+      }
+
+      // 즐겨찾기
+      var fav = document.createElement('button');
+      fav.type = 'button';
+      fav.className = 'ep-hp-picker-card-fav';
+      fav.textContent = item.isFavorite ? '★' : '☆';
+      if (item.isFavorite) fav.classList.add('is-fav');
+      fav.title = item.isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가';
+      fav.addEventListener('mousedown', function(e){ e.preventDefault(); });
+      fav.addEventListener('click', function(e){
+        e.preventDefault(); e.stopPropagation();
+        item.isFavorite = !item.isFavorite;
+        saveHeaderPresets(data);
+        _renderGallery();
+      });
+      card.appendChild(fav);
+
+      // 미리보기 (샘플 텍스트)
+      var prev = document.createElement('div');
+      prev.className = 'ep-hp-picker-card-preview';
+      prev.setAttribute('style', _buildPreviewStyleString(item));
+      // 대형 샘플에는 좀 더 긴 텍스트
+      if (groupKey === 'p'){
+        prev.textContent = '가나다라마바사 본문 예시 문장 ABC';
+      } else {
+        prev.textContent = '가나다라마 ABC';
+      }
+      card.appendChild(prev);
+
+      // 메타 이름 (그룹 표시 포함)
+      var meta = document.createElement('div');
+      meta.className = 'ep-hp-picker-card-meta';
+      var gLabelInline = HEADER_GROUP_LABELS[groupKey] || groupKey.toUpperCase();
+      meta.textContent = gLabelInline + ' · ' + (item.name || '(이름 없음)');
+      card.appendChild(meta);
+
+      card.addEventListener('mousedown', function(e){
+        if (e.target !== fav) e.preventDefault();
+      });
+      card.addEventListener('click', function(e){
+        if (e.target === fav) return;
+        e.preventDefault(); e.stopPropagation();
+        selectedGK = groupKey;
+        selectedItem = item;
+        body.querySelectorAll('.ep-hp-picker-card').forEach(function(c){ c.classList.remove('is-selected'); });
+        card.classList.add('is-selected');
+        _updateSel();
+      });
+      // 더블클릭 = 즉시 적용 (편의)
+      card.addEventListener('dblclick', function(e){
+        e.preventDefault(); e.stopPropagation();
+        selectedGK = groupKey;
+        selectedItem = item;
+        _updateSel();
+        applyBtn.click();
+      });
+
+      return card;
+    }
+
+    function _renderGallery(){
+      body.innerHTML = '';
+
+      // 어느 그룹을 보여줄지 결정
+      var groupsToShow;
+      if (filter === 'all' || filter === 'fav'){
+        groupsToShow = HEADER_BUILTIN_GROUPS.concat(
+          Object.keys(data).filter(function(k){ return HEADER_BUILTIN_GROUPS.indexOf(k) === -1; })
+        );
+      } else {
+        groupsToShow = [filter];
+      }
+
+      var anyRendered = false;
+
+      groupsToShow.forEach(function(gk){
+        var g = data[gk];
+        if (!g) return;
+        var items = g.items || [];
+        if (items.length === 0) return;
+
+        // 필터 적용
+        var filtered = items;
+        if (filter === 'fav'){
+          filtered = filtered.filter(function(it){ return it.isFavorite; });
+        }
+        if (searchText){
+          filtered = filtered.filter(function(it){
+            return (String(it.name || '').toLowerCase().indexOf(searchText) !== -1);
+          });
+        }
+        if (filtered.length === 0) return;
+
+        // 그룹 섹션
+        var section = document.createElement('div');
+        section.className = 'ep-hp-picker-section';
+
+        var shLbl = document.createElement('div');
+        shLbl.className = 'ep-hp-picker-section-label';
+        shLbl.textContent = (HEADER_GROUP_LABELS[gk] || gk) + ' · ' + filtered.length + '개';
+        section.appendChild(shLbl);
+
+        var grid = document.createElement('div');
+        grid.className = 'ep-hp-picker-grid';
+        // 즐겨찾기 우선 정렬
+        var favs = filtered.filter(function(it){ return it.isFavorite; });
+        var rest = filtered.filter(function(it){ return !it.isFavorite; });
+        favs.concat(rest).forEach(function(it){
+          grid.appendChild(_makeGalleryCard(gk, it));
+        });
+        section.appendChild(grid);
+        body.appendChild(section);
+        anyRendered = true;
+      });
+
+      if (!anyRendered){
+        var em = document.createElement('div');
+        em.className = 'ep-hp-picker-empty';
+        if (searchText){
+          em.innerHTML = '"<strong>' + _escapeHtml(searchText) + '</strong>" 에 해당하는 프리셋이 없습니다.';
+        } else if (filter === 'fav'){
+          em.innerHTML = '즐겨찾기한 프리셋이 없습니다.<br>카드의 ☆ 를 눌러 추가하세요.';
+        } else {
+          em.innerHTML = '프리셋이 없습니다.<br><a data-open-mgr>설정에서 만들기</a>';
+          var mgr = em.querySelector('[data-open-mgr]');
+          if (mgr){
+            mgr.addEventListener('click', function(e){
+              e.preventDefault(); e.stopPropagation();
+              overlay.remove();
+              try { openHeaderPresetManager(); } catch(_){}
+            });
+          }
+        }
+        body.appendChild(em);
+      }
+    }
+
+    // 간단 HTML 이스케이프
+    function _escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, function(c){
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'})[c];
+      });
+    }
+
+    _renderGallery();
+    _updateSel();
+
+    document.body.appendChild(overlay);
+
+    // ESC 로 닫기
+    var _keyCloser = function(e){
+      if (e.key === 'Escape' || e.keyCode === 27){
+        overlay.remove();
+        document.removeEventListener('keydown', _keyCloser, true);
+      }
+    };
+    document.addEventListener('keydown', _keyCloser, true);
+
+    // 포커스를 검색박스에 주기
+    setTimeout(function(){ try { searchInput.focus(); } catch(_){} }, 100);
+  }
 
   // ============================================================
   // p23f: 자간 (letter-spacing) / 줄간격 (line-height) 슬라이더 팝오버
@@ -18523,6 +19098,7 @@
     window.__DDL_EDITOR.applyInlineCode     = applyInlineCode;
     window.__DDL_EDITOR.openAlignPopover    = openAlignPopover;
     window.__DDL_EDITOR.openHeadingMiniPopover   = openHeadingMiniPopover;
+    window.__DDL_EDITOR.openHeaderPresetGallery  = openHeaderPresetGallery;
     window.__DDL_EDITOR.applyHeaderPresetToBlock = applyHeaderPresetToBlock;
     window.__DDL_EDITOR.openLetterSpacingPopover = openLetterSpacingPopover;
     window.__DDL_EDITOR.openLineHeightPopover    = openLineHeightPopover;
