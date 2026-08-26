@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23e';
+  var VERSION = 'v2.0-β-p23f';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1832,6 +1832,61 @@
     '}',
     '.ep-heading-popover .eh-open-settings:hover {',
     '  border-color: var(--point, #FF9A76); color: var(--point, #FF9A76);',
+    '}',
+    // p23f: 자간 · 줄간격 슬라이더 팝오버 (ep-mini-popover-legacy 기반 + 세로 배치)
+    '.ep-slider-popover {',
+    '  display: block !important; min-width: 220px;',
+    '  padding: 12px 14px 12px;',
+    '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
+    '}',
+    '.ep-slider-popover .esp-title {',
+    '  font-family: "Cafe24Danjunghae","Gowun Batang",serif;',
+    '  font-size: 13px; opacity: 0.7; margin-bottom: 8px;',
+    '  padding-bottom: 6px; border-bottom: 1px solid rgba(15,58,58,0.1);',
+    '  display: flex; align-items: center; justify-content: space-between;',
+    '}',
+    '.ep-slider-popover .esp-value {',
+    '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
+    '  font-size: 12px; color: var(--point, #FF9A76); font-weight: 600;',
+    '  min-width: 42px; text-align: right;',
+    '}',
+    '.ep-slider-popover .esp-slider-row {',
+    '  display: flex; align-items: center; gap: 8px; padding: 2px 0 8px;',
+    '}',
+    '.ep-slider-popover input[type="range"] {',
+    '  flex: 1; margin: 0; accent-color: var(--point, #FF9A76);',
+    '  height: 22px;',
+    '}',
+    '.ep-slider-popover .esp-presets {',
+    '  display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;',
+    '  padding-bottom: 6px;',
+    '}',
+    '.ep-slider-popover .esp-preset-btn {',
+    '  background: transparent; border: 1px solid rgba(15,58,58,0.15);',
+    '  border-radius: 4px; padding: 5px 4px; cursor: pointer;',
+    '  color: var(--color, #0F3A3A); font-family: inherit; font-size: 11px;',
+    '  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;',
+    '  min-height: 26px;',
+    '}',
+    '.ep-slider-popover .esp-preset-btn:hover {',
+    '  border-color: var(--point, #FF9A76); color: var(--point, #FF9A76);',
+    '}',
+    '.ep-slider-popover .esp-preset-btn.is-active {',
+    '  border-color: var(--point, #FF9A76); background: rgba(255,154,118,0.12);',
+    '  color: var(--color, #0F3A3A); font-weight: 600;',
+    '}',
+    '.ep-slider-popover .esp-footer {',
+    '  display: flex; align-items: center; justify-content: space-between;',
+    '  padding-top: 8px; margin-top: 4px; border-top: 1px solid rgba(15,58,58,0.08);',
+    '}',
+    '.ep-slider-popover .esp-reset {',
+    '  background: transparent; border: none; padding: 4px 6px; cursor: pointer;',
+    '  color: rgba(15,58,58,0.55); font-family: inherit; font-size: 11px;',
+    '  transition: color 120ms ease;',
+    '}',
+    '.ep-slider-popover .esp-reset:hover { color: var(--color, #0F3A3A); }',
+    '.ep-slider-popover .esp-hint {',
+    '  font-size: 10px; opacity: 0.5; color: var(--color, #0F3A3A);',
     '}',
     // p19m: 설정창 허브 (프리셋 관리 링크 카드)
     '.ddl-set-hub {',
@@ -10113,8 +10168,17 @@
         } catch(err){ console.warn(err); }
         return;
       }
-      if (cmd === 'letter-spacing' || cmd === 'line-height'){
-        try { _showStubToast((cmd === 'letter-spacing' ? '자간' : '줄간격') + ' — 다음 배포에서 지원됩니다'); } catch(_){}
+      // p23f: 자간·줄간격 슬라이더 팝오버 연결 (스텁 토스트 제거)
+      if (cmd === 'letter-spacing'){
+        e.preventDefault(); e.stopPropagation();
+        try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
+        try { openLetterSpacingPopover(btn); } catch(err){ console.warn('[LS]', err); }
+        return;
+      }
+      if (cmd === 'line-height'){
+        e.preventDefault(); e.stopPropagation();
+        try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
+        try { openLineHeightPopover(btn); } catch(err){ console.warn('[LH]', err); }
         return;
       }
       if (cmd === 'strikeThrough'){
@@ -17147,11 +17211,299 @@
     }, 0);
   }
 
+  // ============================================================
+  // p23f: 자간 (letter-spacing) / 줄간격 (line-height) 슬라이더 팝오버
+  // ============================================================
+  //
+  // 적용 정책:
+  //   · 자간  → 선택 범위가 있으면 <span style="letter-spacing:...em"> 로 감싸기 (인라인)
+  //           선택 없으면 현재 커서의 .editor-block 안 편집 요소에 인라인 style 으로 부여
+  //   · 줄간격→ 항상 현재 커서의 .editor-block 안 편집 요소에 line-height 인라인 (블록 속성)
+  //
+  // 저장 위생:
+  //   getCleanHtml 계열이 contenteditable 만 턴어내고 inline style 은 유지하므로
+  //   저장 후 사이트에서도 동일하게 렌더된다.
+
+  function _lsGetTargetBlock(){
+    // 커서 위치의 .editor-block 안 편집 요소 찾기
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    var node = sel.getRangeAt(0).startContainer;
+    var el = node.nodeType === 1 ? node : node.parentElement;
+    if (!el) return null;
+    var block = el.closest && el.closest('.editor-block');
+    if (!block) return null;
+    // 블록 안 첫 편집 요소 (block-handle 제외)
+    var editable = null;
+    Array.from(block.children).forEach(function(child){
+      if (editable) return;
+      if (child.classList && child.classList.contains('block-handle')) return;
+      editable = child;
+    });
+    return { block: block, editable: editable };
+  }
+
+  // 선택 범위가 있는지 (텍스트가 실제로 선택되었는지)
+  function _lsHasSelection(){
+    try {
+      var sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return false;
+      var r = sel.getRangeAt(0);
+      if (r.collapsed) return false;
+      return (r.toString() || '').length > 0;
+    } catch(_){ return false; }
+  }
+
+  // 자간 적용: 선택 범위 있으면 span 감싸기 (execCommand 안 씁)
+  //   value = em 수치 (0 = 기본, 음수 가능)
+  function _applyLetterSpacing(valueEm){
+    try { if (typeof restoreRange === 'function') restoreRange(); } catch(_){}
+    var hasSel = _lsHasSelection();
+    if (hasSel){
+      // span 감싸기
+      var sel = window.getSelection();
+      var range = sel.getRangeAt(0);
+      try {
+        var frag = range.extractContents();
+        var span = document.createElement('span');
+        span.style.letterSpacing = valueEm + 'em';
+        span.setAttribute('data-inline-format', 'letter-spacing');
+        span.appendChild(frag);
+        range.insertNode(span);
+        // 선택 복원 (span 전체)
+        var newRange = document.createRange();
+        newRange.selectNodeContents(span);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+        try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
+      } catch(err){ console.warn('[LS-apply]', err); }
+    } else {
+      // 블록 전체에 부여
+      var t = _lsGetTargetBlock();
+      if (t && t.editable){
+        t.editable.style.letterSpacing = valueEm + 'em';
+      }
+    }
+  }
+
+  // 줄간격 적용: 항상 대상 블록 안 편집 요소에 line-height 인라인
+  function _applyLineHeight(value){
+    try { if (typeof restoreRange === 'function') restoreRange(); } catch(_){}
+    var t = _lsGetTargetBlock();
+    if (!t || !t.editable) return;
+    t.editable.style.lineHeight = String(value);
+  }
+
+  // 현재 값 읽기 (팝오버 열 때 초기값에 쓰기 위함)
+  function _readCurrentLetterSpacing(){
+    try {
+      var sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return 0;
+      var node = sel.getRangeAt(0).startContainer;
+      var el = node.nodeType === 1 ? node : node.parentElement;
+      if (!el) return 0;
+      // 인라인 span 이 감싸고 있으면 그 값
+      var span = el.closest && el.closest('span[data-inline-format="letter-spacing"]');
+      if (span){
+        var v = parseFloat(span.style.letterSpacing);
+        if (!isNaN(v)) return v;
+      }
+      // 아니면 블록 editable 의 inline style
+      var t = _lsGetTargetBlock();
+      if (t && t.editable && t.editable.style.letterSpacing){
+        var v2 = parseFloat(t.editable.style.letterSpacing);
+        if (!isNaN(v2)) return v2;
+      }
+      return 0;
+    } catch(_){ return 0; }
+  }
+  function _readCurrentLineHeight(){
+    try {
+      var t = _lsGetTargetBlock();
+      if (!t || !t.editable) return 1.6;
+      var s = t.editable.style.lineHeight;
+      if (s){
+        var v = parseFloat(s);
+        if (!isNaN(v)) return v;
+      }
+      // computed 값 읽기 (블록에 별도 설정 없으면 상속된 값)
+      try {
+        var cs = window.getComputedStyle(t.editable);
+        var fs = parseFloat(cs.fontSize);
+        var lh = parseFloat(cs.lineHeight);
+        if (fs > 0 && lh > 0){
+          return Math.round((lh / fs) * 10) / 10;
+        }
+      } catch(_){}
+      return 1.6;
+    } catch(_){ return 1.6; }
+  }
+
+  // 공용 슬라이더 팝오버 빌더
+  //   opts = {
+  //     kind:      'letter-spacing' | 'line-height'
+  //     title:     '자간' | '줄간격'
+  //     unit:      'em' | ''
+  //     min, max, step:
+  //     initial:   슬라이더 초기값
+  //     presets:   [{ label, value }]
+  //     onChange:  function(value)
+  //     onReset:   function()
+  //     hint:      하단 안내 문구
+  //   }
+  function _openSliderPopover(anchorBtn, opts){
+    var oldId = 'ep-slider-popover-' + opts.kind;
+    var old = document.getElementById(oldId);
+    if (old) { old.remove(); return; }
+
+    var pop = document.createElement('div');
+    pop.id = oldId;
+    pop.className = 'ep-mini-popover-legacy ep-slider-popover';
+
+    var presetsHtml = '';
+    (opts.presets || []).forEach(function(p){
+      presetsHtml += '<button type="button" class="esp-preset-btn" data-preset="' + p.value + '">' + p.label + '</button>';
+    });
+
+    pop.innerHTML =
+      '<div class="esp-title">' +
+        '<span>' + opts.title + '</span>' +
+        '<span class="esp-value" data-esp-value>' + opts.initial + opts.unit + '</span>' +
+      '</div>' +
+      '<div class="esp-slider-row">' +
+        '<input type="range" min="' + opts.min + '" max="' + opts.max + '" step="' + opts.step + '" value="' + opts.initial + '" data-esp-slider>' +
+      '</div>' +
+      (presetsHtml ? '<div class="esp-presets">' + presetsHtml + '</div>' : '') +
+      '<div class="esp-footer">' +
+        '<button type="button" class="esp-reset" data-esp-reset>↺ 기본값으로</button>' +
+        '<span class="esp-hint">' + (opts.hint || '') + '</span>' +
+      '</div>';
+
+    document.body.appendChild(pop);
+
+    // 위치: anchor 아래
+    var r = anchorBtn.getBoundingClientRect();
+    pop.style.top  = (r.bottom + 6) + 'px';
+    pop.style.left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left)) + 'px';
+
+    // 팝오버 안서 mousedown 때 매번 선택 보존 (직접 톤응 방지)
+    pop.addEventListener('mousedown', function(e){
+      // 입력/버튼에서는 기본 동작 허용 (range 유지 안되면 restoreRange 사용)
+      if (e.target.tagName === 'INPUT') return;
+      e.preventDefault();
+    });
+
+    var slider  = pop.querySelector('[data-esp-slider]');
+    var valueEl = pop.querySelector('[data-esp-value]');
+    var resetBtn= pop.querySelector('[data-esp-reset]');
+    var presetBtns = Array.from(pop.querySelectorAll('.esp-preset-btn'));
+
+    function _syncActivePreset(cur){
+      presetBtns.forEach(function(b){
+        var v = parseFloat(b.getAttribute('data-preset'));
+        b.classList.toggle('is-active', Math.abs(v - cur) < 0.001);
+      });
+    }
+    _syncActivePreset(parseFloat(opts.initial));
+
+    slider.addEventListener('input', function(){
+      var v = parseFloat(slider.value);
+      valueEl.textContent = v + opts.unit;
+      _syncActivePreset(v);
+      try { opts.onChange(v); } catch(err){ console.warn('[slider-onChange]', err); }
+    });
+
+    presetBtns.forEach(function(b){
+      b.addEventListener('click', function(ev){
+        ev.preventDefault(); ev.stopPropagation();
+        var v = parseFloat(b.getAttribute('data-preset'));
+        slider.value = v;
+        valueEl.textContent = v + opts.unit;
+        _syncActivePreset(v);
+        try { opts.onChange(v); } catch(err){ console.warn('[slider-preset]', err); }
+      });
+    });
+
+    if (resetBtn){
+      resetBtn.addEventListener('click', function(ev){
+        ev.preventDefault(); ev.stopPropagation();
+        try { opts.onReset(); } catch(err){ console.warn('[slider-reset]', err); }
+        pop.remove();
+      });
+    }
+
+    setTimeout(function(){
+      var closer = function(ev){
+        if (pop.contains(ev.target) || anchorBtn.contains(ev.target)) return;
+        pop.remove();
+        document.removeEventListener('mousedown', closer, true);
+      };
+      document.addEventListener('mousedown', closer, true);
+    }, 0);
+  }
+
+  function openLetterSpacingPopover(anchorBtn){
+    var cur = _readCurrentLetterSpacing();
+    _openSliderPopover(anchorBtn, {
+      kind:    'letter-spacing',
+      title:   '자간',
+      unit:    'em',
+      min:     -0.1,
+      max:     0.4,
+      step:    0.01,
+      initial: cur,
+      presets: [
+        { label: '좁게',   value: -0.03 },
+        { label: '기본',   value:  0    },
+        { label: '보통',   value:  0.05 },
+        { label: '넓게',   value:  0.15 }
+      ],
+      hint: '텍스트 선택 시 그 부분만',
+      onChange: function(v){ _applyLetterSpacing(v); },
+      onReset:  function(){
+        // 선택 있으면 span 복원 (푸는 건 복잡하니 0 으로 설정) · 없으면 블록 style 제거
+        if (_lsHasSelection()){
+          _applyLetterSpacing(0);
+        } else {
+          var t = _lsGetTargetBlock();
+          if (t && t.editable) t.editable.style.letterSpacing = '';
+        }
+      }
+    });
+  }
+
+  function openLineHeightPopover(anchorBtn){
+    var cur = _readCurrentLineHeight();
+    _openSliderPopover(anchorBtn, {
+      kind:    'line-height',
+      title:   '줄간격',
+      unit:    '',
+      min:     1.0,
+      max:     3.0,
+      step:    0.05,
+      initial: cur,
+      presets: [
+        { label: '좁게',   value: 1.2 },
+        { label: '보통',   value: 1.6 },
+        { label: '넓게',   value: 2.0 },
+        { label: '아주넓', value: 2.5 }
+      ],
+      hint: '블록 전체 적용',
+      onChange: function(v){ _applyLineHeight(v); },
+      onReset:  function(){
+        var t = _lsGetTargetBlock();
+        if (t && t.editable) t.editable.style.lineHeight = '';
+      }
+    });
+  }
+
   try {
     window.__DDL_EDITOR = window.__DDL_EDITOR || {};
     window.__DDL_EDITOR.adjustFontSize      = adjustFontSize;
     window.__DDL_EDITOR.applyInlineCode     = applyInlineCode;
     window.__DDL_EDITOR.openAlignPopover    = openAlignPopover;
+    window.__DDL_EDITOR.openLetterSpacingPopover = openLetterSpacingPopover;
+    window.__DDL_EDITOR.openLineHeightPopover    = openLineHeightPopover;
     window.__DDL_EDITOR.showStubToast       = _showStubToast;
   } catch(_){}
 
