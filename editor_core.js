@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23v';
+  var VERSION = 'v2.0-β-p23w';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -14412,9 +14412,30 @@
 
     _renderBody();
 
-    // 하단 "모든 프리셋 보기"
+    // 하단: 형광펜 지우기 (좌) + 모든 프리셋 보기 (우)
     var footer = document.createElement('div');
-    footer.style.cssText = 'border-top: 1px solid rgba(15,58,58,0.06); padding: 8px 10px;';
+    footer.style.cssText = 'border-top: 1px solid rgba(15,58,58,0.06); padding: 8px 10px;'
+      + ' display: flex; justify-content: space-between; align-items: center;';
+
+    // p23w: 형광펜 지우기 (현재 선택에 걸린 모든 형광펜 삭제)
+    var clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.textContent = '형광펜 지우기';
+    clearBtn.title = '선택 영역의 형광펜 제거';
+    clearBtn.style.cssText = 'background: transparent; border: none; cursor: pointer;'
+      + ' font-size: 11px; color: var(--point, #FF9A76); padding: 4px 6px; border-radius: 4px; font-family: inherit;';
+    clearBtn.addEventListener('mouseenter', function(){ clearBtn.style.background = 'rgba(255,154,118,0.08)'; });
+    clearBtn.addEventListener('mouseleave', function(){ clearBtn.style.background = 'transparent'; });
+    clearBtn.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    clearBtn.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      try {
+        if (typeof applyHighlightColor === 'function') applyHighlightColor('');
+      } catch(err){ console.warn('[hl-clear]', err); }
+      pop.remove();
+    });
+    footer.appendChild(clearBtn);
+
     var totalCount = 0;
     lib.groups.forEach(function(g){ totalCount += (g.presets || []).length; });
     var moreBtn = document.createElement('button');
@@ -14428,7 +14449,6 @@
     moreBtn.addEventListener('click', function(e){
       e.preventDefault(); e.stopPropagation();
       pop.remove();
-      // p23w 예정: 형광펜 큰 창 (openHighlighterPresetGallery)
       try {
         if (typeof openHighlighterPresetGallery === 'function'){
           openHighlighterPresetGallery();
@@ -17991,13 +18011,33 @@
       if (p === 'stripe') return 'repeating-linear-gradient(45deg, ' + c1 + ' 0, ' + c1 + ' ' + (s/2) + 'px, ' + c2 + ' ' + (s/2) + 'px, ' + c2 + ' ' + s + 'px)';
       if (p === 'check') return 'conic-gradient(' + c1 + ' 25%, ' + c2 + ' 25% 50%, ' + c1 + ' 50% 75%, ' + c2 + ' 75%) 0 0 / ' + s + 'px ' + s + 'px';
     }
+    // p23w: 신규 3종 mode 추가
+    if (mode === 'fade'){
+      return 'linear-gradient(90deg, transparent 0%, ' + c1 + ' 15%, ' + c1 + ' 85%, transparent 100%)';
+    }
+    if (mode === 'paint'){
+      var pos = spec.pos || 'bottom';
+      if (pos === 'top')    return 'linear-gradient(180deg, ' + c1 + ' 0%, ' + c1 + ' 50%, transparent 50%, transparent 100%)';
+      if (pos === 'middle') return 'linear-gradient(180deg, transparent 0%, transparent 35%, ' + c1 + ' 35%, ' + c1 + ' 65%, transparent 65%, transparent 100%)';
+      return 'linear-gradient(180deg, transparent 0%, transparent 50%, ' + c1 + ' 50%, ' + c1 + ' 100%)';
+    }
+    // mode === 'solid' 또는 'marker' 또는 미부업
     return c1;
   }
 
   // p18k: 확장된 형광펜 적용 — spec 객체(mode/c1/c2/a1/a2/angle/pattern/size) 받음.
-  // 이전 시그니처 유지: 문자열 하나 넘어오면 단색으로 처리.
+  // p23w: 재설계 — 선택 영역 안의 기존 mark 먼저 언랩하고 새 mark로 덮어쓸.
+  //   이전 버그: mark 안 일부만 선택해도 전체 색을 바꿔서 "노랑이 다른 색 덮어쓰기" 발생.
   function applyHighlightColor(input){
-    if (!savedRange) return;
+    // p23w 적용: '' 또는 'none' 이면 지우기 — savedRange 없어도 현재 선택으로 진행
+    if (!savedRange){
+      var _sel = window.getSelection();
+      if (_sel && _sel.rangeCount > 0){
+        savedRange = _sel.getRangeAt(0).cloneRange();
+      } else {
+        return;
+      }
+    }
     // 언랩 케이스
     var isNone = (input === '' || input === 'none');
     var spec;
@@ -18012,43 +18052,172 @@
     }
     restoreRange();
     var sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    if (!sel || sel.rangeCount === 0) return;
+
+    // 커서가 붕괴서 선택이 없으면 — 커서가 mark 안이면 그 mark 전체 대상, 아니면 종료
+    if (sel.isCollapsed){
+      var _caretC = sel.getRangeAt(0).startContainer;
+      var _caretE = _caretC.nodeType === 1 ? _caretC : _caretC.parentElement;
+      var _wrapM = _caretE && _caretE.closest && _caretE.closest('mark');
+      if (_wrapM){
+        if (isNone){
+          _hlUnwrapMark(_wrapM);
+          return;
+        }
+        var _rr = document.createRange();
+        _rr.selectNodeContents(_wrapM);
+        sel.removeAllRanges();
+        sel.addRange(_rr);
+      } else {
+        return;
+      }
+    }
+
+    // p23w 새 로직: 선택 영역 안의 모든 mark 언랩 후 새 mark 씩우기
     var range = sel.getRangeAt(0);
-    var container = range.commonAncestorContainer;
-    var el = container.nodeType === 1 ? container : container.parentElement;
-    var innerMark = el && el.closest && el.closest('mark');
-    if (innerMark) {
+
+    // 먼저 선택 영역 안의 기존 mark 모두 언랩 (덮어쓰기 보장)
+    _hlUnwrapMarksInRange(range);
+
+    // 지우기 모드면 여기서 종료
+    if (isNone){
+      try { saveRange(); } catch(_){}
+      return;
+    }
+
+    // 언랩 후 selection 재수집
+    var sel2 = window.getSelection();
+    if (!sel2 || sel2.rangeCount === 0 || sel2.isCollapsed) return;
+    var range2 = sel2.getRangeAt(0);
+
+    var innerMark = null; // p23w: 이제 이 로직 통하지 않음이므로 항상 null
+    if (false && innerMark) {
       if (isNone) {
         var parent = innerMark.parentNode;
         while (innerMark.firstChild) parent.insertBefore(innerMark.firstChild, innerMark);
         parent.removeChild(innerMark);
         return;
       }
-      // 색 갱신
       innerMark.style.background = specToBackground(spec);
       innerMark.style.backgroundColor = ''; // shorthand 로 덮어씀 방지
       innerMark.style.color = 'inherit';
       setLastHlSpec(spec);
       return;
     }
-    if (isNone) return;
+    // p23w: 새 mark 로 선택 영역 감쌀
     var m = document.createElement('mark');
+    m.className = 'ddl-hl';
+    var _mode = (spec && spec.mode) || 'marker';
+    if (_mode === 'solid') _mode = 'marker';
+    m.setAttribute('data-hl-mode', _mode);
+    if (spec && spec.c1){
+      m.setAttribute('data-hl-c1', spec.c1);
+      m.style.setProperty('--ddl-hl-c1', spec.c1);
+    }
+    if (_mode === 'paint' && spec && spec.pos) m.setAttribute('data-hl-pos', spec.pos);
+    if (spec && typeof spec.ratio === 'number') m.setAttribute('data-hl-ratio', String(spec.ratio));
     m.style.background = specToBackground(spec);
     m.style.color = 'inherit';
     m.style.padding = '0.02em 0.15em';
     m.style.borderRadius = '2px';
-    // 데이터 속성으로 저장/재현 힌트
     try { m.setAttribute('data-hl-spec', JSON.stringify(spec)); } catch(_){}
     try {
-      m.appendChild(range.extractContents());
-      range.insertNode(m);
-      sel.removeAllRanges();
+      m.appendChild(range2.extractContents());
+      range2.insertNode(m);
+      _hlMergeAdjacent(m);
+      sel2.removeAllRanges();
       var nr = document.createRange();
       nr.selectNodeContents(m);
-      sel.addRange(nr);
+      sel2.addRange(nr);
       saveRange();
       setLastHlSpec(spec);
-    } catch(err){ console.warn('[p18k] highlight error', err); }
+    } catch(err){ console.warn('[p23w] highlight apply error', err); }
+  }
+
+  // p23w: mark 하나 언랩
+  function _hlUnwrapMark(mk){
+    if (!mk || !mk.parentNode) return;
+    var parent = mk.parentNode;
+    while (mk.firstChild) parent.insertBefore(mk.firstChild, mk);
+    parent.removeChild(mk);
+    try { parent.normalize && parent.normalize(); } catch(_){}
+  }
+
+  // p23w: range 안 모든 ddl-hl mark 언랩 (덮어쓰기 보장)
+  function _hlUnwrapMarksInRange(range){
+    if (!range || range.collapsed) return;
+    var startC = range.startContainer, startO = range.startOffset;
+    var endC   = range.endContainer,   endO   = range.endOffset;
+
+    var root = range.commonAncestorContainer;
+    var rootEl = root.nodeType === 1 ? root : root.parentElement;
+    if (!rootEl) return;
+
+    // 선택이 mark 안에 완전히 들어있는 경우 포함해 상위로서 스캔
+    var scanRoot = rootEl;
+    var ancMark = rootEl.closest && rootEl.closest('mark');
+    if (ancMark && ancMark.parentNode) scanRoot = ancMark.parentNode;
+
+    var candidates = [];
+    try {
+      Array.prototype.forEach.call(scanRoot.querySelectorAll('mark.ddl-hl, mark'), function(mk){
+        // ddl-hl 이 아닌 mark 는 손대지 않음
+        if (!mk.classList || !mk.classList.contains('ddl-hl')) return;
+        try {
+          var mkR = document.createRange();
+          mkR.selectNodeContents(mk);
+          // range 와 mk 가 조금이라도 겹치는지
+          var cmpStartToEnd = range.compareBoundaryPoints(Range.START_TO_END, mkR);
+          var cmpEndToStart = range.compareBoundaryPoints(Range.END_TO_START, mkR);
+          if (cmpStartToEnd > 0 && cmpEndToStart < 0){
+            candidates.push(mk);
+          }
+        } catch(_){}
+      });
+      if (ancMark && ancMark.classList && ancMark.classList.contains('ddl-hl') && candidates.indexOf(ancMark) === -1){
+        candidates.push(ancMark);
+      }
+    } catch(_){}
+
+    candidates.forEach(function(mk){ _hlUnwrapMark(mk); });
+
+    // 선택 복원 시도
+    try {
+      var nr = document.createRange();
+      var _clampO = function(node, o){
+        if (node.nodeType === 3) return Math.min(o, node.length);
+        return Math.min(o, node.childNodes.length);
+      };
+      nr.setStart(startC, _clampO(startC, startO));
+      nr.setEnd(endC,     _clampO(endC,   endO));
+      var s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(nr);
+    } catch(_){}
+  }
+
+  // p23w: 이웃 mark 가 같은 spec 이면 병합 (같은 색 연속 색 방지)
+  function _hlMergeAdjacent(mk){
+    if (!mk || !mk.parentNode) return;
+    function _sameSpec(a, b){
+      try {
+        var sa = a.getAttribute('data-hl-spec');
+        var sb = b.getAttribute('data-hl-spec');
+        return !!sa && !!sb && sa === sb;
+      } catch(_){ return false; }
+    }
+    var prev = mk.previousSibling;
+    while (prev && prev.nodeType === 3 && !prev.textContent) prev = prev.previousSibling;
+    if (prev && prev.nodeType === 1 && prev.tagName === 'MARK' && _sameSpec(prev, mk)){
+      while (prev.lastChild) mk.insertBefore(prev.lastChild, mk.firstChild);
+      prev.parentNode.removeChild(prev);
+    }
+    var next = mk.nextSibling;
+    while (next && next.nodeType === 3 && !next.textContent) next = next.nextSibling;
+    if (next && next.nodeType === 1 && next.tagName === 'MARK' && _sameSpec(next, mk)){
+      while (next.firstChild) mk.appendChild(next.firstChild);
+      next.parentNode.removeChild(next);
+    }
   }
 
   function toggleEmphasisDot(){
