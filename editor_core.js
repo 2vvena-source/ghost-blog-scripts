@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22w';
+  var VERSION = 'v2.0-β-p22x';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -15101,8 +15101,21 @@
       }
       return '\u27EArt-enc:' + enc + '\u27EB' + inner + '\u27EA/rt-enc\u27EB';
     }
-    html = html.replace(/<mark\s[^>]*class="ddl-ruby"[^>]*data-rt="([^"]*)"[^>]*>([\s\S]*?)<\/mark>/g, _rubyMarker);
-    html = html.replace(/<mark\s[^>]*data-rt="([^"]*)"[^>]*class="ddl-ruby"[^>]*>([\s\S]*?)<\/mark>/g, _rubyMarker);
+    // p22x: mark 전체(속성+style 포함) 를 캡처해서 크기/위치 값도 마커에 담기
+    html = html.replace(/<mark\s[^>]*class="ddl-ruby"[^>]*>([\s\S]*?)<\/mark>/g, function(fullMatch, inner){
+      // data-rt 추출
+      var rtMatch = fullMatch.match(/data-rt="([^"]*)"/);
+      if (!rtMatch) return fullMatch;
+      var rt = rtMatch[1];
+      // style 에서 --ddl-ruby-size, --ddl-ruby-offset 값 추출
+      var extras = '';
+      var szMatch = fullMatch.match(/--ddl-ruby-size:\s*([0-9.]+)em/);
+      var ofMatch = fullMatch.match(/--ddl-ruby-offset:\s*([0-9.]+)%/);
+      if (szMatch) { var szPct = Math.round(parseFloat(szMatch[1]) * 100); extras += '|s:' + szPct; }
+      if (ofMatch) { extras += '|o:' + Math.round(parseFloat(ofMatch[1])); }
+      // p22x: extras 를 rt 값 끝에 붙임 (기존 _rubyMarker 로직 그대로 활용하되 rt 를 확장)
+      return _rubyMarker(fullMatch, rt + extras, inner);
+    });
 
     // p13e: 저장 HTML 진단 로그
     log('[SAVE-HTML] 길이:', html.length, '/ 콜아웃:', (html.match(/callout-box/g)||[]).length, '/ 구분선:', (html.match(/ddl-divider-block/g)||[]).length, '/ 버튼:', (html.match(/ddl-button-block/g)||[]).length, '/ kg-card:', (html.match(/kg-card-begin/g)||[]).length);
@@ -18140,10 +18153,11 @@
       }
     }
 
-    document.addEventListener('keydown', function(e){
+    // p22x: contentEl 에 우선 리스너 등록, contentEl 아직 없으면 document 로 fallback
+    var _bulletKeyHandler = function(e){
       // p22w: 진단용 - 어떤 키가 실제로 들어오는지 log
       if (e.key === 'Tab' || e.key === 'Enter' || e.key === 'Backspace') {
-        try { log('[BULLET-KD]', e.key, 'shift=', e.shiftKey); } catch(_){}
+        try { log('[BULLET-KD]', e.key, 'shift=', e.shiftKey, 'target=', e.target && e.target.tagName); } catch(_){}
       }
       // Tab / Shift+Tab
       if (e.key === 'Tab'){
@@ -18190,7 +18204,33 @@
         e.preventDefault();
         _customOutdent(li3);
       }
-    }, true);
+    };
+    // p22x: contentEl 이 있으면 우선 거기에, 없으면 document 에 폴백
+    //       + contentEl 이 나중에 만들어질 수 있으므로 500ms 뒤 재시도
+    function _bulletTryAttach(){
+      if (typeof contentEl !== 'undefined' && contentEl){
+        try {
+          contentEl.removeEventListener('keydown', _bulletKeyHandler, true);
+          contentEl.addEventListener('keydown', _bulletKeyHandler, true);
+          try { log('[BULLET-SETUP] contentEl 에 keydown 리스너 등록'); } catch(_){}
+          return true;
+        } catch(_){}
+      }
+      return false;
+    }
+    if (!_bulletTryAttach()){
+      // 최소한의 안전판: document 에도 등록 (사용자 리포트: document 만으로는 안 발화)
+      document.addEventListener('keydown', _bulletKeyHandler, true);
+      try { log('[BULLET-SETUP] contentEl 아직 없음. document 폴백. 나중에 재시도.'); } catch(_){}
+      // contentEl 이 나중에 준비되면 이동
+      setTimeout(function(){
+        if (_bulletTryAttach()){
+          try { document.removeEventListener('keydown', _bulletKeyHandler, true); } catch(_){}
+          try { log('[BULLET-SETUP] contentEl 확보. document 리스너 제거.'); } catch(_){}
+        }
+      }, 500);
+      setTimeout(function(){ _bulletTryAttach(); }, 2000);
+    }
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', _setupBulletTabHandler);
@@ -20128,10 +20168,16 @@
         var mark = document.createElement('mark');
         mark.className = 'ddl-ruby';
         var rtVal = m[2];
+        // p22x: 마커에서 |s:xx|o:xx 값 추출 후 mark 인라인 style 로 복원
+        var _rubyExtras = { size: null, offset: null };
+        rtVal = rtVal.replace(/\|s:(\d+)/g, function(_a, v){ _rubyExtras.size = parseFloat(v); return ''; });
+        rtVal = rtVal.replace(/\|o:(\d+)/g, function(_a, v){ _rubyExtras.offset = parseFloat(v); return ''; });
         mark.setAttribute('data-rt', rtVal);
         mark.setAttribute('title', rtVal.replace(/<[^>]+>/g,''));
         mark.style.background = 'transparent';
         mark.style.color = 'inherit';
+        if (_rubyExtras.size != null)   mark.style.setProperty('--ddl-ruby-size', (_rubyExtras.size / 100) + 'em');
+        if (_rubyExtras.offset != null) mark.style.setProperty('--ddl-ruby-offset', _rubyExtras.offset + '%');
         // rt-html 이면 자식 span 으로 innerHTML 삽입 (CSS ::before 대신)
         // p19j: rt-enc 는 base64url 디코딩, rt-html 은 그대로 (호환성)
         var htmlVal = null;
