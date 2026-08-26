@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23z';
+  var VERSION = 'v2.0-β-p24a';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -10487,7 +10487,7 @@
       '<div class="ep-modern-toolbar-sep"></div>' +
       // 5행 (p22h): 서식 프리셋 (별도 행)
       '<div class="ep-modern-toolbar-icons" style="grid-template-columns:1fr;">' +
-        '<button type="button" data-cmd="open-presets"   data-expand="true" title="서식 프리셋" style="font-size:14px;">⭐ 서식 프리셋</button>' +
+        '<button type="button" data-cmd="open-format-apply" data-expand="true" title="서식" style="font-size:14px;">⭐ 서식</button>' +
       '</div>' +
       '<div class="ep-modern-toolbar-sep"></div>' +
       // 링크는 이 4x4에 자리 없으므로 하단 텍스트 영역에서 접근하거나 별도 배치 (사용자 스펙 준수)
@@ -10555,7 +10555,23 @@
         return;
       }
       if (cmd === 'open-presets'){
+        // p24a: legacy — 이제 다른 곳 (사이드바 등)에서만 사용되는 기존 인라인 서식 프리셋 모싀
         try { openPresetModal(); } catch(err){ console.warn(err); }
+        return;
+      }
+      if (cmd === 'open-format-apply'){
+        // p24a: 서식 즉시 적용창 (헤더 편집창을 apply-format 모드로 재사용)
+        e.preventDefault(); e.stopPropagation();
+        try { saveRange(); } catch(_){}
+        try {
+          if (typeof openHeaderPresetEditor === 'function'){
+            openHeaderPresetEditor(
+              { name: '', style: (typeof _headerDefaults === 'function' ? _headerDefaults('p') : {}) },
+              null,
+              { mode: 'apply-format', initialTab: 'props' }
+            );
+          }
+        } catch(err){ console.warn('[open-format-apply]', err); }
         return;
       }
       // p22e: 모던 툴바 새 명령
@@ -11361,11 +11377,76 @@
   //           ├ body (nameArea + heroWrap + segWrap + tabContent)
   //           └ footer (초기화 / 취소 / 저장)
 
-  function openHeaderPresetEditor(preset, onSave){
+  // p24a: 3가지 모드 지원
+  //   'save-preset' (기본): 프리셋을 만들거나 편집해서 저장. 헤더/형광펜 관리창에서 사용.
+  //   'apply-format':  서식 즉시 적용. 모던 툴바 "서식" 버튼에서 진입. 프리셋 저장 X.
+  //   'apply-color':   색깔 즉시 적용. Text Color 미니의 ▸ 확장 버튼에서 진입. 색깔 프리셋·그룹은 가능.
+  function openHeaderPresetEditor(preset, onSave, options){
+    options = options || {};
+    var editorMode = options.mode || 'save-preset';
     var current = JSON.parse(JSON.stringify(preset || {}));
     if (!current.style) current.style = _headerDefaults('p');
     var initialSnapshot = JSON.parse(JSON.stringify(current));
-    var currentTab = 'props';
+    var currentTab = options.initialTab || 'props';
+
+    // p24a: 즉시 적용 모드에서는 사용자가 막 선택해둔 범위를 기억해둔다
+    var savedApplyRange = null;
+    if (editorMode !== 'save-preset'){
+      try {
+        if (typeof savedRange !== 'undefined' && savedRange){
+          savedApplyRange = savedRange.cloneRange();
+        } else {
+          var _sel = window.getSelection();
+          if (_sel && _sel.rangeCount > 0) savedApplyRange = _sel.getRangeAt(0).cloneRange();
+        }
+      } catch(_){}
+    }
+
+    // p24a: 현재 현재.style 을 선택 영역에 인라인 style 로 적용 (span으로 감쌀)
+    //   서식: fontFamily, fontSize, fontWeight, letterSpacing, lineHeight, color
+    function _applyStyleToRange(range, style){
+      if (!range || range.collapsed) return;
+      var css = [];
+      if (style.fontFamily)    css.push('font-family: '   + style.fontFamily);
+      if (style.fontSize)      css.push('font-size: '     + style.fontSize);
+      if (style.fontWeight)    css.push('font-weight: '   + style.fontWeight);
+      if (style.letterSpacing) css.push('letter-spacing: '+ style.letterSpacing);
+      if (style.lineHeight)    css.push('line-height: '   + style.lineHeight);
+      if (style.color)         css.push('color: '         + style.color);
+      if (css.length === 0) return;
+      try {
+        var span = document.createElement('span');
+        span.setAttribute('data-inline-format', '1');
+        span.style.cssText = css.join('; ') + ';';
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
+        // 선택 복원
+        var s = window.getSelection();
+        s.removeAllRanges();
+        var nr = document.createRange();
+        nr.selectNodeContents(span);
+        s.addRange(nr);
+        try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
+      } catch(err){ console.warn('[apply-format] error', err); }
+    }
+
+    // p24a: 색만 적용 (color 만)
+    function _applyColorOnly(range, color){
+      if (!range || range.collapsed || !color) return;
+      try {
+        var span = document.createElement('span');
+        span.setAttribute('data-inline-format', '1');
+        span.style.cssText = 'color: ' + color + ';';
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
+        var s = window.getSelection();
+        s.removeAllRanges();
+        var nr = document.createRange();
+        nr.selectNodeContents(span);
+        s.addRange(nr);
+        try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
+      } catch(err){ console.warn('[apply-color] error', err); }
+    }
 
     // 열려있는 관리창 잠시 숨김
     var hiddenManagers = [];
@@ -11407,7 +11488,10 @@
       + ' cursor: move; user-select: none;'
       + ' display: flex; align-items: center; justify-content: space-between;';
     var dTitle = document.createElement('span');
-    dTitle.textContent = '프리셋 편집';
+    // p24a: 모드별 제목
+    if (editorMode === 'apply-format')      dTitle.textContent = '서식 적용';
+    else if (editorMode === 'apply-color')  dTitle.textContent = '색깔 적용';
+    else                                    dTitle.textContent = '프리셋 편집';
     var dClose = document.createElement('button');
     dClose.type = 'button';
     dClose.textContent = '×';
@@ -11455,16 +11539,79 @@
     }
 
     var pseudoPP = { body: dBody };  // _renderPresetEditorBody 는 pp.body 를 사용
-    dFooter.appendChild(makeBtn('초기화', { secondary: true, onClick: function(){
-      current = JSON.parse(JSON.stringify(initialSnapshot));
-      _renderPresetEditorBody(pseudoPP, current, currentTab, function(nt){ currentTab = nt; });
-    }}));
-    dFooter.appendChild(makeBtn('취소',   { onClick: function(){ closeDialog(); } }));
-    dFooter.appendChild(makeBtn('저장',   { primary: true, onClick: function(){
-      if (typeof onSave === 'function') onSave(current);
-      closeDialog();
-    }}));
+    // p24a: 모드별 푸터 버튼 구성
+    if (editorMode === 'save-preset'){
+      // 기존 동작 유지
+      dFooter.appendChild(makeBtn('초기화', { secondary: true, onClick: function(){
+        current = JSON.parse(JSON.stringify(initialSnapshot));
+        _renderPresetEditorBody(pseudoPP, current, currentTab, function(nt){ currentTab = nt; }, editorMode);
+      }}));
+      dFooter.appendChild(makeBtn('취소',   { onClick: function(){ closeDialog(); } }));
+      dFooter.appendChild(makeBtn('저장',   { primary: true, onClick: function(){
+        if (typeof onSave === 'function') onSave(current);
+        closeDialog();
+      }}));
+    } else if (editorMode === 'apply-format'){
+      // 서식 즉시 적용: [취소] [적용]
+      dFooter.appendChild(makeBtn('취소', { onClick: function(){ closeDialog(); } }));
+      dFooter.appendChild(makeBtn('적용', { primary: true, onClick: function(){
+        // 사용자가 막 선택해둔 범위에 style 적용
+        try {
+          // savedApplyRange 가 있으면 그것, 안 되면 현재 selection 사용
+          var range = null;
+          if (savedApplyRange){
+            range = savedApplyRange;
+            var s = window.getSelection();
+            s.removeAllRanges();
+            s.addRange(range);
+          } else {
+            var s2 = window.getSelection();
+            if (s2 && s2.rangeCount > 0) range = s2.getRangeAt(0);
+          }
+          if (range && !range.collapsed){
+            _applyStyleToRange(range, current.style);
+          }
+        } catch(err){ console.warn('[apply-format]', err); }
+        closeDialog();
+      }}));
+    } else if (editorMode === 'apply-color'){
+      // 색깔 즉시 적용: [닫기] 만 있음 — 카드 클릭 = 즉시 적용, 창은 닫히지 않음
+      var hintLabel = document.createElement('span');
+      hintLabel.textContent = '카드 클릭 = 즉시 적용 · ESC 로 닫기';
+      hintLabel.style.cssText = 'font-size: 11px; color: rgba(15,58,58,0.5); margin-right: auto; align-self: center;';
+      dFooter.appendChild(hintLabel);
+      dFooter.appendChild(makeBtn('닫기', { onClick: function(){ closeDialog(); } }));
+    }
     dialog.appendChild(dFooter);
+
+    // p24a: apply-color 모드에서는 색 변경이 일어날 때 즉시 선택 영역에 적용
+    if (editorMode === 'apply-color'){
+      // current.style.color 이 바뀌면 적용하는 감시기
+      var _lastColor = current.style.color;
+      var _colorWatcher = setInterval(function(){
+        if (!document.body.contains(overlay)){
+          clearInterval(_colorWatcher);
+          return;
+        }
+        if (current.style.color !== _lastColor){
+          _lastColor = current.style.color;
+          try {
+            if (savedApplyRange){
+              var s = window.getSelection();
+              s.removeAllRanges();
+              s.addRange(savedApplyRange);
+              _applyColorOnly(savedApplyRange, current.style.color);
+              // 벤이스 range 업데이트 (span 감쌀 후 새 range 로)
+              try {
+                if (typeof savedRange !== 'undefined' && savedRange){
+                  savedApplyRange = savedRange.cloneRange();
+                }
+              } catch(_){}
+            }
+          } catch(err){ console.warn('[apply-color watcher]', err); }
+        }
+      }, 200);
+    }
 
     // === 드래그 이동 ===
     (function(){
@@ -11503,15 +11650,22 @@
     };
     document.addEventListener('keydown', escHandler);
 
+    // p24a: apply-color 모드는 배경 클릭으로도 닫힘 (카드 클릭은 dialog stopPropagation 이 잡음)
+    if (editorMode === 'apply-color' || editorMode === 'apply-format'){
+      overlay.addEventListener('click', function(ev){
+        if (ev.target === overlay){ closeDialog(); document.removeEventListener('keydown', escHandler); }
+      });
+    }
+
     // === 조립 & 마운트 ===
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
 
     // 바디 내용 렌더
-    _renderPresetEditorBody(pseudoPP, current, currentTab, function(nt){ currentTab = nt; });
+    _renderPresetEditorBody(pseudoPP, current, currentTab, function(nt){ currentTab = nt; }, editorMode);
   }
 
-  function _renderPresetEditorBody(pp, current, activeTab, onTabChange){
+  function _renderPresetEditorBody(pp, current, activeTab, onTabChange, editorMode){
     var body = pp.body || pp.getBody('__single');
     if (!body) return;
     body.innerHTML = '';
@@ -11570,6 +11724,10 @@
     // ============================
     var nameArea = document.createElement('div');
     nameArea.style.cssText = 'padding: 14px 18px 8px; border-bottom: 1px solid rgba(15,58,58,0.06);';
+    // p24a: 즉시 적용 모드에서는 이름 입력 숨김 (저장하지 않으므로 의미 없음)
+    if (editorMode === 'apply-format' || editorMode === 'apply-color'){
+      nameArea.style.display = 'none';
+    }
     var nameLabel = document.createElement('div');
     nameLabel.style.cssText = 'font-size: 10px; opacity: 0.5; letter-spacing: 0.06em; margin-bottom: 4px; text-transform: uppercase;';
     nameLabel.textContent = '이름';
@@ -23101,8 +23259,18 @@
       showAddBtn: true,
       showExpand: true,
       onExpand: function(){
-        // p23 예정: 색깔 전용 큰 편집창 (헤더 프리셋 편집창과 동일 골격)
-        _showStubToast('색깔 전용 편집창 — 다음 배포에서 지원됩니다');
+        // p24a: 색깔 즉시 적용창 (헤더 편집창을 apply-color 모드로 재사용)
+        try { mp.close(); } catch(_){}
+        try { saveRange(); } catch(_){}
+        try {
+          if (typeof openHeaderPresetEditor === 'function'){
+            openHeaderPresetEditor(
+              { name: '', style: (typeof _headerDefaults === 'function' ? _headerDefaults('p') : {}) },
+              null,
+              { mode: 'apply-color', initialTab: 'color' }
+            );
+          }
+        } catch(err){ console.warn('[open-color-apply]', err); }
       },
       onPick: function(item){
         if (!item || !item.color) return;
