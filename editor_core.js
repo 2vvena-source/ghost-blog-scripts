@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22v';
+  var VERSION = 'v2.0-β-p22w';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -16408,6 +16408,7 @@
 
     overlay.appendChild(box);
     document.body.appendChild(overlay);
+    try { log('[RUBY-DIALOG] opened · baseText=', baseText); } catch(_){}
 
     var editable    = box.querySelector('#ruby-editable');
     var fmtToolbar  = box.querySelector('#ruby-fmttoolbar');
@@ -16449,6 +16450,8 @@
     function _closeRuby(){ if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
 
     function _applyRuby(){
+      // p22w: 진단용 · 확인이 실제로 실행되는지 눈에 보이게
+      try { log('[RUBY-APPLY] editable html len =', (editable.innerHTML || '').length, 'size=', _curSize, 'offset=', _curOffset); } catch(_){}
       var rubyHtml = (editable.innerHTML || '').trim();
       if (!rubyHtml || rubyHtml === '<br>') { _closeRuby(); return; }
       // 색 관련 태그 제거 (사용자 지시: 색은 본문 상속)
@@ -16496,11 +16499,12 @@
       _closeRuby();
     }
 
-    // 버튼 클릭
+    // 버튼 클릭 (p22w: 로그 추가하여 발화 여부 검증)
     overlay.addEventListener('click', function(e){
+      try { log('[RUBY-CLICK] target=', e.target.tagName, (e.target.dataset || {}).rubyCancel || '', (e.target.dataset || {}).rubyOk || ''); } catch(_){}
       if (e.target === overlay) { _closeRuby(); return; }
-      if (e.target.closest('[data-ruby-cancel]')) { _closeRuby(); return; }
-      if (e.target.closest('[data-ruby-ok]'))     { _applyRuby(); return; }
+      if (e.target.closest && e.target.closest('[data-ruby-cancel]')) { _closeRuby(); return; }
+      if (e.target.closest && e.target.closest('[data-ruby-ok]'))     { _applyRuby(); return; }
     });
     // 키보드
     editable.addEventListener('keydown', function(e){
@@ -18137,11 +18141,17 @@
     }
 
     document.addEventListener('keydown', function(e){
+      // p22w: 진단용 - 어떤 키가 실제로 들어오는지 log
+      if (e.key === 'Tab' || e.key === 'Enter' || e.key === 'Backspace') {
+        try { log('[BULLET-KD]', e.key, 'shift=', e.shiftKey); } catch(_){}
+      }
       // Tab / Shift+Tab
       if (e.key === 'Tab'){
         var li = _getCurrentLi();
-        if (!li) return;
+        if (!li) { try { log('[BULLET-KD] Tab · li 없음 - 무시'); } catch(_){}  return; }
         e.preventDefault();
+        e.stopPropagation();
+        try { log('[BULLET-KD] Tab · li 있음 · shift=', e.shiftKey); } catch(_){}
         if (e.shiftKey) _customOutdent(li);
         else            _customIndent(li);
         return;
@@ -18150,8 +18160,10 @@
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey){
         var li2 = _getCurrentLi();
         if (!li2) return;
-        if (!_isLiEmpty(li2)) return;   // 내용 있으면 기본 동작
+        if (!_isLiEmpty(li2)) { try { log('[BULLET-KD] Enter · li 비어있지 않음 - 기본동작'); } catch(_){} return; }
+        try { log('[BULLET-KD] Enter · 빈 li · outdent 실행'); } catch(_){}
         e.preventDefault();
+        e.stopPropagation();
         _customOutdent(li2);
         return;
       }
