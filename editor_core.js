@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22o';
+  var VERSION = 'v2.0-β-p22p';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -19778,7 +19778,8 @@
     '  position: absolute !important;',
     '  left: 50% !important;',
     '  bottom: 100% !important;',
-    '  transform: translateX(-50%) !important;',
+    /* p22p: translateY 로 아래로 밀어 원 텍스트에 가깝게 배치 (사용자 요청: 너무 위에 붕 뜸) */
+    '  transform: translateX(-50%) translateY(35%) !important;',
     '  font-size: 0.5em !important;',
     '  line-height: 1 !important;',
     '  white-space: nowrap !important;',
@@ -19792,7 +19793,8 @@
     '  position: absolute !important;',
     '  left: 50% !important;',
     '  bottom: 100% !important;',
-    '  transform: translateX(-50%) !important;',
+    /* p22p: HTML 서식 있는 루비도 동일하게 아래로 이동 */
+    '  transform: translateX(-50%) translateY(35%) !important;',
     '  font-size: 0.5em !important;',
     '  line-height: 1 !important;',
     '  white-space: nowrap !important;',
