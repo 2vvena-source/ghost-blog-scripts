@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22c';
+  var VERSION = 'v2.0-β-p22d';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1512,8 +1512,8 @@
     '  padding-left: 0.35em;',
     '  border-left: 1px solid rgba(15,58,58,0.15) !important;',
     '}',
-    /* p22b: 툴바 글자색 A 버튼 · 사각형 + 하단 살구색 바 */
-    '.ep-float-toolbar .ftb-textcolor {',
+    /* p22b: 툴바 글자색 A 버튼 · p22d: 형광펜 동일 구조 공유 */
+    '.ep-float-toolbar .ftb-textcolor, .ep-float-toolbar .ftb-hlcolor {',
     '  display: inline-flex !important;',
     '  flex-direction: column;',
     '  align-items: center;',
@@ -1523,16 +1523,20 @@
     '  padding: 0.25em 0.35em !important;',
     '  line-height: 1 !important;',
     '}',
-    '.ep-float-toolbar .ftb-textcolor .tc-letter {',
+    '.ep-float-toolbar .ftb-textcolor .tc-letter,',
+    '.ep-float-toolbar .ftb-hlcolor .tc-letter {',
     '  font-size: 0.95em; font-weight: 700; line-height: 1;',
     '  color: #0F3A3A;',
     '}',
-    '.ep-float-toolbar .ftb-textcolor .tc-bar {',
+    '.ep-float-toolbar .ftb-textcolor .tc-bar,',
+    '.ep-float-toolbar .ftb-hlcolor .tc-bar {',
     '  width: 1.1em; height: 3px; border-radius: 1px;',
     '  background: #FF9A76;',
     '}',
-    '.ep-float-toolbar .ftb-textcolor:hover .tc-letter { color: var(--point, #FF9A76); }',
-    '.ep-float-toolbar .ftb-textcolor.is-active .tc-letter { color: var(--point, #FF9A76); }',
+    '.ep-float-toolbar .ftb-textcolor:hover .tc-letter,',
+    '.ep-float-toolbar .ftb-hlcolor:hover .tc-letter { color: var(--point, #FF9A76); }',
+    '.ep-float-toolbar .ftb-textcolor.is-active .tc-letter,',
+    '.ep-float-toolbar .ftb-hlcolor.is-active .tc-letter { color: var(--point, #FF9A76); }',
     // p19l: 모던 툴바 (참고 이미지 스타일 — 팝오버 + 말꼬리 + 라벨-값 섹션)
     // 프레임은 .ep-popup-v2 와 별개. 이유: 툴바는 드래그 X, 헤더 X, 탭 X.
     '.ep-modern-toolbar {',
@@ -1660,30 +1664,32 @@
     '.ep-modern-toolbar.tail-right::before  { display: block; right: -6px; top: 24px; transform: rotate(135deg); }',
     '.ep-modern-toolbar.tail-top::before    { display: block; top: -6px;   left: 24px; transform: rotate(45deg);  }',
     '.ep-modern-toolbar.tail-bottom::before { display: block; bottom:-6px; left: 24px; transform: rotate(-135deg);}',
-    // p19m: 미니 팝오버 (정렬 3종, H▸ stub 드롭다운 공통 스타일)
-    '.ep-mini-popover {',
+    // p19m: 낡은 미니 팝오버 (정렬 3종, H▸ stub) · p22d: 이름 변경 · ep-mini-popover-legacy
+    //   (새 §Z ep-mini-popover 와 충돌 방지 · 새것은 세로 구조, 이건 정렬 가로용)
+    '.ep-mini-popover-legacy {',
     '  position: fixed; z-index: 9994;',
     '  background: #fff;',
     '  border: 1px solid rgba(15,58,58,0.25);',
     '  border-radius: 6px;',
     '  box-shadow: 0 8px 20px rgba(0,0,0,0.08);',
-    '  padding: 6px;',
-    '  display: inline-flex; align-items: center; gap: 4px;',
+    '  padding: 4px;',
+    '  display: inline-flex; align-items: center; gap: 2px;',
     '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
     '  animation: mtb-in 120ms ease-out;',
     '}',
-    '.ep-mini-popover button {',
+    '.ep-mini-popover-legacy button {',
     '  background: transparent; border: 1px solid transparent;',
-    '  border-radius: 4px; padding: 6px 8px; cursor: pointer;',
+    '  border-radius: 4px; padding: 4px 6px; cursor: pointer;',
     '  color: var(--color, #0F3A3A);',
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  transition: background 120ms ease, border-color 120ms ease;',
+    '  min-width: 28px; min-height: 28px;',
     '}',
-    '.ep-mini-popover button:hover {',
+    '.ep-mini-popover-legacy button:hover {',
     '  background: rgba(15,58,58,0.05); border-color: rgba(15,58,58,0.15);',
     '}',
-    '.ep-mini-popover button svg * { stroke: var(--color, #0F3A3A); }',
-    '.ep-mini-popover button:hover svg * { stroke: var(--point, #FF9A76); }',
+    '.ep-mini-popover-legacy button svg * { stroke: var(--color, #0F3A3A); }',
+    '.ep-mini-popover-legacy button:hover svg * { stroke: var(--point, #FF9A76); }',
     // p19m: H▸ 드롭다운 stub 전용
     '.ep-heading-popover {',
     '  display: block !important; min-width: 220px;',
@@ -2136,10 +2142,11 @@
     '  --ep-mini-width:     296px;',
     '  --ep-mini-z:         9500;',
     '}',
-    /* 팝오버 셸 · p22c: min-width 강제 · 좁아지는 버그 방지 */
+    /* 팝오버 셸 · p22c: min-width 강제 · p22d: display:block 명시 (낡은 CSS 상속 질달) */
     '.ep-mini-popover {',
     '  position: fixed;',
     '  z-index: var(--ep-mini-z);',
+    '  display: block !important;',
     '  width: var(--ep-mini-width) !important;',
     '  min-width: var(--ep-mini-width) !important;',
     '  max-width: calc(100vw - 16px);',
@@ -2152,6 +2159,14 @@
     '  font-family: "Pretendard Variable","Pretendard","Noto Sans KR",sans-serif;',
     '  font-size: 0.9em;',
     '  animation: epMiniFadeIn 120ms ease-out;',
+    '  padding: 0 !important;',
+    '  gap: 0 !important;',
+    '  align-items: initial !important;',
+    '}',
+    /* p22d: 미니 팝오버 안 버튼은 낡은 CSS 영향 차단 */
+    '.ep-mini-popover button {',
+    '  min-width: 0 !important; min-height: 0 !important;',
+    '  padding: 0;',
     '}',
     '@keyframes epMiniFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }',
     /* 헤더 */
@@ -9905,7 +9920,7 @@
       document.querySelectorAll('.ep-float-toolbar.is-open').forEach(function(b){ b.classList.remove('is-open'); });
       // 3) 형광펜 팔레트 / 미니 팝오버 닫기
       document.querySelectorAll('.ep-hl-palette.is-open').forEach(function(p){ p.classList.remove('is-open'); });
-      document.querySelectorAll('.ep-mini-popover, #ep-align-popover, #ep-heading-popover').forEach(function(p){ if (p.parentNode) p.parentNode.removeChild(p); });
+      document.querySelectorAll('.ep-mini-popover, .ep-mini-popover-legacy, #ep-align-popover, #ep-heading-popover').forEach(function(p){ if (p.parentNode) p.parentNode.removeChild(p); });
       // 4) 텍스트 선택 해제
       try {
         var sel = window.getSelection();
@@ -15644,7 +15659,11 @@
     try { return GM_getValue('inline_hl_last', '#FFF176') || '#FFF176'; }
     catch(_) { return '#FFF176'; }
   }
-  function setLastHlColor(c){ try { GM_setValue('inline_hl_last', c); } catch(_){} }
+  function setLastHlColor(c){
+    try { GM_setValue('inline_hl_last', c); } catch(_){}
+    // p22d: 툴바 형광펜 버튼 색 바 갱신
+    try { if (window.__DDL_EDITOR && typeof window.__DDL_EDITOR.updateHlColorButton === 'function') window.__DDL_EDITOR.updateHlColorButton(); } catch(_){}
+  }
   function loadHlUserPresets(){
     try { return JSON.parse(GM_getValue('inline_hl_presets', '[]')) || []; }
     catch(_) { return []; }
@@ -16571,7 +16590,8 @@
 
     var pop = document.createElement('div');
     pop.id = 'ep-align-popover';
-    pop.className = 'ep-mini-popover ddl-editor-popup';
+    // p22d: 가로 배치 전용 낡은 팝오버 클래스 사용 (새 §Z 세로 구조와 분리)
+    pop.className = 'ep-mini-popover-legacy ddl-editor-popup';
     pop.innerHTML =
       '<button type="button" data-align="justifyLeft"   title="왼쪽 정렬">'   + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg>' + '</button>' +
       '<button type="button" data-align="justifyCenter" title="가운데 정렬">' + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="5" y1="18" x2="19" y2="18"/></svg>' + '</button>' +
@@ -16610,7 +16630,8 @@
 
     var pop = document.createElement('div');
     pop.id = 'ep-heading-popover';
-    pop.className = 'ep-mini-popover ep-heading-popover';
+    // p22d: legacy 클래스 (새 §Z 미니와 분리)
+    pop.className = 'ep-mini-popover-legacy ep-heading-popover';
     // p19o: 이미 저장된 프리셋이 있으면 살짝 안내글 수정
     var _hpData = {};
     var _hpTotal = 0;
@@ -16803,8 +16824,8 @@
       '<button data-cmd="align-expand" title="정렬"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg></button>' +
       // 7. 글자색▾ (A + 살구색 하단 바)
       '<button data-cmd="text-color" class="ftb-textcolor" title="글자색"><span class="tc-letter">A</span><span class="tc-bar"></span></button>' +
-      // 8. 형광펜▾ (기존: 마지막 색 적용 + 팔레트 열기 → p22c: 통합 확장)
-      '<button data-cmd="highlight-expand" title="형광펜">' + _svg_hl + '</button>' +
+      // 8. 형광펜▾ (p22d: A 버튼처럼 아이콘 + 하단 색상 바)
+      '<button data-cmd="highlight-expand" class="ftb-hlcolor" title="형광펜"><span class="tc-letter">가</span><span class="tc-bar"></span></button>' +
       '<span class="ftb-sep"></span>' +
       // 9. 불릿▾ (기존 list-expand 를 사용)
       '<button data-cmd="list-expand" title="불릿/목록"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg></button>' +
@@ -17076,7 +17097,10 @@
       }
       updateBar();
     });
-    log('플로팅 툴바 설치 (p19m + p22b/p22c · 툴바 15개 순서 재편 + 첨자 통합)');
+    // p22d: 형광펜·글자색 버튼 하단 색상 바 초기화
+    try { if (typeof updateHlColorButton === 'function') updateHlColorButton(); } catch(_){}
+    try { if (typeof updateTextColorButton === 'function') updateTextColorButton(); } catch(_){}
+    log('플로팅 툴바 설치 (p19m + p22b/p22c/p22d)');
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -17193,6 +17217,21 @@
     var btns = document.querySelectorAll('.ep-float-toolbar .ftb-textcolor .tc-bar, .ep-modern-toolbar .ftb-textcolor .tc-bar');
     btns.forEach(function(b){ b.style.background = _lastTextColor; });
   }
+
+  // p22d: 형광펜 버튼 하단 살구 바에 현재 형광펜 색 반영 (투명도 포함)
+  function updateHlColorButton(){
+    try {
+      var c = (typeof getLastHlColor === 'function') ? getLastHlColor() : '#FFF176';
+      var btns = document.querySelectorAll('.ep-float-toolbar .ftb-hlcolor .tc-bar, .ep-modern-toolbar .ftb-hlcolor .tc-bar');
+      btns.forEach(function(b){ b.style.background = c; });
+    } catch(_){}
+  }
+  // 명시적 호출 가능하게 전역 노출
+  try {
+    window.__DDL_EDITOR = window.__DDL_EDITOR || {};
+    window.__DDL_EDITOR.updateHlColorButton = updateHlColorButton;
+    window.__DDL_EDITOR.updateTextColorButton = updateTextColorButton;
+  } catch(_){}
 
   function applyTextColor(color){
     if (!color) return;
