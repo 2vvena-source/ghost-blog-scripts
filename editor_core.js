@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23o';
+  var VERSION = 'v2.0-β-p23p';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1910,8 +1910,8 @@
     '  border: 1px solid rgba(15,58,58,0.1);',
     '  border-radius: 8px; cursor: pointer;',
     '  transition: all 140ms ease;',
-    '  display: flex; flex-direction: column; gap: 3px;',
-    '  min-height: 56px;',
+    '  display: flex; flex-direction: column; gap: 4px; justify-content: center;',
+    '  min-height: 62px;',
     '  overflow: hidden;',
     '}',
     '.ep-heading-mini-card:hover {',
@@ -1939,8 +1939,9 @@
     '.ep-heading-mini-card:not([data-group="h1"]):not([data-group="h2"]):not([data-group="h3"]):not([data-group="h4"]):not([data-group="h5"]):not([data-group="h6"]):not([data-group="p"])::before { background: rgba(255,154,118,0.25); }',
     '.ep-heading-mini-card:hover::before { background: var(--point, #FF9A76); }',
     '.ep-heading-mini-card.is-active::before { background: var(--point, #FF9A76); }',
+    /* 미리보기: 프리셋별 인라인 style 이 이 CSS 보다 우선되도록 둘이 자연스럽게 공존 */
     '.ep-heading-mini-card-preview {',
-    '  font-size: 14px; color: var(--color, #0F3A3A); line-height: 1.15;',
+    '  font-size: 14px; color: #0F3A3A; line-height: 1.15;',
     '  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
     '  padding-left: 3px;',
     '}',
@@ -17717,29 +17718,68 @@
       return used;
     }
 
-    // p23o: 미리보기 텍스트 인라인 스타일
-    //   실제 fontSize 를 반영하되, 카드가 너무 커지지 않도록 범위 클램프 (10~18px)
+    // p23p: **미리보기 시스템 완전 재설계**
+    //
+    //   지난 라운드 버그: 프리셋 구조가 { id, name, style: { fontFamily, fontSize, ... } } 인데
+    //   _previewStyle 이 item.fontFamily 를 직접 읽어서 모두 undefined → 미리보기 미적용
+    //   새 계약: item.style.* 을 우선 읽고, 없으면 item.* 로 fallback (구조 호환)
+    //
+    //   다른 개선점:
+    //     · CSS var(--color) 가 팝오버에서 해석 안될 수있어 hex 값 fallback 매핑
+    //     · fontSize 를 비율 유지 축소: 다음 방식으로 상대적 크기 차이가 눈에 보임
+    //       - H1 (32px) → 22px, H2 (26px) → 19px, H3 (22px) → 17px, ...
+    //       - min 11px, max 24px (카드 눈이 안 데지게 및 H1↔H6 차이 보이게)
+    //   이 공용 함수는 향후 형광펜/글자색/폰트/블록 프리셋에도 재사용 예정.
+
+    function _resolvePresetStyle(item){
+      // 새/이전 구조 모두 처리
+      if (!item) return {};
+      var s = (item.style && typeof item.style === 'object') ? item.style : item;
+      return s || {};
+    }
+
+    // CSS var() 가 팝오버에서 레더링 안 될 때를 대비해 hex 변환
+    function _resolveColorValue(v){
+      if (!v) return '';
+      var s = String(v);
+      // var(--color, #0F3A3A) 패턴 → fallback 부분 추출
+      var m = s.match(/var\(\s*--[\w-]+\s*,\s*([^)]+)\s*\)/);
+      if (m) return m[1].trim();
+      // var(--color) 이면 기본 deep-green
+      if (s.indexOf('var(') === 0) return '#0F3A3A';
+      return s;
+    }
+
+    // 미리보기 fontSize 축소 · 원본 px 기준 22를 최대로 잡고 비례로
+    function _shrinkPreviewFontSize(fs){
+      if (!fs) return null;
+      var m = String(fs).match(/^(\d+(?:\.\d+)?)\s*(px|em|rem)?$/);
+      if (!m) return null;
+      var v = parseFloat(m[1]);
+      var unit = m[2] || 'px';
+      var px = unit === 'px' ? v : v * 16;
+      // 32px → 22px 으로 압축 · 기본 비율 ×0.7 (11~24 clamp)
+      var out = Math.round(px * 0.72);
+      if (out < 11) out = 11;
+      if (out > 24) out = 24;
+      return out;
+    }
+
     function _previewStyle(item){
+      var st = _resolvePresetStyle(item);
       var s = '';
-      if (item.fontFamily)    s += 'font-family:' + item.fontFamily + ';';
-      // 프리셋의 fontSize 를 10~18px 범위 안으로 클램프
-      if (item.fontSize){
-        var m = String(item.fontSize).match(/^(\d+(?:\.\d+)?)\s*(px|em|rem)?$/);
-        if (m){
-          var v = parseFloat(m[1]);
-          var unit = m[2] || 'px';
-          // em/rem 은 16 곱해서 px 추정치
-          var px = unit === 'px' ? v : v * 16;
-          // 대보기용으로 10~18px 범위
-          if (px < 10) px = 10;
-          if (px > 18) px = 18;
-          s += 'font-size:' + px + 'px;';
-        }
+      if (st.fontFamily)    s += 'font-family:' + st.fontFamily + ';';
+      var newFs = _shrinkPreviewFontSize(st.fontSize);
+      if (newFs)            s += 'font-size:' + newFs + 'px;';
+      if (st.fontWeight)    s += 'font-weight:' + st.fontWeight + ';';
+      if (st.letterSpacing) s += 'letter-spacing:' + st.letterSpacing + ';';
+      if (st.lineHeight)    s += 'line-height:' + st.lineHeight + ';';
+      if (st.color){
+        var c = _resolveColorValue(st.color);
+        if (c) s += 'color:' + c + ';';
       }
-      if (item.fontWeight)    s += 'font-weight:' + item.fontWeight + ';';
-      if (item.letterSpacing) s += 'letter-spacing:' + item.letterSpacing + ';';
-      if (item.lineHeight)    s += 'line-height:' + item.lineHeight + ';';
-      if (item.color)         s += 'color:' + item.color + ';';
+      // 미리보기는 한 줄로 보이되 너무 넘치면 자르게
+      s += 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
       return s;
     }
 
@@ -17947,15 +17987,17 @@
       block.setAttribute('data-block-type', targetTag.toLowerCase());
     }
 
-    // 인라인 스타일 부여 (사이트에서도 보이게)
+    // p23p: 인라인 스타일 부여 · item.style 우선 (실제 프리셋 구조) · fallback 은 item 직접
+    //   지난 라운드까지 item.fontFamily 을 읽어서 실제로 인라인 스타일이 부여 안 되었음
+    var st = (item.style && typeof item.style === 'object') ? item.style : item;
     var s = newEl.style;
-    if (item.fontFamily)    s.fontFamily    = item.fontFamily;
-    if (item.fontSize)      s.fontSize      = item.fontSize;
-    if (item.fontWeight)    s.fontWeight    = item.fontWeight;
-    if (item.color)         s.color         = item.color;
-    if (item.letterSpacing) s.letterSpacing = item.letterSpacing;
-    if (item.lineHeight)    s.lineHeight    = String(item.lineHeight);
-    if (item.marginBottom)  s.marginBottom  = item.marginBottom;
+    if (st.fontFamily)    s.fontFamily    = st.fontFamily;
+    if (st.fontSize)      s.fontSize      = st.fontSize;
+    if (st.fontWeight)    s.fontWeight    = st.fontWeight;
+    if (st.color)         s.color         = st.color;
+    if (st.letterSpacing) s.letterSpacing = st.letterSpacing;
+    if (st.lineHeight)    s.lineHeight    = String(st.lineHeight);
+    if (st.marginBottom)  s.marginBottom  = st.marginBottom;
 
     // 프리셋 ID 상태 · "이 글에서" 필터용
     if (item.id) newEl.setAttribute('data-header-preset', item.id);
