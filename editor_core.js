@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23b';
+  var VERSION = 'v2.0-β-p23c';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -17747,7 +17747,7 @@
     // 리스트 생성 (execCommand)
     try { document.execCommand(isOL ? 'insertOrderedList' : 'insertUnorderedList'); } catch(_){}
 
-    // p23b: 생성된 list 의 상위 editor-block 에 data-* 설정 + 위아래 빈 블록 정리
+    // 생성된 list 의 상위 editor-block 에 data-* 설정
     setTimeout(function(){
       var sel2 = window.getSelection();
       if (!sel2 || sel2.rangeCount === 0) return;
@@ -17760,65 +17760,19 @@
         block = li && li.closest && li.closest('.editor-block');
       }
       if (!block) return;
-
-      // p23b: block 안 빈 p (execCommand 가 만든 잔재) 정리
-      //   execCommand 는 종종 <p><br></p> 를 UL 앞뒤에 남김
-      function _isEmpty(el){
-        if (!el) return false;
-        if (el.tagName === 'UL' || el.tagName === 'OL') return false;
-        var text = (el.textContent || '').replace(/\u200B|\u00A0/g, '').trim();
-        if (text.length > 0) return false;
-        // <br> 만 있는 <p> 도 빈 것으로 간주
-        if (el.children.length === 0) return true;
-        // 자식이 br 뿐이면 빈 것
-        var onlyBr = true;
-        for (var i = 0; i < el.children.length; i++){
-          if (el.children[i].tagName !== 'BR') { onlyBr = false; break; }
-        }
-        return onlyBr;
-      }
-      var removed = 0;
-      Array.from(block.children).forEach(function(child){
-        // block-handle 은 건드리지 않음
-        if (child.classList && child.classList.contains('block-handle')) return;
-        // UL/OL 은 유지
-        if (child.tagName === 'UL' || child.tagName === 'OL') return;
-        // 빈 p/div 등 제거
-        if (_isEmpty(child)) {
-          child.remove();
-          removed++;
-        }
-      });
-
-      // 이전/다음 sibling 이 빈 editor-block 이면 제거 (execCommand 가 만들었을 수 있음)
-      function _isEmptyEditorBlock(b){
-        if (!b || !b.classList || !b.classList.contains('editor-block')) return false;
-        // block-handle 을 제외한 자식이 모두 빈지 확인
-        var real = Array.from(b.children).filter(function(c){ return !c.classList || !c.classList.contains('block-handle'); });
-        if (real.length === 0) return true;
-        // UL/OL 이 있으면 빈 게 아님
-        for (var i = 0; i < real.length; i++){
-          if (real[i].tagName === 'UL' || real[i].tagName === 'OL') return false;
-          if (!_isEmpty(real[i])) return false;
-        }
-        return true;
-      }
-      var prev = block.previousElementSibling;
-      if (prev && _isEmptyEditorBlock(prev)) { prev.remove(); removed++; }
-      var next = block.nextElementSibling;
-      if (next && _isEmptyEditorBlock(next)) { next.remove(); removed++; }
-
-      // block 안에 UL/OL 이 없으면 (execCommand 실패한 경우) 아무것도 안 함
-      var hasList = block.querySelector('ul, ol');
-      if (!hasList) {
-        if (window.__DDL_DBG_BULLET) { try { log('[BULLET] execCommand 후 UL/OL 없음'); } catch(_){} }
-      }
-
       block.setAttribute('data-bullet-style', style);
       if (applyFrame && applyFrame !== 'none') block.setAttribute('data-frame', applyFrame);
       else block.removeAttribute('data-frame');
-      if (window.__DDL_DBG_BULLET && removed > 0) { try { log('[BULLET] 빈 블록/요소 정리:', removed, '개'); } catch(_){} }
-      try { if (window.__DDL_DBG_TB_CMD) console.log('[BULLET] applied', style, 'frame=', applyFrame, 'cleaned:', removed, block); } catch(_){}
+
+      // p23c: 진단 · window.__DDL_DBG_BULLET_DOM=true 로 켜면 DOM 구조 출력
+      if (window.__DDL_DBG_BULLET_DOM) {
+        try {
+          console.log('[BULLET-DOM] block.outerHTML =', block.outerHTML);
+          if (block.previousElementSibling) console.log('[BULLET-DOM] prev sibling =', block.previousElementSibling.outerHTML);
+          if (block.nextElementSibling)     console.log('[BULLET-DOM] next sibling =', block.nextElementSibling.outerHTML);
+        } catch(_){}
+      }
+      try { if (window.__DDL_DBG_TB_CMD) console.log('[BULLET] applied', style, 'frame=', applyFrame, block); } catch(_){}
     }, 30);
   }
 
