@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22x';
+  var VERSION = 'v2.0-β-p22y';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -16352,8 +16352,9 @@
     } catch(_){}
   }
 
-  // p22v: 루비 전용 다이얼로그 - openEditorDialog 우회 (타이밍 문제 원천 제거)
-  //       B/I/U 서식 툴바 + 크기 슬라이더 + 위치 슬라이더 통합
+  // p22y: p19j-fix3 원본 openEditorDialog 방식으로 완전 복원
+  //   - 편집기 설정(⚙) 팝오버의 전역 위치 슬라이더 값을 사용 (모든 신규 루비에 적용)
+  //   - 편집창 안 개별 슬라이더는 폐기 (다음 라운드에서 mark 클릭 팝오버로 별도 지원 예정)
   function insertRuby(){
     if (!savedRange) return;
     restoreRange();
@@ -16364,127 +16365,33 @@
     }
     var baseText = sel.toString();
     saveRange();
-
-    // 초기값
-    var _initOffset = 55;
-    try { var _s = localStorage.getItem('ddl.rubyOffset'); if (_s != null && !isNaN(parseFloat(_s))) _initOffset = parseFloat(_s); } catch(_){}
-    var _initSize = 50;
-
-    // 다이얼로그 DOM 직접 구성
-    var existing = document.getElementById('ep-dialog-overlay');
-    if (existing) existing.remove();
-
-    var overlay = document.createElement('div');
-    overlay.id = 'ep-dialog-overlay';
-    overlay.className = 'ep-dialog-overlay';
-
-    var box = document.createElement('div');
-    box.className = 'ep-dialog';
-    box.innerHTML =
-      '<div class="ep-dialog-header"><span>윗글씨 (루비)</span>' +
-        '<button type="button" class="ep-dialog-close" data-ruby-cancel="1">×</button>' +
-      '</div>' +
-      '<div class="ep-dialog-body">' +
-        '<div class="ep-dialog-row">' +
-          '<label class="ep-dialog-label">"' + escapeHtml(baseText) + '" 위에 표시할 내용</label>' +
-          '<div id="ruby-editable" contenteditable="true" style="min-height:1.8em; padding:0.4em 0.6em; background:transparent; border:none; border-bottom:1px solid rgba(15,58,58,0.35); font-family:inherit; color:var(--color,#0F3A3A); box-sizing:border-box; outline:none; font-size:0.9em; line-height:1.5;" data-placeholder="서식 툴바로 굵기·색 지정 가능"></div>' +
-          '<div id="ruby-fmttoolbar" style="display:flex; gap:4px; margin-top:6px; align-items:center; flex-wrap:wrap;">' +
-            '<button type="button" data-rcmd="bold"       class="pop-btn" style="font-weight:800;" title="굵게">B</button>' +
-            '<button type="button" data-rcmd="italic"     class="pop-btn" style="font-style:italic; font-family:serif;" title="기울임">I</button>' +
-            '<button type="button" data-rcmd="underline"  class="pop-btn" style="text-decoration:underline;" title="밑줄">U</button>' +
-            '<button type="button" data-rcmd="clearFormat" class="pop-btn" title="서식 지우기" style="margin-left:auto;">✕서식</button>' +
-          '</div>' +
-          '<div style="margin-top:12px; padding:10px 12px; background:rgba(15,58,58,0.03); border-radius:6px; display:flex; flex-direction:column; gap:10px;">' +
-            '<div>' +
-              '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">' +
-                '<span style="font-size:11.5px; font-weight:600; color:#0F3A3A;">루비 크기</span>' +
-                '<span id="ruby-lbl-size" style="font-size:11px; color:rgba(15,58,58,0.6); font-variant-numeric:tabular-nums;">' + _initSize + '%</span>' +
-              '</div>' +
-              '<input id="ruby-slider-size" type="range" min="30" max="90" step="5" value="' + _initSize + '" style="width:100%; accent-color:#FF9A76;" />' +
-              '<div style="display:flex; justify-content:space-between; font-size:9.5px; color:rgba(15,58,58,0.4); margin-top:1px;"><span>작게</span><span>기본</span><span>크게</span></div>' +
-            '</div>' +
-            '<div>' +
-              '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">' +
-                '<span style="font-size:11.5px; font-weight:600; color:#0F3A3A;">루비 위치 (위↔아래)</span>' +
-                '<span id="ruby-lbl-offset" style="font-size:11px; color:rgba(15,58,58,0.6); font-variant-numeric:tabular-nums;">' + _initOffset + '%</span>' +
-              '</div>' +
-              '<input id="ruby-slider-offset" type="range" min="0" max="100" step="5" value="' + _initOffset + '" style="width:100%; accent-color:#FF9A76;" />' +
-              '<div style="display:flex; justify-content:space-between; font-size:9.5px; color:rgba(15,58,58,0.4); margin-top:1px;"><span>위</span><span>기본</span><span>아래</span></div>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="ep-dialog-footer">' +
-        '<button type="button" class="ep-btn-ghost" data-ruby-cancel="1">취소</button>' +
-        '<button type="button" class="ep-btn-primary" data-ruby-ok="1">확인</button>' +
-      '</div>';
-
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    try { log('[RUBY-DIALOG] opened · baseText=', baseText); } catch(_){}
-
-    var editable    = box.querySelector('#ruby-editable');
-    var fmtToolbar  = box.querySelector('#ruby-fmttoolbar');
-    var sliderSize  = box.querySelector('#ruby-slider-size');
-    var sliderOff   = box.querySelector('#ruby-slider-offset');
-    var lblSize     = box.querySelector('#ruby-lbl-size');
-    var lblOff      = box.querySelector('#ruby-lbl-offset');
-
-    // 로컬 상태 (클로저)
-    var _curSize   = _initSize;
-    var _curOffset = _initOffset;
-
-    // 슬라이더 이벤트
-    sliderSize.addEventListener('input', function(){
-      _curSize = parseFloat(sliderSize.value);
-      lblSize.textContent = _curSize + '%';
-    });
-    sliderOff.addEventListener('input', function(){
-      _curOffset = parseFloat(sliderOff.value);
-      lblOff.textContent = _curOffset + '%';
-    });
-
-    // 서식 툴바 - mousedown preventDefault 로 selection 유지 (p22m 교훈)
-    fmtToolbar.addEventListener('mousedown', function(e){ e.preventDefault(); });
-    fmtToolbar.addEventListener('click', function(e){
-      var btn = e.target.closest('[data-rcmd]');
-      if (!btn) return;
-      var cmd = btn.getAttribute('data-rcmd');
-      editable.focus();
-      if (cmd === 'bold') document.execCommand('bold', false, null);
-      else if (cmd === 'italic') document.execCommand('italic', false, null);
-      else if (cmd === 'underline') document.execCommand('underline', false, null);
-      else if (cmd === 'clearFormat') document.execCommand('removeFormat', false, null);
-    });
-
-    // editable 포커스
-    setTimeout(function(){ try { editable.focus(); } catch(_){} }, 30);
-
-    function _closeRuby(){ if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
-
-    function _applyRuby(){
-      // p22w: 진단용 · 확인이 실제로 실행되는지 눈에 보이게
-      try { log('[RUBY-APPLY] editable html len =', (editable.innerHTML || '').length, 'size=', _curSize, 'offset=', _curOffset); } catch(_){}
-      var rubyHtml = (editable.innerHTML || '').trim();
-      if (!rubyHtml || rubyHtml === '<br>') { _closeRuby(); return; }
-      // 색 관련 태그 제거 (사용자 지시: 색은 본문 상속)
-      rubyHtml = rubyHtml.replace(/<font\b[^>]*>/gi, '').replace(/<\/font>/gi, '')
-                          .replace(/\s*color\s*:\s*[^;"]+;?/gi, '');
-
+    openEditorDialog('윗글씨 (루비)', [
+      { key:'ruby', label:'"' + baseText + '" 위에 표시할 내용', default:'', placeholder:'서식 툴바로 굵기·색 지정 가능' }
+    ], function(vals){
+      if (!vals) return;
+      var rubyHtml = (vals.ruby || '').trim();
+      if (!rubyHtml || rubyHtml === '<br>') return;
       restoreRange();
       var sel2 = window.getSelection();
-      if (!sel2 || sel2.rangeCount === 0) { _closeRuby(); return; }
+      if (!sel2 || sel2.rangeCount === 0) return;
       var range = sel2.getRangeAt(0);
       var el = document.createElement('mark');
       el.className = 'ddl-ruby';
+      // p19j-fix3: 색 관련 태그 제거 (색은 본문 상속)
+      rubyHtml = rubyHtml.replace(/<font\b[^>]*>/gi, '').replace(/<\/font>/gi, '')
+                          .replace(/\s*color\s*:\s*[^;"]+;?/gi, '');
       el.setAttribute('data-rt', rubyHtml);
       el.setAttribute('title', rubyHtml.replace(/<[^>]+>/g,''));
       el.style.background = 'transparent';
       el.style.color = 'inherit';
-      // p22v: 클로저 로컬 상태에서 직접 인라인 style 세팅 (전역 변수 우회)
-      el.style.setProperty('--ddl-ruby-size', (_curSize / 100) + 'em');
-      el.style.setProperty('--ddl-ruby-offset', _curOffset + '%');
-      // HTML 서식 있으면 rt-span
+      // p22y: 전역 위치 값을 mark 인라인 style 로 세팅 (편집기 설정 팝오버의 슬라이더 값)
+      try {
+        var _globalOffset = 55;
+        var _lg = localStorage.getItem('ddl.rubyOffset');
+        if (_lg != null && !isNaN(parseFloat(_lg))) _globalOffset = parseFloat(_lg);
+        el.style.setProperty('--ddl-ruby-offset', _globalOffset + '%');
+      } catch(_){}
+      // HTML 이면 편집 중 시각화용 rt-span
       if (rubyHtml.indexOf('<') >= 0) {
         var _rtSpan = document.createElement('span');
         _rtSpan.className = 'ddl-ruby-rt';
@@ -16496,7 +16403,7 @@
       try {
         el.appendChild(range.extractContents());
         range.insertNode(el);
-        // mark 뒤 zero-width space + 커서 이동 (p22s 방어)
+        // p22s: mark 뒤 zwsp + 커서 이동
         var _zwsp = document.createTextNode('\u200B');
         if (el.parentNode){
           if (el.nextSibling) el.parentNode.insertBefore(_zwsp, el.nextSibling);
@@ -16508,22 +16415,9 @@
         nr.collapse(true);
         sel2.addRange(nr);
         saveRange();
-      } catch(err){ console.warn('[p22v] ruby error', err); }
-      _closeRuby();
-    }
-
-    // 버튼 클릭 (p22w: 로그 추가하여 발화 여부 검증)
-    overlay.addEventListener('click', function(e){
-      try { log('[RUBY-CLICK] target=', e.target.tagName, (e.target.dataset || {}).rubyCancel || '', (e.target.dataset || {}).rubyOk || ''); } catch(_){}
-      if (e.target === overlay) { _closeRuby(); return; }
-      if (e.target.closest && e.target.closest('[data-ruby-cancel]')) { _closeRuby(); return; }
-      if (e.target.closest && e.target.closest('[data-ruby-ok]'))     { _applyRuby(); return; }
+      } catch(err){ console.warn('[p22y] ruby insert error', err); }
     });
-    // 키보드
-    editable.addEventListener('keydown', function(e){
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _applyRuby(); }
-      else if (e.key === 'Escape') { e.preventDefault(); _closeRuby(); }
-    });
+    setTimeout(function(){ _augmentRubyDialogWithToolbar(''); }, 30);
   }
 
   function toggleSupSub(which){
@@ -18101,6 +17995,46 @@
       return true;
     }
 
+    // p22y: Backspace 전용 simple outdent - 뒤 형제 li 를 건드리지 않음
+    //   (기존 _customOutdent 는 뒤 형제를 sublist 로 편입시켜서 여러개 지워지는 것처럼 보임)
+    function _customOutdentSimple(li){
+      if (!li) return false;
+      var parentList = li.parentElement;
+      var grandParent = parentList && parentList.parentElement;
+      if (grandParent && grandParent.tagName === 'LI'){
+        // 중첩 → 부모 li 뒤로 (뒤 형제는 건드리지 않음)
+        var greatGrand = grandParent.parentElement;
+        greatGrand.insertBefore(li, grandParent.nextSibling);
+        if (parentList.children.length === 0) parentList.remove();
+        _placeCursor(li, true);
+        return 'outdent-nested-simple';
+      } else {
+        // 최상위 → 리스트 밖 <p> 로 (뒤 형제 li 는 원래 리스트에 그대로 유지)
+        var editorBlock = parentList.closest && parentList.closest('.editor-block');
+        var newP = document.createElement('p');
+        newP.setAttribute('contenteditable', 'true');
+        newP.innerHTML = li.innerHTML || '<br>';
+        if (editorBlock){
+          var wrapper = document.createElement('div');
+          wrapper.className = 'editor-block';
+          wrapper.setAttribute('data-block-type', 'P');
+          if (typeof makeBlockHandle === 'function') wrapper.appendChild(makeBlockHandle());
+          wrapper.appendChild(newP);
+          editorBlock.parentNode.insertBefore(wrapper, editorBlock.nextSibling);
+          li.remove();
+          if (parentList.children.length === 0){
+            editorBlock.parentNode.removeChild(editorBlock);
+          }
+        } else {
+          parentList.parentNode.insertBefore(newP, parentList.nextSibling);
+          li.remove();
+          if (parentList.children.length === 0) parentList.remove();
+        }
+        _placeCursor(newP, true);
+        return 'outdent-toplevel-simple';
+      }
+    }
+
     // Shift+Tab: 부모 li 뒤로 이동, 뒤 형제 li 들은 현재 li 안 sublist 로
     function _customOutdent(li){
       if (!li) return false;
@@ -18201,8 +18135,9 @@
           }
         }
         if (!isAtStart) return;
+        try { log('[BULLET-KD] Backspace · 빈 li 맨앞 · simple outdent'); } catch(_){}
         e.preventDefault();
-        _customOutdent(li3);
+        _customOutdentSimple(li3);
       }
     };
     // p22x: contentEl 이 있으면 우선 거기에, 없으면 document 에 폴백
@@ -19728,6 +19663,28 @@
   }
 
   // 페이지 내 이미 붙은 li/p/h1-6 등 필수 가능한 요소가 contenteditable=false 로 오염되었다면 복구
+  // p22y: 진단용 · Shift+Enter 후 백스페이스로 블록 통째로 지워지는 현상 원인 파악
+  //   contentEl 에 mutation observer 를 걸어 editor-block 이 사라지면 로그
+  function _installBlockRemovalDiagnostic(){
+    if (!contentEl || window.__DDL_BLOCK_MO) return;
+    try {
+      var mo = new MutationObserver(function(muts){
+        muts.forEach(function(m){
+          if (m.type === 'childList' && m.removedNodes && m.removedNodes.length){
+            m.removedNodes.forEach(function(n){
+              if (n.nodeType === 1 && n.classList && n.classList.contains && n.classList.contains('editor-block')){
+                try { log('[BLOCK-REMOVED] editor-block 제거됨 · innerHTML=', (n.innerHTML||'').slice(0,80)); } catch(_){}
+              }
+            });
+          }
+        });
+      });
+      mo.observe(contentEl, { childList: true, subtree: false });
+      window.__DDL_BLOCK_MO = mo;
+      log('[BLOCK-DIAG] 블록 제거 감시 옵저버 설치');
+    } catch(_){}
+  }
+
   function _repairContentEditable(){
     if (!contentEl) return 0;
     var fixed = 0;
@@ -19931,6 +19888,8 @@
 
     // p22k: MutationObserver 상시 감시 설치 (Ghost auto-save 후 CE 소실 방지)
     try { _setupPersistentCERepair(); } catch(_){}
+    // p22y: 블록 삭제 진단 옵저버
+    try { _installBlockRemovalDiagnostic(); } catch(_){}
 
     // p22k: 최초 로드 직후에도 1회 즉시 복구 (기존 저장분에 CE 없는 상태)
     setTimeout(function(){ try { _repairContentEditable(); } catch(_){} }, 500);
