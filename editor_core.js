@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23k';
+  var VERSION = 'v2.0-β-p23m';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1833,6 +1833,106 @@
     '.ep-heading-popover .eh-open-settings:hover {',
     '  border-color: var(--point, #FF9A76); color: var(--point, #FF9A76);',
     '}',
+
+    /* p23m: 헤더 미니 팝오버 · 갤러리 형식 (참고 이미지에 맞춰 디자인) */
+    '.ep-heading-mini {',
+    '  position: fixed; z-index: 9996;',
+    '  width: 380px; max-width: 380px; box-sizing: border-box;',
+    '  background: #fff;',
+    '  border: 1px solid rgba(15,58,58,0.15);',
+    '  border-radius: 10px;',
+    '  box-shadow: 0 8px 24px rgba(15,58,58,0.12);',
+    '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
+    '  overflow: hidden;',
+    '  animation: mtb-in 140ms ease-out;',
+    '}',
+    /* 상단 필터 탭 바 + 설정 버튼 */
+    '.ep-heading-mini-topbar {',
+    '  display: flex; align-items: stretch; gap: 4px; padding: 8px 10px;',
+    '  border-bottom: 1px solid rgba(15,58,58,0.08);',
+    '  background: rgba(15,58,58,0.02);',
+    '}',
+    '.ep-heading-mini-tabs {',
+    '  flex: 1; display: flex; gap: 3px;',
+    '}',
+    '.ep-heading-mini-tab {',
+    '  flex: 1; padding: 6px 10px; border: 0; background: transparent;',
+    '  border-radius: 6px; cursor: pointer;',
+    '  color: rgba(15,58,58,0.6);',
+    '  font-family: inherit; font-size: 12px; font-weight: 500;',
+    '  transition: all 120ms ease;',
+    '}',
+    '.ep-heading-mini-tab:hover { color: var(--color, #0F3A3A); background: rgba(15,58,58,0.04); }',
+    '.ep-heading-mini-tab.is-active {',
+    '  background: rgba(255,154,118,0.14); color: var(--point, #FF9A76); font-weight: 600;',
+    '}',
+    '.ep-heading-mini-gear {',
+    '  width: 32px; height: 32px; border: 0; background: transparent;',
+    '  border-radius: 6px; cursor: pointer;',
+    '  display: inline-flex; align-items: center; justify-content: center;',
+    '  color: rgba(15,58,58,0.55);',
+    '  transition: all 120ms ease;',
+    '}',
+    '.ep-heading-mini-gear:hover { background: rgba(15,58,58,0.06); color: var(--color, #0F3A3A); }',
+    /* 그리드 카드 목록 */
+    '.ep-heading-mini-body {',
+    '  padding: 10px; max-height: 420px; overflow-y: auto;',
+    '  background: #fff;',
+    '}',
+    '.ep-heading-mini-body::-webkit-scrollbar { width: 6px; }',
+    '.ep-heading-mini-body::-webkit-scrollbar-thumb { background: rgba(15,58,58,0.15); border-radius: 3px; }',
+    '.ep-heading-mini-grid {',
+    '  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;',
+    '}',
+    '.ep-heading-mini-card {',
+    '  position: relative; padding: 12px 12px 10px;',
+    '  background: #fff;',
+    '  border: 1px solid rgba(15,58,58,0.12);',
+    '  border-radius: 8px; cursor: pointer;',
+    '  transition: all 120ms ease;',
+    '  display: flex; flex-direction: column; gap: 4px;',
+    '  min-height: 60px;',
+    '}',
+    '.ep-heading-mini-card:hover {',
+    '  border-color: rgba(255,154,118,0.5); background: rgba(255,154,118,0.03);',
+    '  transform: translateY(-1px); box-shadow: 0 2px 6px rgba(15,58,58,0.06);',
+    '}',
+    '.ep-heading-mini-card.is-active {',
+    '  border-color: var(--point, #FF9A76); background: rgba(255,154,118,0.08);',
+    '  box-shadow: 0 0 0 2px rgba(255,154,118,0.15);',
+    '}',
+    '.ep-heading-mini-card-preview {',
+    '  font-size: 17px; color: var(--color, #0F3A3A); line-height: 1.1;',
+    '  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
+    '}',
+    '.ep-heading-mini-card-meta {',
+    '  font-size: 10px; color: rgba(15,58,58,0.5); font-weight: 400;',
+    '  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
+    '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
+    '}',
+    /* 카드 우상단 즐겨찾기 별표 */
+    '.ep-heading-mini-card-fav {',
+    '  position: absolute; top: 6px; right: 6px;',
+    '  width: 18px; height: 18px; border: 0; background: transparent;',
+    '  cursor: pointer; padding: 0;',
+    '  font-size: 12px; line-height: 1;',
+    '  color: rgba(15,58,58,0.25);',
+    '  border-radius: 4px;',
+    '  transition: all 120ms ease;',
+    '  display: inline-flex; align-items: center; justify-content: center;',
+    '}',
+    '.ep-heading-mini-card-fav:hover { color: var(--point, #FF9A76); background: rgba(255,154,118,0.1); }',
+    '.ep-heading-mini-card-fav.is-fav { color: var(--point, #FF9A76); }',
+    /* 빈 상태 */
+    '.ep-heading-mini-empty {',
+    '  grid-column: 1 / -1;',
+    '  padding: 24px 16px; text-align: center;',
+    '  font-size: 12px; color: rgba(15,58,58,0.5); line-height: 1.6;',
+    '}',
+    '.ep-heading-mini-empty a {',
+    '  color: var(--point, #FF9A76); cursor: pointer; text-decoration: underline;',
+    '}',
+
     // p23f: 자간 · 줄간격 슬라이더 팝오버 (ep-mini-popover-legacy 기반 + 세로 배치)
     '.ep-slider-popover {',
     '  display: block !important; min-width: 220px;',
@@ -2607,12 +2707,15 @@
     /* li 첫줄 텍스트는 baseline 이 약 line-height/2 + em/2 ≈ 0.85em 지점.                      */
     /* 마커 높이 1.4em (변환 안 함) → 상단이 약 li 상단에서 0.15em~0.2em 서로 닉은 것이 관적으로 적합. */
     /* p22s: 옵션 B - Flexbox 재설계 · 마커가 첫줄 텍스트와 baseline 정렬 */
-    '.editor-block[data-frame="circle"] ol { list-style: none; counter-reset: bl-frame; padding-left: 0; }',
-    '.editor-block[data-frame="circle"] ol > li {',
+    /* p23l: 프레임 규칙을 “편집기 블록의 직계 ol” 에만 적용 — 자손 ol/ul 은 프레임 안 받게 함 */
+    /*   기존 .editor-block[data-frame="square"] ol > li 는 모든 depth 의 ol > li 를 잡아 하위 계층에도 프레임 적용되는 버그 */
+    /*   .editor-block > ol > li 로 바꿔 최상위 OL 자손 li 만 잡도록 수정 */
+    '.editor-block[data-frame="circle"] > ol { list-style: none; counter-reset: bl-frame; padding-left: 0; }',
+    '.editor-block[data-frame="circle"] > ol > li {',
     '  counter-increment: bl-frame; display: flex; align-items: flex-start;',
     '  gap: 0.5em; padding-left: 0; position: static; min-height: 0;',
     '}',
-    '.editor-block[data-frame="circle"] ol > li::before {',
+    '.editor-block[data-frame="circle"] > ol > li::before {',
     '  content: counter(bl-frame, var(--bl-marker, decimal));',
     '  flex: 0 0 auto; width: 1.4em; height: 1.4em; box-sizing: border-box;',
     '  display: inline-flex; align-items: center; justify-content: center;',
@@ -2620,12 +2723,12 @@
     '  font-size: 0.75em; line-height: 1; padding: 0;',
     '  margin-top: 0.4em; position: static;',
     '}',
-    '.editor-block[data-frame="square"] ol { list-style: none; counter-reset: bl-frame; padding-left: 0; }',
-    '.editor-block[data-frame="square"] ol > li {',
+    '.editor-block[data-frame="square"] > ol { list-style: none; counter-reset: bl-frame; padding-left: 0; }',
+    '.editor-block[data-frame="square"] > ol > li {',
     '  counter-increment: bl-frame; display: flex; align-items: flex-start;',
     '  gap: 0.5em; padding-left: 0; position: static; min-height: 0;',
     '}',
-    '.editor-block[data-frame="square"] ol > li::before {',
+    '.editor-block[data-frame="square"] > ol > li::before {',
     '  content: counter(bl-frame, var(--bl-marker, decimal));',
     '  flex: 0 0 auto; width: 1.4em; height: 1.4em; box-sizing: border-box;',
     '  display: inline-flex; align-items: center; justify-content: center;',
@@ -2633,18 +2736,28 @@
     '  font-size: 0.75em; line-height: 1; padding: 0;',
     '  margin-top: 0.4em; position: static;',
     '}',
-    '.editor-block[data-frame="tall"] ol { list-style: none; counter-reset: bl-frame; padding-left: 0; }',
-    '.editor-block[data-frame="tall"] ol > li {',
+    '.editor-block[data-frame="tall"] > ol { list-style: none; counter-reset: bl-frame; padding-left: 0; }',
+    '.editor-block[data-frame="tall"] > ol > li {',
     '  counter-increment: bl-frame; display: flex; align-items: flex-start;',
     '  gap: 0.5em; padding-left: 0; position: static; min-height: 0;',
     '}',
-    '.editor-block[data-frame="tall"] ol > li::before {',
+    '.editor-block[data-frame="tall"] > ol > li::before {',
     '  content: counter(bl-frame, var(--bl-marker, decimal));',
     '  flex: 0 0 auto; width: 1.1em; height: 1.6em; box-sizing: border-box;',
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  border: 1px solid currentColor; border-radius: 3px;',
     '  font-size: 0.72em; line-height: 1; padding: 0;',
     '  margin-top: 0.3em; position: static;',
+    '}',
+    /* p23l: 하위 UL/OL 은 프레임 안 받으니 기본 list-style 로 되돌림 (재설정) */
+    '.editor-block[data-frame] > ol ol, .editor-block[data-frame] > ol ul, .editor-block[data-frame] > ul ol, .editor-block[data-frame] > ul ul {',
+    '  list-style: revert; counter-reset: none; padding-left: 1.5em;',
+    '}',
+    '.editor-block[data-frame] > ol ol > li, .editor-block[data-frame] > ol ul > li, .editor-block[data-frame] > ul ol > li, .editor-block[data-frame] > ul ul > li {',
+    '  display: list-item; padding-left: 0; counter-increment: none; gap: 0;',
+    '}',
+    '.editor-block[data-frame] > ol ol > li::before, .editor-block[data-frame] > ol ul > li::before, .editor-block[data-frame] > ul ol > li::before, .editor-block[data-frame] > ul ul > li::before {',
+    '  content: none; border: 0; width: auto; height: auto; margin: 0;',
     '}',
     /* 프레임이 적용된 ol — counter marker 변수를 data-bullet-style 에서 설정 */
     '.editor-block[data-bullet-style="decimal"] { --bl-marker: decimal; }',
@@ -10586,6 +10699,14 @@
         if (typeof obj[gk].showInToolbar !== 'boolean') obj[gk].showInToolbar = true;
       }
     });
+    // p23m: 각 아이템에 isFavorite 필드 자동 부여 (즐겨찾기 필터 탭용)
+    Object.keys(obj).forEach(function(gk){
+      var g = obj[gk];
+      if (!g || !Array.isArray(g.items)) return;
+      g.items.forEach(function(it){
+        if (typeof it.isFavorite !== 'boolean') it.isFavorite = false;
+      });
+    });
     return obj;
   }
 
@@ -17470,40 +17591,210 @@
   }
 
   // H▸ 드롭다운 (껍데기) — 헤더 프리셋 시스템 다음 라운드에 실체화
-  function openHeadingPopoverStub(anchorBtn){
+  // p23m: **헤더 미니 팝오버 완전 재작성** — 갤러리 형식 (참고 이미지 스타일)
+  //   구조:
+  //     ㄰ 상단 필터 탭 바: 전체 / ★ / 이 글에서 + 설정(⚙)
+  //     ㄰ 2열 그리드: 각 카드 = 미리보기 + 그룹/이름 소제목 + 즐겨찾기 ★
+  //   그룹 노출 방식:
+  //     - showInToolbar === true 인 그룹만 그리드에 등장
+  //     - 설정(⚙) 버튼 클릭 → 기존 openHeaderPresetManager 열림
+  //     - 필터 '★' → isFavorite=true 인 아이템만
+  //     - 필터 '이 글에서' → 현재 contentEl 안에서 사용중인 프리셋만 (data-header-preset 문석)
+  //     - '전체' → 모든 (기본)
+  function openHeadingMiniPopover(anchorBtn){
     var old = document.getElementById('ep-heading-popover');
     if (old) { old.remove(); return; }
 
+    var data = loadHeaderPresets();
+    var filter = 'all'; // 'all' | 'fav' | 'used'
+
     var pop = document.createElement('div');
     pop.id = 'ep-heading-popover';
-    // p22d: legacy 클래스 (새 §Z 미니와 분리)
-    pop.className = 'ep-mini-popover-legacy ep-heading-popover';
-    // p19o: 이미 저장된 프리셋이 있으면 살짝 안내글 수정
-    var _hpData = {};
-    var _hpTotal = 0;
-    try {
-      _hpData = loadHeaderPresets();
-      Object.keys(_hpData).forEach(function(gk){ _hpTotal += (_hpData[gk].items || []).length; });
-    } catch(_){}
+    pop.className = 'ep-heading-mini ddl-editor-popup';
 
-    var msg = _hpTotal > 0
-      ? '저장된 프리셋: ' + _hpTotal + '개<br>툴바 적용은 다음 배포에서 지원됩니다'
-      : '설정 → 이 링크에서<br>헤더 프리셋을 먼저 만들어주세요';
+    // 상단 필터 탭바
+    var topbar = document.createElement('div');
+    topbar.className = 'ep-heading-mini-topbar';
+    var tabs = document.createElement('div');
+    tabs.className = 'ep-heading-mini-tabs';
+    var tabDefs = [
+      { key: 'all',  label: '전체' },
+      { key: 'fav',  label: '★' },
+      { key: 'used', label: '이 글에서' }
+    ];
+    var tabButtons = {};
+    tabDefs.forEach(function(td){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ep-heading-mini-tab';
+      b.textContent = td.label;
+      if (filter === td.key) b.classList.add('is-active');
+      b.addEventListener('mousedown', function(e){ e.preventDefault(); });
+      b.addEventListener('click', function(e){
+        e.preventDefault(); e.stopPropagation();
+        filter = td.key;
+        Object.keys(tabButtons).forEach(function(k){ tabButtons[k].classList.remove('is-active'); });
+        b.classList.add('is-active');
+        _renderGrid();
+      });
+      tabButtons[td.key] = b;
+      tabs.appendChild(b);
+    });
+    topbar.appendChild(tabs);
 
-    pop.innerHTML =
-      '<div class="eh-title">헤더 스타일</div>' +
-      '<div class="eh-empty">' + msg + '</div>' +
-      '<button type="button" class="eh-open-settings">프리셋 관리 열기 →</button>';
-    document.body.appendChild(pop);
-
-    var r = anchorBtn.getBoundingClientRect();
-    pop.style.top  = (r.bottom + 6) + 'px';
-    pop.style.left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left)) + 'px';
-
-    pop.querySelector('.eh-open-settings').addEventListener('click', function(){
+    // 설정 버튼 (⚙)
+    var gear = document.createElement('button');
+    gear.type = 'button';
+    gear.className = 'ep-heading-mini-gear';
+    gear.title = '프리셋 관리 열기';
+    gear.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+    gear.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    gear.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
       pop.remove();
       try { openHeaderPresetManager(); } catch(err){ console.warn(err); }
     });
+    topbar.appendChild(gear);
+    pop.appendChild(topbar);
+
+    // 그리드 영역
+    var bodyEl = document.createElement('div');
+    bodyEl.className = 'ep-heading-mini-body';
+    var grid = document.createElement('div');
+    grid.className = 'ep-heading-mini-grid';
+    bodyEl.appendChild(grid);
+    pop.appendChild(bodyEl);
+
+    // '이 글에서' 필터용 — contentEl 안 사용 중 preset ID 수집
+    function _collectUsedPresetIds(){
+      var used = {};
+      try {
+        if (typeof contentEl !== 'undefined' && contentEl){
+          contentEl.querySelectorAll('[data-header-preset]').forEach(function(el){
+            var pid = el.getAttribute('data-header-preset');
+            if (pid) used[pid] = true;
+          });
+        }
+      } catch(_){}
+      return used;
+    }
+
+    // 미리보기 텍스트 인라인 스타일 생성
+    function _previewStyle(item){
+      var s = '';
+      if (item.fontFamily)    s += 'font-family:' + item.fontFamily + ';';
+      // 미리보기는 팀지 프리뷰 적절 크기로 감소 적용 (오직 보이도록)
+      if (item.fontWeight)    s += 'font-weight:' + item.fontWeight + ';';
+      if (item.letterSpacing) s += 'letter-spacing:' + item.letterSpacing + ';';
+      if (item.lineHeight)    s += 'line-height:' + item.lineHeight + ';';
+      if (item.color)         s += 'color:' + item.color + ';';
+      return s;
+    }
+
+    function _renderGrid(){
+      grid.innerHTML = '';
+      var used = _collectUsedPresetIds();
+      var allCards = [];
+      // 그룹 순회: 내장 순서 + 사용자 그룹
+      var groupOrder = HEADER_BUILTIN_GROUPS.concat(
+        Object.keys(data).filter(function(k){ return HEADER_BUILTIN_GROUPS.indexOf(k) === -1; })
+      );
+      groupOrder.forEach(function(gk){
+        var g = data[gk];
+        if (!g || !g.showInToolbar) return;
+        var items = g.items || [];
+        // 아이템이 하나도 없으면 skip (을벼므로 빈 그룹은 안 보임)
+        if (items.length === 0) return;
+        items.forEach(function(it, idx){
+          if (filter === 'fav' && !it.isFavorite) return;
+          if (filter === 'used' && !used[it.id]) return;
+          allCards.push({ groupKey: gk, group: g, item: it, idx: idx });
+        });
+      });
+
+      if (allCards.length === 0){
+        var em = document.createElement('div');
+        em.className = 'ep-heading-mini-empty';
+        if (filter === 'fav'){
+          em.innerHTML = '즐겨찾기한 프리셋이 없습니다.<br>카드 모서리의 ★ 를 눌러 추가하세요.';
+        } else if (filter === 'used'){
+          em.innerHTML = '이 글에서 사용 중인 프리셋이 없습니다.';
+        } else {
+          em.innerHTML = '툴바에 노출된 프리셋이 없습니다.<br><a data-open-mgr>설정에서 프리셋 만들기</a>';
+          em.querySelector('[data-open-mgr]').addEventListener('click', function(e){
+            e.preventDefault(); e.stopPropagation();
+            pop.remove();
+            try { openHeaderPresetManager(); } catch(_){}
+          });
+        }
+        grid.appendChild(em);
+        return;
+      }
+
+      allCards.forEach(function(c){
+        var card = document.createElement('div');
+        card.className = 'ep-heading-mini-card';
+        card.setAttribute('data-preset-id', c.item.id || '');
+
+        // 미리보기 텍스트
+        var prev = document.createElement('div');
+        prev.className = 'ep-heading-mini-card-preview';
+        prev.setAttribute('style', _previewStyle(c.item));
+        prev.textContent = c.item.name || '제목 예시';
+        card.appendChild(prev);
+
+        // 소제목 (그룹 · 이름)
+        var meta = document.createElement('div');
+        meta.className = 'ep-heading-mini-card-meta';
+        var groupLabel = HEADER_GROUP_LABELS[c.groupKey] || c.groupKey;
+        meta.textContent = groupLabel + ' · ' + (c.item.name || '이름없음');
+        card.appendChild(meta);
+
+        // 즐겨찾기 별표
+        var fav = document.createElement('button');
+        fav.type = 'button';
+        fav.className = 'ep-heading-mini-card-fav';
+        fav.textContent = c.item.isFavorite ? '★' : '☆';
+        if (c.item.isFavorite) fav.classList.add('is-fav');
+        fav.title = c.item.isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가';
+        fav.addEventListener('mousedown', function(e){ e.preventDefault(); });
+        fav.addEventListener('click', function(e){
+          e.preventDefault(); e.stopPropagation();
+          c.item.isFavorite = !c.item.isFavorite;
+          saveHeaderPresets(data);
+          _renderGrid();
+        });
+        card.appendChild(fav);
+
+        // 카드 클릭 → 프리셋 적용
+        card.addEventListener('mousedown', function(e){
+          // 별표 버튼은 자체 핸들러로 처리되므로 preventDefault 만
+          if (e.target !== fav) e.preventDefault();
+        });
+        card.addEventListener('click', function(e){
+          if (e.target === fav) return;
+          e.preventDefault(); e.stopPropagation();
+          try { restoreRange(); } catch(_){}
+          applyHeaderPresetToBlock(c.groupKey, c.item);
+          // 적용 후 닫는 대신 활성 표시만 갱신
+          grid.querySelectorAll('.ep-heading-mini-card').forEach(function(k){ k.classList.remove('is-active'); });
+          card.classList.add('is-active');
+        });
+
+        grid.appendChild(card);
+      });
+    }
+
+    _renderGrid();
+
+    document.body.appendChild(pop);
+
+    // 위치: anchor 아래 (그리드 크기 고정 380px)
+    var r = anchorBtn.getBoundingClientRect();
+    pop.style.top  = (r.bottom + 6) + 'px';
+    pop.style.left = Math.max(8, Math.min(window.innerWidth - 380 - 8, r.left)) + 'px';
+
+    // outside closer · mousedown 기반 (카드 클릭은 팝오버 안이므로 안전)
     setTimeout(function(){
       var closer = function(ev){
         if (pop.contains(ev.target) || anchorBtn.contains(ev.target)) return;
@@ -17511,8 +17802,78 @@
         document.removeEventListener('mousedown', closer, true);
       };
       document.addEventListener('mousedown', closer, true);
-    }, 0);
+    }, 100);
   }
+
+  // p23m: 헤더 프리셋을 현재 커서가 있는 블록에 적용
+  //   groupKey 가 h1~h6 이면 실제 태그를 바꿔 삽입, p 또는 사용자그룹이면 태그 유지한 인라인 style
+  function applyHeaderPresetToBlock(groupKey, item){
+    try { if (typeof restoreRange === 'function') restoreRange(); } catch(_){}
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    var node = sel.getRangeAt(0).startContainer;
+    var el = node.nodeType === 1 ? node : node.parentElement;
+    if (!el) return;
+    var block = el.closest && el.closest('.editor-block');
+    if (!block) return;
+
+    // 블록 안 편집 요소(P/H1~H6) 찾기
+    var editable = null;
+    Array.from(block.children).forEach(function(child){
+      if (editable) return;
+      if (child.classList && child.classList.contains('block-handle')) return;
+      editable = child;
+    });
+    if (!editable) return;
+
+    // 태그 변경 필요 여부
+    var targetTag = 'P';
+    var gk = String(groupKey).toLowerCase();
+    if (gk === 'h1' || gk === 'h2' || gk === 'h3' || gk === 'h4' || gk === 'h5' || gk === 'h6'){
+      targetTag = gk.toUpperCase();
+    } // p 또는 사용자그룹 → P 유지
+
+    var currentTag = editable.tagName;
+    var newEl = editable;
+    if (currentTag !== targetTag){
+      newEl = document.createElement(targetTag);
+      newEl.setAttribute('contenteditable', 'true');
+      newEl.innerHTML = editable.innerHTML;
+      // 기존 클래스/data-* 복사 (인라인 style 은 아래서 재설정)
+      Array.from(editable.attributes).forEach(function(a){
+        if (a.name !== 'contenteditable' && a.name !== 'style') newEl.setAttribute(a.name, a.value);
+      });
+      editable.parentNode.replaceChild(newEl, editable);
+      block.setAttribute('data-block-type', targetTag.toLowerCase());
+    }
+
+    // 인라인 스타일 부여 (사이트에서도 보이게)
+    var s = newEl.style;
+    if (item.fontFamily)    s.fontFamily    = item.fontFamily;
+    if (item.fontSize)      s.fontSize      = item.fontSize;
+    if (item.fontWeight)    s.fontWeight    = item.fontWeight;
+    if (item.color)         s.color         = item.color;
+    if (item.letterSpacing) s.letterSpacing = item.letterSpacing;
+    if (item.lineHeight)    s.lineHeight    = String(item.lineHeight);
+    if (item.marginBottom)  s.marginBottom  = item.marginBottom;
+
+    // 프리셋 ID 상태 · "이 글에서" 필터용
+    if (item.id) newEl.setAttribute('data-header-preset', item.id);
+
+    // 커서를 새 요소 끝으로
+    try {
+      newEl.focus();
+      var range = document.createRange();
+      range.selectNodeContents(newEl);
+      range.collapse(false);
+      var s2 = window.getSelection();
+      s2.removeAllRanges();
+      s2.addRange(range);
+    } catch(_){}
+  }
+
+  // p23m: 기존 stub 이름 호환성 유지 (다른 곳에서 호출하는 데 있으면 새 함수로 리다이렉트)
+  function openHeadingPopoverStub(anchorBtn){ return openHeadingMiniPopover(anchorBtn); }
 
   // ============================================================
   // p23f: 자간 (letter-spacing) / 줄간격 (line-height) 슬라이더 팝오버
@@ -17724,11 +18085,11 @@
     });
 
     pop.innerHTML =
-      // 제목 줄
+      // 제목 줄 (p23l: 버전 표시 추가 → 사용자가 새 파일 적용되었는지 눈으로 확인 가능)
       '<div style="font-family:\'Cafe24Danjunghae\',\'Gowun Batang\',serif;font-size:13px;opacity:0.75;' +
         'margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(15,58,58,0.1);' +
         'display:flex;align-items:center;justify-content:space-between;">' +
-        '<span>' + opts.title + '</span>' +
+        '<span>' + opts.title + ' <span style="font-size:9px;opacity:0.4;font-family:monospace;">p23l</span></span>' +
         '<span data-esp-value style="font-family:\'Pretendard Variable\',sans-serif;' +
         'font-size:12px;color:#FF9A76;font-weight:600;min-width:44px;text-align:right;">' +
         initClamped + opts.unit + '</span>' +
@@ -17964,6 +18325,8 @@
     window.__DDL_EDITOR.adjustFontSize      = adjustFontSize;
     window.__DDL_EDITOR.applyInlineCode     = applyInlineCode;
     window.__DDL_EDITOR.openAlignPopover    = openAlignPopover;
+    window.__DDL_EDITOR.openHeadingMiniPopover   = openHeadingMiniPopover;
+    window.__DDL_EDITOR.applyHeaderPresetToBlock = applyHeaderPresetToBlock;
     window.__DDL_EDITOR.openLetterSpacingPopover = openLetterSpacingPopover;
     window.__DDL_EDITOR.openLineHeightPopover    = openLineHeightPopover;
     window.__DDL_EDITOR.showStubToast       = _showStubToast;
@@ -18981,6 +19344,10 @@
 
     // p23k: footer 가 이제 존재 → 하위 탭이면 숨김 적용
     if (_bulletState.activeLevel !== 1) footer.style.display = 'none';
+
+    // p23l: **진짜초기 렌더** — tabBar/rowsHost/footer 을 모두 만든 다음 한번에 모두 렌더
+    //   (이전에 준 함수 정의 전에만 호출해서 초기 빈 공간 버그 발생)
+    _rebuildRows();
 
     var tip = document.createElement('div');
     tip.className = 'ep-bullet-mini-tip';
