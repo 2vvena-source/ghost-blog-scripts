@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p24d';
+  var VERSION = 'v2.0-β-p24e';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -15156,7 +15156,27 @@
     body.appendChild(heroWrap);
 
     function renderPreview(){
-      previewMark.style.background = specToBackground(current.spec);
+      // p24e: !important 로 보장 (혼시 다른 CSS 이 뎊을 경우 대비)
+      //       + data-hl-mode/data-hl-c1 설정 — 실제 형광폜과 동일하게 거동을 설정
+      var _sp = current.spec || {};
+      var _mode = _sp.mode || 'marker';
+      if (_mode === 'solid') _mode = 'marker';
+      previewMark.setAttribute('data-hl-mode', _mode);
+      if (_sp.pos) previewMark.setAttribute('data-hl-pos', _sp.pos);
+      else previewMark.removeAttribute('data-hl-pos');
+      // --ddl-hl-c1 변수도 alpha 반영 rgba 로
+      if (_sp.c1){
+        previewMark.setAttribute('data-hl-c1', _sp.c1);
+        var _cvar = _sp.c1;
+        if (typeof _sp.a1 === 'number' && _sp.a1 < 100){
+          try {
+            var _rgbP = (typeof parseRgb === 'function') ? parseRgb(_sp.c1) : null;
+            if (_rgbP) _cvar = 'rgba(' + _rgbP.r + ',' + _rgbP.g + ',' + _rgbP.b + ',' + (_sp.a1/100) + ')';
+          } catch(_){}
+        }
+        previewMark.style.setProperty('--ddl-hl-c1', _cvar);
+      }
+      previewMark.style.setProperty('background', specToBackground(_sp), 'important');
     }
     renderPreview();
 
@@ -18425,7 +18445,17 @@
       mk.style.setProperty('color', 'inherit', 'important');
       mk.style.setProperty('padding', '0.02em 0.15em', 'important');
       mk.style.setProperty('border-radius', '2px', 'important');
-      if (spec.c1) mk.style.setProperty('--ddl-hl-c1', spec.c1);
+      // p24e: --ddl-hl-c1 변수도 alpha 반영 (이중 방어)
+      if (spec.c1){
+        var _cvarSite = spec.c1;
+        if (typeof spec.a1 === 'number' && spec.a1 < 100){
+          try {
+            var _rgbSite = (typeof parseRgb === 'function') ? parseRgb(spec.c1) : null;
+            if (_rgbSite) _cvarSite = 'rgba(' + _rgbSite.r + ',' + _rgbSite.g + ',' + _rgbSite.b + ',' + (spec.a1/100) + ')';
+          } catch(_){}
+        }
+        mk.style.setProperty('--ddl-hl-c1', _cvarSite);
+      }
     });
   }
   try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.enhanceHighlightForSite = enhanceHighlightForSite; } catch(e){}
@@ -19599,12 +19629,22 @@
     if (_mode === 'solid') _mode = 'marker';
     m.setAttribute('data-hl-mode', _mode);
     if (spec && spec.c1){
-      m.setAttribute('data-hl-c1', spec.c1);
-      m.style.setProperty('--ddl-hl-c1', spec.c1);
+      m.setAttribute('data-hl-c1', spec.c1);        // 원본 hex 그대로 보존
+      // p24e: --ddl-hl-c1 변수 자체를 alpha 반영된 rgba 로 설정
+      //       (CSS 귘칙이 !important 로 var(--ddl-hl-c1) 를 참조해도 그 안에 이미 alpha 가 들어있으니 반투명 보장)
+      var _cvarValue = spec.c1;
+      if (typeof spec.a1 === 'number' && spec.a1 < 100){
+        try {
+          var _rgb = (typeof parseRgb === 'function') ? parseRgb(spec.c1) : null;
+          if (_rgb) _cvarValue = 'rgba(' + _rgb.r + ',' + _rgb.g + ',' + _rgb.b + ',' + (spec.a1/100) + ')';
+        } catch(_){}
+      }
+      m.style.setProperty('--ddl-hl-c1', _cvarValue);
     }
     if (_mode === 'paint' && spec && spec.pos) m.setAttribute('data-hl-pos', spec.pos);
     if (spec && typeof spec.ratio === 'number') m.setAttribute('data-hl-ratio', String(spec.ratio));
-    m.style.background = specToBackground(spec);
+    // p24e: background 을 !important 로 설정 — CSS 귘칙의 !important 를 이기게
+    m.style.setProperty('background', specToBackground(spec), 'important');
     m.style.color = 'inherit';
     m.style.padding = '0.02em 0.15em';
     m.style.borderRadius = '2px';
