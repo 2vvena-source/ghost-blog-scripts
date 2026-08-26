@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p24c';
+  var VERSION = 'v2.0-β-p24d';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -11436,29 +11436,47 @@
     var current = JSON.parse(JSON.stringify(preset || {}));
     if (!current.style) current.style = _headerDefaults('p');
 
-    // p24b: 즉시 적용 모드는 마지막에 [적용] 한 값을 다시 초기값으로 사용
-    //   · 사용자가 색·서식만 살짝 바꾸고 다시 열어도 이전 설정 유지
-    //   · save-preset 모드는 원본 preset 그대로 (프리셋 편집은 원본 유지가 원칙)
-    try {
-      if (editorMode === 'apply-format'){
-        var lastF = localStorage.getItem('ddl.lastAppliedFormat');
-        if (lastF){
-          var pf = JSON.parse(lastF);
-          if (pf && typeof pf === 'object'){
-            // 저장된 값이 있는 필드만 덮어쓰기 (없는 필드는 defaults 유지)
-            ['fontFamily','fontSize','fontWeight','letterSpacing','lineHeight','color'].forEach(function(k){
-              if (pf[k]) current.style[k] = pf[k];
-            });
+    // p24d: 즉시 적용 모드에서는 —
+    //   · 선택된 글자에 이미 있는 서식(computed style)을 읽어와서 current.style 에 반영
+    //   · 그러면 사용자가 "살구색+폰트A" 글자를 선택해서 열면 살구색+폰트A 가 이미 설정된 상태로 시작
+    //   · [적용] 눈를 때는 이 초기값 대비 사용자가 바꾼 필드만 적용 → 바꾸지 않은 것은 기존 서식이 그대로 유지됨
+    var _initialFromSelection = null;   // 선택에서 읽어온 초기값 (변경 감지용)
+    if (editorMode === 'apply-format' || editorMode === 'apply-color'){
+      try {
+        var _readRange = null;
+        if (typeof savedRange !== 'undefined' && savedRange) _readRange = savedRange;
+        else {
+          var _selRead = window.getSelection();
+          if (_selRead && _selRead.rangeCount > 0) _readRange = _selRead.getRangeAt(0);
+        }
+        if (_readRange && !_readRange.collapsed){
+          // 선택 범위 안의 첫 글자 노드의 부모 element 를 기준으로 computed style 읽기
+          var _startNode = _readRange.startContainer;
+          if (_startNode && _startNode.nodeType === 3) _startNode = _startNode.parentElement;
+          if (_startNode && _startNode.nodeType === 1){
+            var _cs = window.getComputedStyle(_startNode);
+            var _read = {
+              fontFamily:    _cs.fontFamily    || '',
+              fontSize:      _cs.fontSize      || '',
+              fontWeight:    _cs.fontWeight    || '',
+              letterSpacing: _cs.letterSpacing || '',
+              lineHeight:    _cs.lineHeight    || '',
+              color:         _cs.color         || ''
+            };
+            // 'normal' 값은 없는 것으로 취급 (사용자가 명시적으로 설정한 게 아님)
+            if (_read.letterSpacing === 'normal') _read.letterSpacing = '';
+            // 'normal' lineHeight 도 유지 (변경 감지 로직이 적절히 처리)
+            current.style.fontFamily    = _read.fontFamily    || current.style.fontFamily;
+            current.style.fontSize      = _read.fontSize      || current.style.fontSize;
+            current.style.fontWeight    = _read.fontWeight    || current.style.fontWeight;
+            if (_read.letterSpacing)   current.style.letterSpacing = _read.letterSpacing;
+            if (_read.lineHeight)      current.style.lineHeight    = _read.lineHeight;
+            current.style.color         = _read.color         || current.style.color;
+            _initialFromSelection = _read;
           }
         }
-      } else if (editorMode === 'apply-color'){
-        var lastC = localStorage.getItem('ddl.lastAppliedColor');
-        if (lastC){
-          // 마지막 색은 단순 hex/rgba 문자열
-          current.style.color = lastC;
-        }
-      }
-    } catch(_){}
+      } catch(_){}
+    }
 
     var initialSnapshot = JSON.parse(JSON.stringify(current));
     var currentTab = options.initialTab || 'props';
@@ -11520,6 +11538,25 @@
         s.addRange(nr);
         try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
       } catch(err){ console.warn('[apply-color] error', err); }
+    }
+
+    // p24d: 초기값(initialFromSel) 대비 현재 style 에서 바뀌 필드만 추출
+    //   - initialFromSel 이 null (선택 없이 열렸거나 읽기 실패) 면 전체 적용 (기존 동작)
+    //   - initialFromSel 이 있으면 각 필드를 비교해서 다른 것만 반환
+    function _extractChangedStyle(cur, initial){
+      var out = {};
+      var keys = ['fontFamily','fontSize','fontWeight','letterSpacing','lineHeight','color'];
+      if (!initial){
+        // 초기값 없으면 현재 값 전체 (빈 값 제외)
+        keys.forEach(function(k){ if (cur[k]) out[k] = cur[k]; });
+        return out;
+      }
+      keys.forEach(function(k){
+        var c = cur[k]     ? String(cur[k]).trim()     : '';
+        var i = initial[k] ? String(initial[k]).trim() : '';
+        if (c && c !== i) out[k] = cur[k];
+      });
+      return out;
     }
 
     // 열려있는 관리창 잠시 숨김
@@ -11629,9 +11666,9 @@
       // 서식 즉시 적용: [취소] [적용]
       dFooter.appendChild(makeBtn('취소', { onClick: function(){ closeDialog(); } }));
       dFooter.appendChild(makeBtn('적용', { primary: true, onClick: function(){
-        // 사용자가 막 선택해둔 범위에 style 적용
+        // p24d: 사용자가 막 선택해둔 범위에 style 적용
+        //   중요: 초기값 대비 바꾼 필드만 적용 (안 바꾸 것은 원래 서식 유지)
         try {
-          // savedApplyRange 가 있으면 그것, 안 되면 현재 selection 사용
           var range = null;
           if (savedApplyRange){
             range = savedApplyRange;
@@ -11643,21 +11680,13 @@
             if (s2 && s2.rangeCount > 0) range = s2.getRangeAt(0);
           }
           if (range && !range.collapsed){
-            _applyStyleToRange(range, current.style);
+            // 바꾸 필드만 추려내서 적용
+            var _diff = _extractChangedStyle(current.style, _initialFromSelection);
+            if (Object.keys(_diff).length > 0){
+              _applyStyleToRange(range, _diff);
+            }
           }
         } catch(err){ console.warn('[apply-format]', err); }
-        // p24b: 마지막 적용 서식을 저장 → 다음에 창 열 때 초기값으로 재사용
-        try {
-          var pack = {
-            fontFamily:    current.style.fontFamily    || '',
-            fontSize:      current.style.fontSize      || '',
-            fontWeight:    current.style.fontWeight    || '',
-            letterSpacing: current.style.letterSpacing || '',
-            lineHeight:    current.style.lineHeight    || '',
-            color:         current.style.color         || ''
-          };
-          localStorage.setItem('ddl.lastAppliedFormat', JSON.stringify(pack));
-        } catch(_){}
         closeDialog();
       }}));
     } else if (editorMode === 'apply-color'){
@@ -11670,9 +11699,9 @@
     }
     dialog.appendChild(dFooter);
 
-    // p24a: apply-color 모드에서는 색 변경이 일어날 때 즉시 선택 영역에 적용
+    // p24d: apply-color 모드에서는 색 변경이 일어날 때 즉시 선택 영역에 적용
+    //   (localStorage 저장 로직 제거 — 이제는 선택된 글자에서 읽어오므로)
     if (editorMode === 'apply-color'){
-      // current.style.color 이 바뀌면 적용하는 감시기
       var _lastColor = current.style.color;
       var _colorWatcher = setInterval(function(){
         if (!document.body.contains(overlay)){
@@ -11687,15 +11716,12 @@
               s.removeAllRanges();
               s.addRange(savedApplyRange);
               _applyColorOnly(savedApplyRange, current.style.color);
-              // 벤이스 range 업데이트 (span 감쌀 후 새 range 로)
               try {
                 if (typeof savedRange !== 'undefined' && savedRange){
                   savedApplyRange = savedRange.cloneRange();
                 }
               } catch(_){}
             }
-            // p24b: 마지막 적용 색을 저장 → 다음에 창 열 때 초기값으로 재사용
-            try { if (current.style.color) localStorage.setItem('ddl.lastAppliedColor', current.style.color); } catch(_){}
           } catch(err){ console.warn('[apply-color watcher]', err); }
         }
       }, 200);
@@ -12021,9 +12047,8 @@
             + ' transition: background 120ms, border-color 120ms;';
           var sample = document.createElement('div');
           sample.textContent = '가나다';
-          // p24c: 폰트 카드 미리보기에도 현재 설정된 색을 반영 — 사용자가 살구색 설정 상태에서도 카드의 "가나다"를 살구색으로 볼 수 있도록
-          var _sampleColor = (current.style && current.style.color) ? current.style.color : 'var(--color, #0F3A3A)';
-          sample.style.cssText = 'font-family: ' + f.value + '; font-size: 16px; color: ' + _sampleColor + '; margin-bottom: 3px; line-height: 1.2;';
+          // p24d: 폰트 카드 미리보기는 진초록(--color, #0F3A3A) 고정 — 사용자 확정
+          sample.style.cssText = 'font-family: ' + f.value + '; font-size: 16px; color: var(--color, #0F3A3A); margin-bottom: 3px; line-height: 1.2;';
           var lbl = document.createElement('div');
           lbl.textContent = f.label;
           lbl.style.cssText = 'font-size: 10px; opacity: 0.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
