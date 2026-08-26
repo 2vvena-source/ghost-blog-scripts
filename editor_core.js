@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22e';
+  var VERSION = 'v2.0-β-p22g';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1506,6 +1506,24 @@
     '  background: rgba(15, 58, 58, 0.25);',
     '  margin: 0 0.15em;',
     '}',
+    /* p22g: 클래식 툴바 확장 버튼(▾) 작은 화살표 — 오른쪽 아래 색상 바 관련 버튼은 제외 */
+    '.ep-float-toolbar button[data-expand="true"] {',
+    '  position: relative;',
+    '  padding-right: 0.9em;',
+    '}',
+    '.ep-float-toolbar button[data-expand="true"]::after {',
+    '  content: "";',
+    '  position: absolute;',
+    '  right: 2px; bottom: 3px;',
+    '  width: 6px; height: 6px;',
+    '  background-image: url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 10 10%27><path d=%27M1 3 L5 7 L9 3%27 fill=%27none%27 stroke=%27%230F3A3A%27 stroke-width=%271.5%27 stroke-linecap=%27round%27/></svg>");',
+    '  background-size: contain; background-repeat: no-repeat; opacity: 0.55;',
+    '  pointer-events: none;',
+    '}',
+    '.ep-float-toolbar button[data-expand="true"]:hover::after {',
+    '  background-image: url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 10 10%27><path d=%27M1 3 L5 7 L9 3%27 fill=%27none%27 stroke=%27%23FF9A76%27 stroke-width=%271.5%27 stroke-linecap=%27round%27/></svg>");',
+    '  opacity: 0.9;',
+    '}',
     // p19l: 툴바 안 ⚙ 톱니 버튼 (클래식 툴바 오른쪽 끝에 붙음)
     '.ep-float-toolbar .ftb-gear {',
     '  margin-left: 0.15em;',
@@ -1546,6 +1564,35 @@
     '.ep-float-toolbar .ftb-hlcolor:hover .tc-letter { color: var(--point, #FF9A76); }',
     '.ep-float-toolbar .ftb-textcolor.is-active .tc-letter,',
     '.ep-float-toolbar .ftb-hlcolor.is-active .tc-letter { color: var(--point, #FF9A76); }',
+    /* p22f: 모던 툴바에서도 A/형광펜 버튼 동일 스타일 적용 */
+    '.ep-modern-toolbar .ftb-textcolor, .ep-modern-toolbar .ftb-hlcolor {',
+    '  display: inline-flex !important;',
+    '  flex-direction: column;',
+    '  align-items: center;',
+    '  justify-content: center;',
+    '  gap: 2px;',
+    '  padding: 6px 0 !important;',
+    '  line-height: 1 !important;',
+    '}',
+    '.ep-modern-toolbar .ftb-textcolor .tc-letter,',
+    '.ep-modern-toolbar .ftb-hlcolor .tc-letter {',
+    '  font-size: 13px; font-weight: 700; line-height: 1;',
+    '  color: #0F3A3A;',
+    '}',
+    '.ep-modern-toolbar .ftb-textcolor .tc-bar,',
+    '.ep-modern-toolbar .ftb-hlcolor .tc-bar {',
+    '  width: 16px; height: 3px; border-radius: 1px;',
+    '  background: #FF9A76;',
+    '}',
+    '.ep-modern-toolbar .ftb-hlcolor .tc-hl-icon {',
+    '  display: inline-flex; align-items: center; justify-content: center; line-height: 1;',
+    '}',
+    '.ep-modern-toolbar .ftb-hlcolor .tc-hl-icon svg {',
+    '  width: 14px; height: 14px;',
+    '}',
+    '.ep-modern-toolbar .ftb-textcolor:hover .tc-letter,',
+    '.ep-modern-toolbar .ftb-hlcolor:hover .tc-letter { color: var(--point, #FF9A76); }',
+    '.ep-modern-toolbar .ftb-hlcolor:hover .tc-hl-icon svg * { stroke: var(--point, #FF9A76); }',
     // p19l: 모던 툴바 (참고 이미지 스타일 — 팝오버 + 말꼬리 + 라벨-값 섹션)
     // 프레임은 .ep-popup-v2 와 별개. 이유: 툴바는 드래그 X, 헤더 X, 탭 X.
     '.ep-modern-toolbar {',
@@ -1558,11 +1605,11 @@
     '  border-radius: 8px;',
     '  box-shadow: 0 8px 24px rgba(0,0,0,0.08);',
     '  padding: 10px 12px 12px;',
-    '  width: 280px;',
-    '  max-height: 70vh;',                        /* p19n: 길어지면 스크롤 */
-    '  overflow-y: auto;',                        /* p19n */
-    '  scrollbar-width: none;',                   /* p19n: Firefox 스크롤바 숨김 */
-    '  -ms-overflow-style: none;',                /* p19n: IE/Edge */
+    '  width: 280px;',                            /* p22f: 폭 고정 */
+    '  max-height: 480px;',                       /* p22f: 높이 고정 · 넘치면 투명 스크롤 */
+    '  overflow-y: auto;',                        /* 투명 세로 스크롤 */
+    '  scrollbar-width: none;',                   /* Firefox */
+    '  -ms-overflow-style: none;',                /* IE/Edge */
     '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
     '  font-size: 13px;',
     '  line-height: 1.4;',
@@ -1589,10 +1636,10 @@
     '.ep-modern-toolbar-head-gear:hover { background: rgba(15,58,58,0.06); }',
     '.ep-modern-toolbar-head-gear svg * { stroke: var(--color, #0F3A3A); }',
     '.ep-modern-toolbar-head-gear:hover svg * { stroke: var(--point, #FF9A76); }',
-    // 아이콘 2행 그리드
+    // p22f: 아이콘 4열 그리드 (사용자 스펙)
     '.ep-modern-toolbar-icons {',
-    '  display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;',
-    '  margin-bottom: 8px;',
+    '  display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;',
+    '  margin-bottom: 4px;',
     '}',
     '.ep-modern-toolbar-icons button {',
     '  padding: 6px 0; background: transparent;',
@@ -1608,8 +1655,55 @@
     '}',
     '.ep-modern-toolbar-icons button svg * { stroke: var(--color, #0F3A3A); }',
     '.ep-modern-toolbar-icons button:hover svg * { stroke: var(--point, #FF9A76); }',
-    // hairline 구분선
-    '.ep-modern-toolbar-sep { border-top: 1px solid rgba(15,58,58,0.1); margin: 8px -2px 10px; }',
+    // hairline 구분선 · p22f: 마진 즐임
+    '.ep-modern-toolbar-sep { border-top: 1px solid rgba(15,58,58,0.1); margin: 4px -2px 6px; }',
+    /* p22f: 1행 전용 · 헤더 + 세로 구분선 + BIUS 4개 (flex row) */
+    '.ep-modern-toolbar-row {',
+    '  display: flex; align-items: center; gap: 6px;',
+    '  margin-bottom: 4px;',
+    '}',
+    '.ep-modern-toolbar-row-cell {',
+    '  display: grid; grid-template-columns: repeat(1, 1fr); gap: 4px;',
+    '  flex: 0 0 auto;',
+    '}',
+    '.ep-modern-toolbar-row-cell-4 {',
+    '  display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;',
+    '  flex: 1 1 auto;',
+    '}',
+    '.ep-modern-toolbar-row button {',
+    '  padding: 6px 0; background: transparent;',
+    '  border: 1px solid transparent; border-radius: 4px;',
+    '  cursor: pointer; color: var(--color, #0F3A3A);',
+    '  font-family: inherit; font-size: 13px;',
+    '  display: inline-flex; align-items: center; justify-content: center;',
+    '  transition: background 120ms ease, border-color 120ms ease;',
+    '  position: relative;',
+    '}',
+    '.ep-modern-toolbar-row button:hover { background: rgba(15,58,58,0.05); border-color: rgba(15,58,58,0.15); }',
+    '.ep-modern-toolbar-row button[data-expand="true"]::after {',
+    '  content: "";',
+    '  position: absolute; right: 3px; bottom: 3px;',
+    '  width: 5px; height: 5px;',
+    '  background-image: url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 10 10%27><path d=%27M1 3 L5 7 L9 3%27 fill=%27none%27 stroke=%27%230F3A3A%27 stroke-width=%271.5%27 stroke-linecap=%27round%27/></svg>");',
+    '  background-size: contain; background-repeat: no-repeat; opacity: 0.55;',
+    '}',
+    '.ep-modern-toolbar-vsep {',
+    '  width: 1px; align-self: stretch;',
+    '  background: rgba(15,58,58,0.12);',
+    '  margin: 4px 2px;',
+    '}',
+    /* p22f: 모던 툴바 버튼 확장 표시(▾) · 오른쪽 아래 */
+    '.ep-modern-toolbar-icons button[data-expand="true"] {',
+    '  position: relative;',
+    '}',
+    '.ep-modern-toolbar-icons button[data-expand="true"]::after {',
+    '  content: "";',
+    '  position: absolute;',
+    '  right: 3px; bottom: 3px;',
+    '  width: 5px; height: 5px;',
+    '  background-image: url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 10 10%27><path d=%27M1 3 L5 7 L9 3%27 fill=%27none%27 stroke=%27%230F3A3A%27 stroke-width=%271.5%27 stroke-linecap=%27round%27/></svg>");',
+    '  background-size: contain; background-repeat: no-repeat; opacity: 0.55;',
+    '}',
     // 라벨-값 섹션 (Typeface / Size / Text Color)
     '.ep-modern-toolbar .mtb-row { margin-bottom: 10px; }',
     '.ep-modern-toolbar .mtb-row:last-child { margin-bottom: 0; }',
@@ -9102,35 +9196,41 @@
     root.className = 'ep-mini-popover ddl-editor-popup';
     root.setAttribute('data-variant', variant);
 
-    // 헤더
-    var header = document.createElement('div');
-    header.className = 'ep-mini-header';
-    var hLeft = document.createElement('div');
-    hLeft.className = 'ep-mini-header-left';
-    var titleEl = document.createElement('span');
-    titleEl.textContent = title;
-    hLeft.appendChild(titleEl);
-    if (showExpand) {
-      var expBtn = document.createElement('button');
-      expBtn.type = 'button';
-      expBtn.className = 'ep-mini-expand-btn';
-      expBtn.setAttribute('aria-label', '전용 편집창 열기');
-      expBtn.title = '전용 편집창 열기';
-      expBtn.innerHTML = '&#9656;';   // ▸
-      expBtn.addEventListener('click', function(e){
+    // 헤더 (p22f: title 이 비어있으면 헤더 자체를 생략 · 정렬처럼 심플하게)
+    if (title || showExpand) {
+      var header = document.createElement('div');
+      header.className = 'ep-mini-header';
+      var hLeft = document.createElement('div');
+      hLeft.className = 'ep-mini-header-left';
+      var titleEl = document.createElement('span');
+      titleEl.textContent = title;
+      hLeft.appendChild(titleEl);
+      if (showExpand) {
+        var expBtn = document.createElement('button');
+        expBtn.type = 'button';
+        expBtn.className = 'ep-mini-expand-btn';
+        expBtn.setAttribute('aria-label', '전용 편집창 열기');
+        expBtn.title = '전용 편집창 열기';
+        expBtn.innerHTML = '&#9656;';   // ▸
+        expBtn.addEventListener('click', function(e){
+          e.stopPropagation();
+          if (onExpand) onExpand(api);
+        });
+        hLeft.appendChild(expBtn);
+      }
+      var closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.className = 'ep-mini-close';
+      closeBtn.setAttribute('aria-label', '닫기');
+      closeBtn.textContent = '×';
+      closeBtn.addEventListener('click', function(e){
         e.stopPropagation();
-        if (onExpand) onExpand(api);
+        api.close();
       });
-      hLeft.appendChild(expBtn);
+      header.appendChild(hLeft);
+      header.appendChild(closeBtn);
+      root.appendChild(header);
     }
-    var closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.className = 'ep-mini-close';
-    closeBtn.setAttribute('aria-label', '닫기');
-    closeBtn.textContent = '×';
-    header.appendChild(hLeft);
-    header.appendChild(closeBtn);
-    root.appendChild(header);
 
     // 바디
     var body = document.createElement('div');
@@ -9366,10 +9466,7 @@
       }
     }
 
-    closeBtn.addEventListener('click', function(e){
-      e.stopPropagation();
-      api.close();
-    });
+    // p22f: closeBtn 리스너는 헤더 조건문 안으로 이동함 (헤더 없을 때 ReferenceError 방지)
 
     // ── 공개 API ─────────────────────────────────────────
     var api = {
@@ -9644,15 +9741,20 @@
     var svgCode     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,7 4,12 9,17"/><polyline points="15,7 20,12 15,17"/></svg>';
     var svgHeadingT = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><path d="M6 4v16M14 4v16M6 12h8"/><text x="18" y="20" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="9" fill="#0F3A3A" stroke="none">▸</text></svg>';
 
-    // p22e: TOOLBAR_SPEC_v2 §3-2 순서 준수
-    //   1.헤더▾ | 2.B 3.I 4.U 5.S | 6.정렬▾ 7.형광펜▾ 8.불릿 9.링크 |
-    //   10.위첨 11.아래첨 12.루비▾ 13.강조점 | 14.A+ 15.A− 16.자간▾ 17.줄간격▾ |
-    //   18.<> 19.서식▾ 20.서식지우기
+    // p22f: TOOLBAR_SPEC_v2 §3-2 + 사용자 스펙 4x4 준수 · flex-wrap 사용
+    //   1행: 헤더▾ | B I U S           (5칸: 헤더 + 세로구분 + BIUS)
+    //   2행: 정렬▾ 글자색 형광펜▾ 불릿▾
+    //   3행: 첨자▾ A+ A− <>
+    //   4행: 자간▾ 줄간격▾ 서식▾ 서식지우기
     // 아이콘 추가
     var svgHl_m     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h6"/><path d="M8 14l6-6 4 4-6 6H8v-4z"/><path d="M14 8l3-3 3 3-3 3"/></svg>';
     var svgRuby_m   = '<svg width="16" height="14" viewBox="0 0 24 20" fill="none" stroke="#0F3A3A" stroke-width="1.4" stroke-linecap="round"><line x1="6" y1="3" x2="18" y2="3"/><text x="12" y="17" text-anchor="middle" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="12" fill="#0F3A3A" stroke="none">가</text></svg>';
     var svgClear_m  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h12"/><path d="M10 11l4 6"/><path d="M14 11l-4 6"/><path d="M18 4L4 18"/></svg>';
     var svgLetterSp = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><path d="M6 6v12M18 6v12"/><path d="M9 12h6"/><polyline points="9,10 6,12 9,14"/><polyline points="15,10 18,12 15,14"/></svg>';
+    // 첨자 통합 아이콘 (X²)
+    var svgSupSub_m = '<span style="font-size:12px;">X<sup style="font-size:9px;">2</sup></span>';
+    // 헤더 아이콘 (H▾ 텍스트 표시)
+    var svgHeadH    = '<span style="font-family:Cafe24Danjunghae,Gowun Batang,serif; font-size:14px; font-weight:700;">H</span>';
 
     bar.innerHTML =
       // 미니 헤더
@@ -9660,50 +9762,46 @@
         '<span class="ep-modern-toolbar-head-title">편집기 툴바</span>' +
         '<button type="button" class="ep-modern-toolbar-head-gear" data-cmd="open-settings" title="편집기 설정">' + _gearSvg(16) + '</button>' +
       '</div>' +
-      // 1그룹: 헤더▾
-      '<div class="ep-modern-toolbar-icons">' +
-        '<button type="button" data-cmd="heading-expand" title="헤더 (H1-H6)">' + svgHeadingT + '</button>' +
+      // 1행: 헤더▾ | B I U S (세로 구분선 포함 · flex row)
+      '<div class="ep-modern-toolbar-row">' +
+        '<div class="ep-modern-toolbar-row-cell">' +
+          '<button type="button" data-cmd="heading-expand" data-expand="true" title="헤더 (H1-H6)">' + svgHeadH + '</button>' +
+        '</div>' +
+        '<div class="ep-modern-toolbar-vsep"></div>' +
+        '<div class="ep-modern-toolbar-row-cell ep-modern-toolbar-row-cell-4">' +
+          '<button type="button" data-cmd="bold"          title="굵게"    style="font-weight:800;">B</button>' +
+          '<button type="button" data-cmd="italic"        title="기울임"  style="font-style:italic;font-family:serif;">I</button>' +
+          '<button type="button" data-cmd="underline"     title="밑줄"    style="text-decoration:underline;">U</button>' +
+          '<button type="button" data-cmd="strikeThrough" title="취소선"  style="text-decoration:line-through;">S</button>' +
+        '</div>' +
       '</div>' +
       '<div class="ep-modern-toolbar-sep"></div>' +
-      // 2그룹: B I U S
+      // 2행: 정렬▾ · 글자색 · 형광펜▾ · 불릿▾
       '<div class="ep-modern-toolbar-icons">' +
-        '<button type="button" data-cmd="bold"          title="굵게"     style="font-weight:800;">B</button>' +
-        '<button type="button" data-cmd="italic"        title="기울임"   style="font-style:italic;font-family:serif;">I</button>' +
-        '<button type="button" data-cmd="underline"     title="밑줄"     style="text-decoration:underline;">U</button>' +
-        '<button type="button" data-cmd="strikeThrough" title="취소선"   style="text-decoration:line-through;">S</button>' +
+        '<button type="button" data-cmd="align-expand"     data-expand="true" title="정렬">' + svgAlignL + '</button>' +
+        '<button type="button" data-cmd="text-color"       class="ftb-textcolor" title="글자색"><span class="tc-letter">A</span><span class="tc-bar"></span></button>' +
+        '<button type="button" data-cmd="highlight-expand" data-expand="true" class="ftb-hlcolor" title="형광펜"><span class="tc-letter tc-hl-icon">' + svgHl_m + '</span><span class="tc-bar"></span></button>' +
+        '<button type="button" data-cmd="list-expand"      data-expand="true" title="불릿/목록">' + svgList + '</button>' +
       '</div>' +
       '<div class="ep-modern-toolbar-sep"></div>' +
-      // 3그룹: 정렬▾ · 형광펜▾ · 불릿 · 링크
+      // 3행: 첨자▾ · A+ · A− · <>
       '<div class="ep-modern-toolbar-icons">' +
-        '<button type="button" data-cmd="align-expand"     title="정렬">' + svgAlignL + '</button>' +
-        '<button type="button" data-cmd="highlight-expand" class="ftb-hlcolor" title="형광펜"><span class="tc-letter tc-hl-icon">' + svgHl_m + '</span><span class="tc-bar"></span></button>' +
-        '<button type="button" data-cmd="list-expand"      title="불릿/목록">' + svgList + '</button>' +
-        '<button type="button" data-cmd="createLink"       title="링크">' + svgLink + '</button>' +
-      '</div>' +
-      '<div class="ep-modern-toolbar-sep"></div>' +
-      // 4그룹: 위첨 · 아래첨 · 루비 · 강조점
-      '<div class="ep-modern-toolbar-icons">' +
-        '<button type="button" data-cmd="sup"       title="위첨자"    style="font-size:0.9em;">X<sup style="font-size:0.7em;">2</sup></button>' +
-        '<button type="button" data-cmd="sub"       title="아래첨자"  style="font-size:0.9em;">X<sub style="font-size:0.7em;">2</sub></button>' +
-        '<button type="button" data-cmd="ruby"      title="루비 (윗글씨)">' + svgRuby_m + '</button>' +
-        '<button type="button" data-cmd="emphasis"  title="강조점(방점)" style="font-family:Cafe24Danjunghae,Gowun Batang,serif;">·가·</button>' +
-      '</div>' +
-      '<div class="ep-modern-toolbar-sep"></div>' +
-      // 5그룹: A+ · A− · 자간 · 줄간격
-      '<div class="ep-modern-toolbar-icons">' +
+        '<button type="button" data-cmd="supsub-expand"  data-expand="true" title="첨자·루비·강조점">' + svgSupSub_m + '</button>' +
         '<button type="button" data-cmd="font-size-up"   title="글자 크게">' + svgFontUp   + '</button>' +
         '<button type="button" data-cmd="font-size-down" title="글자 작게">' + svgFontDown + '</button>' +
-        '<button type="button" data-cmd="letter-spacing" title="자간">'     + svgLetterSp + '</button>' +
-        '<button type="button" data-cmd="line-height"    title="줄간격">'   + svgLineH    + '</button>' +
+        '<button type="button" data-cmd="inline-code"    title="코드">' + svgCode + '</button>' +
       '</div>' +
       '<div class="ep-modern-toolbar-sep"></div>' +
-      // 6그룹: <> · 서식 · 서식지우기
+      // 4행: 자간▾ · 줄간격▾ · 서식▾ · 서식지우기
       '<div class="ep-modern-toolbar-icons">' +
-        '<button type="button" data-cmd="inline-code"    title="코드">' + svgCode + '</button>' +
-        '<button type="button" data-cmd="open-presets"   title="서식 프리셋" style="font-size:14px;">⭐</button>' +
+        '<button type="button" data-cmd="letter-spacing" data-expand="true" title="자간">' + svgLetterSp + '</button>' +
+        '<button type="button" data-cmd="line-height"    data-expand="true" title="줄간격">' + svgLineH + '</button>' +
+        '<button type="button" data-cmd="open-presets"   data-expand="true" title="서식 프리셋" style="font-size:14px;">⭐</button>' +
         '<button type="button" data-cmd="removeFormat"   title="서식 지우기">' + svgClear_m + '</button>' +
       '</div>' +
       '<div class="ep-modern-toolbar-sep"></div>' +
+      // 링크는 이 4x4에 자리 없으므로 하단 텍스트 영역에서 접근하거나 별도 배치 (사용자 스펙 준수)
+      // → 사용자 지시엔 없지만 필요 시 재배치. 현재는 클래식 툴바에서 링크 사용 · 모던에서 링크 버튼 제거.
       // Typeface
       '<div class="mtb-row">' +
         '<div class="mtb-row-label">Typeface</div>' +
@@ -9737,7 +9835,11 @@
 
     // 클릭 핸들러 (직접 execCommand 보존. 생속적 서식은 기존 클래식 툴바 로직을 재사용하는 것이 안전 —
     // 이번 라운드는 UI 구조만 만든다. 실제 서식 부여는 다음 AI 세션에서 연결 권장.)
-    bar.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    bar.addEventListener('mousedown', function(e){
+      e.preventDefault();
+      // p22g: mousedown 시점에 saveRange — 선택이 사라지기 전에 범위 보존
+      try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
+    });
     bar.addEventListener('click', function(e){
       var btn = e.target.closest('button');
       if (!btn) return;
@@ -9773,20 +9875,30 @@
         return;
       }
       if (cmd === 'highlight-expand'){
+        // p22f: openPalette 를 전역에서 참조 (setupFloatingToolbar 클로저에 갇혀 있으므로 전역 경유 필수)
         e.preventDefault(); e.stopPropagation();
-        try { if (typeof openPalette === 'function') openPalette(btn); } catch(err){ console.warn(err); }
+        try {
+          var _op = (window.__DDL_EDITOR && window.__DDL_EDITOR.openPalette) || (typeof openPalette === 'function' ? openPalette : null);
+          if (_op) _op(btn);
+          else _showStubToast('형광펜 — 팔레트 로드 실패');
+        } catch(err){ console.warn(err); }
         return;
       }
-      if (cmd === 'sup' || cmd === 'sub'){
-        try { toggleSupSub(cmd); } catch(err){ console.warn(err); }
+      // p22f: 모던 툴바 첨자 통합 버튼 (클래식과 동일)
+      if (cmd === 'supsub-expand'){
+        e.preventDefault(); e.stopPropagation();
+        try {
+          if (window.__DDL_EDITOR && window.__DDL_EDITOR.openSupSubMini) window.__DDL_EDITOR.openSupSubMini(btn);
+          else if (typeof openSupSubMini === 'function') openSupSubMini(btn);
+        } catch(err){ console.warn(err); }
         return;
       }
-      if (cmd === 'ruby'){
-        try { insertRuby(); } catch(err){ console.warn(err); }
-        return;
-      }
-      if (cmd === 'emphasis'){
-        try { toggleEmphasisDot(); } catch(err){ console.warn(err); }
+      // p22f: 글자색 (모던 툴바도 새 미니 팝오버 사용)
+      if (cmd === 'text-color'){
+        e.preventDefault(); e.stopPropagation();
+        try {
+          if (window.__DDL_EDITOR && window.__DDL_EDITOR.openTextColorMini) window.__DDL_EDITOR.openTextColorMini(btn);
+        } catch(err){ console.warn(err); }
         return;
       }
       if (cmd === 'letter-spacing' || cmd === 'line-height'){
@@ -9974,6 +10086,8 @@
         lastRect = rect;
 
         if (style === 'modern'){
+          // p22g: 첨자/형광펜/글자색이 restoreRange 사용 → saveRange 유지 필수
+          try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
           // 모던 툴바 띄우기
           openModernToolbar(rect);
           // 클래식 툴바 숨기기 (기존 로직이 띄우네도 강제 hide)
@@ -16914,10 +17028,10 @@
       // 8. 형광펜▾ (p22e: '가' 글자 제거 · 실제 형광펜 마커 아이콘 + 하단 색상 바)
       '<button data-cmd="highlight-expand" class="ftb-hlcolor" title="형광펜"><span class="tc-letter tc-hl-icon">' + _svg_hl + '</span><span class="tc-bar"></span></button>' +
       '<span class="ftb-sep"></span>' +
-      // 9. 불릿▾ (기존 list-expand 를 사용)
-      '<button data-cmd="list-expand" title="불릿/목록"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg></button>' +
-      // 10. 첨자▾ (위·아래·루비·강조점 4개 통합)
-      '<button data-cmd="supsub-expand" title="첨자·루비·강조점" style="font-size:0.85em;">X<sup style="font-size:0.7em;">²</sup></button>' +
+      // 9. 불릿▾ (기존 list-expand 를 사용 · p22g: data-expand)
+      '<button data-cmd="list-expand" data-expand="true" title="불릿/목록"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg></button>' +
+      // 10. 첨자▾ (위·아래·루비·강조점 4개 통합 · p22g: data-expand)
+      '<button data-cmd="supsub-expand" data-expand="true" title="첨자·루비·강조점" style="font-size:0.85em;">X<sup style="font-size:0.7em;">²</sup></button>' +
       '<span class="ftb-sep"></span>' +
       // 11-12. A+ / A−
       '<button data-cmd="font-size-up"   title="글자 크게">' + _svg_font_up   + '</button>' +
@@ -17187,17 +17301,19 @@
     // p22d: 형광펜·글자색 버튼 하단 색상 바 초기화
     try { if (typeof updateHlColorButton === 'function') updateHlColorButton(); } catch(_){}
     try { if (typeof updateTextColorButton === 'function') updateTextColorButton(); } catch(_){}
-    log('플로팅 툴바 설치 (p19m + p22b/p22c/p22d)');
+    // p22f: openPalette 전역 노출 (모던 툴바에서 형광펜 버튼이 참조 가능하도록)
+    try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.openPalette = openPalette; } catch(_){}
+    log('플로팅 툴바 설치 (p19m + p22b/p22c/p22d/p22f)');
   }
 
   // ═══════════════════════════════════════════════════════════
   // p22c. 첨자 통합 미니 (위첨자·아래첨자·루비·강조점 4개 버튼)
   // ═══════════════════════════════════════════════════════════
   function openSupSubMini(anchor){
-    // buttons variant 사용 · 4개 버튼
+    // p22f: buttons variant · 헤더/푸터 없이 아이콘만 (정렬 팝오버처럼 심플)
     var mp = window.__DDL_EDITOR.createMiniPopover({
       anchor: anchor,
-      title: '첨자·루비·강조점',
+      title: '',                     // 제목 없음
       variant: 'buttons',
       buttons: [
         { html: 'X<sup style="font-size:0.7em;">2</sup>', title: '위첨자' },
@@ -17227,6 +17343,84 @@
   }
 
   try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.openSupSubMini = openSupSubMini; } catch(_){}
+
+  // ════════════════════════════════════════════════════════
+  // p22g. 링크 호버 미리보기 툴팁
+  //   · 사이트 body 안 <a href> 위에 마우스 올리면 하단에 URL 표시
+  //   · 단순 디자인 (배경 흰색 · 테두리 1px · 그림자)
+  // ════════════════════════════════════════════════════════
+  var _linkPreviewEl = null;
+  var _linkPreviewTimer = null;
+  function _ensureLinkPreview(){
+    if (_linkPreviewEl) return _linkPreviewEl;
+    var el = document.createElement('div');
+    el.className = 'ep-link-preview ddl-editor-popup';
+    el.style.cssText = [
+      'position:fixed', 'z-index:9985', 'display:none',
+      'background:#fff', 'color:#0F3A3A',
+      'border:1px solid rgba(15,58,58,0.2)', 'border-radius:6px',
+      'box-shadow:0 4px 12px rgba(0,0,0,0.08)',
+      'padding:6px 10px', 'max-width:360px',
+      'font-family:"Pretendard Variable","Pretendard",sans-serif',
+      'font-size:12px', 'line-height:1.4',
+      'white-space:nowrap', 'overflow:hidden', 'text-overflow:ellipsis',
+      'pointer-events:none'
+    ].join(';') + ';';
+    document.body.appendChild(el);
+    _linkPreviewEl = el;
+    return el;
+  }
+  function _showLinkPreview(a){
+    if (!a || !a.getAttribute) return;
+    var href = a.getAttribute('href') || '';
+    if (!href) return;
+    var el = _ensureLinkPreview();
+    // 아이콘 + URL (링크 모양 SVG)
+    el.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;">'
+      + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FF9A76" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>'
+      + '<span style="opacity:0.85;">' + href.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span>'
+      + '</span>';
+    var r = a.getBoundingClientRect();
+    // 기본적으로 링크 아래, 화면 아래로 넘치면 위로
+    var top = r.bottom + 6;
+    if (top + 40 > window.innerHeight) top = Math.max(6, r.top - 36);
+    var left = Math.max(6, Math.min(r.left, window.innerWidth - 380));
+    el.style.top = top + 'px';
+    el.style.left = left + 'px';
+    el.style.display = 'block';
+  }
+  function _hideLinkPreview(){
+    if (_linkPreviewEl) _linkPreviewEl.style.display = 'none';
+  }
+  function _setupLinkPreview(){
+    // 가벼운 이벤트 위임 — 문서 전체 대상
+    document.addEventListener('mouseover', function(ev){
+      var a = ev.target && ev.target.closest && ev.target.closest('a[href]');
+      if (!a) return;
+      // 툴바 · 팝오버 내부 링크는 미리보기 안 함 (예: 설정, 프리셋 모달)
+      if (a.closest('.ep-modern-toolbar') || a.closest('.ep-float-toolbar') ||
+          a.closest('.ep-popup') || a.closest('.ep-popup-v2') ||
+          a.closest('.ep-link-preview') || a.closest('.ep-mini-popover')) return;
+      if (_linkPreviewTimer) clearTimeout(_linkPreviewTimer);
+      _linkPreviewTimer = setTimeout(function(){ _showLinkPreview(a); }, 250);
+    });
+    document.addEventListener('mouseout', function(ev){
+      var a = ev.target && ev.target.closest && ev.target.closest('a[href]');
+      if (!a) return;
+      if (_linkPreviewTimer) { clearTimeout(_linkPreviewTimer); _linkPreviewTimer = null; }
+      _hideLinkPreview();
+    });
+    // 스크롤 · 리사이즈시 숨김
+    window.addEventListener('scroll', _hideLinkPreview, true);
+    window.addEventListener('resize', _hideLinkPreview);
+  }
+  // DOM 준비 후 등록
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _setupLinkPreview);
+  } else {
+    _setupLinkPreview();
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.showLinkPreview = _showLinkPreview; window.__DDL_EDITOR.hideLinkPreview = _hideLinkPreview; } catch(_){}
 
   // ═══════════════════════════════════════════════════════════
   // p22b. 글자색 미니 팝오버 (createMiniPopover 실전 첫 배선)
