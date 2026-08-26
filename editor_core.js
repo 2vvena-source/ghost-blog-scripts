@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22d';
+  var VERSION = 'v2.0-β-p22e';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1533,6 +1533,15 @@
     '  width: 1.1em; height: 3px; border-radius: 1px;',
     '  background: #FF9A76;',
     '}',
+    /* p22e: 형광펜 버튼 SVG 아이콘 크기·색 조정 (A 글자와 시각 균형) */
+    '.ep-float-toolbar .ftb-hlcolor .tc-hl-icon {',
+    '  display: inline-flex; align-items: center; justify-content: center;',
+    '  line-height: 1;',
+    '}',
+    '.ep-float-toolbar .ftb-hlcolor .tc-hl-icon svg {',
+    '  width: 14px; height: 14px;',
+    '}',
+    '.ep-float-toolbar .ftb-hlcolor:hover .tc-hl-icon svg * { stroke: var(--point, #FF9A76); }',
     '.ep-float-toolbar .ftb-textcolor:hover .tc-letter,',
     '.ep-float-toolbar .ftb-hlcolor:hover .tc-letter { color: var(--point, #FF9A76); }',
     '.ep-float-toolbar .ftb-textcolor.is-active .tc-letter,',
@@ -1664,6 +1673,18 @@
     '.ep-modern-toolbar.tail-right::before  { display: block; right: -6px; top: 24px; transform: rotate(135deg); }',
     '.ep-modern-toolbar.tail-top::before    { display: block; top: -6px;   left: 24px; transform: rotate(45deg);  }',
     '.ep-modern-toolbar.tail-bottom::before { display: block; bottom:-6px; left: 24px; transform: rotate(-135deg);}',
+    /* p22e: buttons variant 가로 배치 모드 · 팝오버 폭 자동 (첫자 4개 등) */
+    '.ep-mini-popover[data-variant="buttons"] {',
+    '  width: auto !important;',
+    '  min-width: 0 !important;',
+    '}',
+    '.ep-mini-popover[data-variant="buttons"] .ep-mini-body {',
+    '  padding: 8px !important;',
+    '}',
+    '.ep-mini-popover[data-variant="buttons"] .ep-mini-btn-row {',
+    '  gap: 4px;',
+    '  flex-wrap: nowrap;',
+    '}',
     // p19m: 낡은 미니 팝오버 (정렬 3종, H▸ stub) · p22d: 이름 변경 · ep-mini-popover-legacy
     //   (새 §Z ep-mini-popover 와 충돌 방지 · 새것은 세로 구조, 이건 정렬 가로용)
     '.ep-mini-popover-legacy {',
@@ -9623,37 +9644,64 @@
     var svgCode     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,7 4,12 9,17"/><polyline points="15,7 20,12 15,17"/></svg>';
     var svgHeadingT = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><path d="M6 4v16M14 4v16M6 12h8"/><text x="18" y="20" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="9" fill="#0F3A3A" stroke="none">▸</text></svg>';
 
+    // p22e: TOOLBAR_SPEC_v2 §3-2 순서 준수
+    //   1.헤더▾ | 2.B 3.I 4.U 5.S | 6.정렬▾ 7.형광펜▾ 8.불릿 9.링크 |
+    //   10.위첨 11.아래첨 12.루비▾ 13.강조점 | 14.A+ 15.A− 16.자간▾ 17.줄간격▾ |
+    //   18.<> 19.서식▾ 20.서식지우기
+    // 아이콘 추가
+    var svgHl_m     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h6"/><path d="M8 14l6-6 4 4-6 6H8v-4z"/><path d="M14 8l3-3 3 3-3 3"/></svg>';
+    var svgRuby_m   = '<svg width="16" height="14" viewBox="0 0 24 20" fill="none" stroke="#0F3A3A" stroke-width="1.4" stroke-linecap="round"><line x1="6" y1="3" x2="18" y2="3"/><text x="12" y="17" text-anchor="middle" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="12" fill="#0F3A3A" stroke="none">가</text></svg>';
+    var svgClear_m  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h12"/><path d="M10 11l4 6"/><path d="M14 11l-4 6"/><path d="M18 4L4 18"/></svg>';
+    var svgLetterSp = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><path d="M6 6v12M18 6v12"/><path d="M9 12h6"/><polyline points="9,10 6,12 9,14"/><polyline points="15,10 18,12 15,14"/></svg>';
+
     bar.innerHTML =
       // 미니 헤더
       '<div class="ep-modern-toolbar-head">' +
         '<span class="ep-modern-toolbar-head-title">편집기 툴바</span>' +
         '<button type="button" class="ep-modern-toolbar-head-gear" data-cmd="open-settings" title="편집기 설정">' + _gearSvg(16) + '</button>' +
       '</div>' +
-      // 1행: 정렬 / 링크 / 목록
+      // 1그룹: 헤더▾
       '<div class="ep-modern-toolbar-icons">' +
-        '<button type="button" data-cmd="justifyLeft"   title="왼쪽 정렬">'  + svgAlignL + '</button>' +
-        '<button type="button" data-cmd="justifyCenter" title="가운데 정렬">' + svgAlignC + '</button>' +
-        '<button type="button" data-cmd="justifyRight"  title="오른쪽 정렬">' + svgAlignR + '</button>' +
-        '<button type="button" data-cmd="createLink"   title="링크">'         + svgLink   + '</button>' +
-        '<button type="button" data-cmd="list-expand"  title="목록">'         + svgList   + '</button>' +
+        '<button type="button" data-cmd="heading-expand" title="헤더 (H1-H6)">' + svgHeadingT + '</button>' +
       '</div>' +
       '<div class="ep-modern-toolbar-sep"></div>' +
-      // 2행: B / I / U / AA / 줄간격
+      // 2그룹: B I U S
       '<div class="ep-modern-toolbar-icons">' +
-        '<button type="button" data-cmd="bold"        title="볼드"      style="font-weight:700;">B</button>' +
-        '<button type="button" data-cmd="italic"      title="이탤릭"    style="font-style:italic;font-family:serif;">I</button>' +
-        '<button type="button" data-cmd="underline"   title="밑줄"      style="text-decoration:underline;">U</button>' +
-        '<button type="button" data-cmd="size-cycle"  title="글자 크기 순환" style="font-family:serif;font-size:11px;letter-spacing:-0.5px;">AA</button>' +
-        '<button type="button" data-cmd="line-height" title="줄간격">'    + svgLineH  + '</button>' +
+        '<button type="button" data-cmd="bold"          title="굵게"     style="font-weight:800;">B</button>' +
+        '<button type="button" data-cmd="italic"        title="기울임"   style="font-style:italic;font-family:serif;">I</button>' +
+        '<button type="button" data-cmd="underline"     title="밑줄"     style="text-decoration:underline;">U</button>' +
+        '<button type="button" data-cmd="strikeThrough" title="취소선"   style="text-decoration:line-through;">S</button>' +
       '</div>' +
       '<div class="ep-modern-toolbar-sep"></div>' +
-      // p19m: 3행 (툴바 동일성 유지)
+      // 3그룹: 정렬▾ · 형광펜▾ · 불릿 · 링크
       '<div class="ep-modern-toolbar-icons">' +
-        '<button type="button" data-cmd="font-size-down" title="글자 크기 준임 (-2px)">' + svgFontDown + '</button>' +
-        '<button type="button" data-cmd="font-size-up"   title="글자 크기 키움 (+2px)">' + svgFontUp   + '</button>' +
-        '<button type="button" data-cmd="inline-code"    title="인라인 코드">'                + svgCode     + '</button>' +
-        '<button type="button" data-cmd="heading-expand" title="헤더 (H1-H6)">'                     + svgHeadingT + '</button>' +
-        '<button type="button" data-cmd="open-presets"   title="인라인 서식 프리셋" style="font-size:14px;">⭐</button>' +
+        '<button type="button" data-cmd="align-expand"     title="정렬">' + svgAlignL + '</button>' +
+        '<button type="button" data-cmd="highlight-expand" class="ftb-hlcolor" title="형광펜"><span class="tc-letter tc-hl-icon">' + svgHl_m + '</span><span class="tc-bar"></span></button>' +
+        '<button type="button" data-cmd="list-expand"      title="불릿/목록">' + svgList + '</button>' +
+        '<button type="button" data-cmd="createLink"       title="링크">' + svgLink + '</button>' +
+      '</div>' +
+      '<div class="ep-modern-toolbar-sep"></div>' +
+      // 4그룹: 위첨 · 아래첨 · 루비 · 강조점
+      '<div class="ep-modern-toolbar-icons">' +
+        '<button type="button" data-cmd="sup"       title="위첨자"    style="font-size:0.9em;">X<sup style="font-size:0.7em;">2</sup></button>' +
+        '<button type="button" data-cmd="sub"       title="아래첨자"  style="font-size:0.9em;">X<sub style="font-size:0.7em;">2</sub></button>' +
+        '<button type="button" data-cmd="ruby"      title="루비 (윗글씨)">' + svgRuby_m + '</button>' +
+        '<button type="button" data-cmd="emphasis"  title="강조점(방점)" style="font-family:Cafe24Danjunghae,Gowun Batang,serif;">·가·</button>' +
+      '</div>' +
+      '<div class="ep-modern-toolbar-sep"></div>' +
+      // 5그룹: A+ · A− · 자간 · 줄간격
+      '<div class="ep-modern-toolbar-icons">' +
+        '<button type="button" data-cmd="font-size-up"   title="글자 크게">' + svgFontUp   + '</button>' +
+        '<button type="button" data-cmd="font-size-down" title="글자 작게">' + svgFontDown + '</button>' +
+        '<button type="button" data-cmd="letter-spacing" title="자간">'     + svgLetterSp + '</button>' +
+        '<button type="button" data-cmd="line-height"    title="줄간격">'   + svgLineH    + '</button>' +
+      '</div>' +
+      '<div class="ep-modern-toolbar-sep"></div>' +
+      // 6그룹: <> · 서식 · 서식지우기
+      '<div class="ep-modern-toolbar-icons">' +
+        '<button type="button" data-cmd="inline-code"    title="코드">' + svgCode + '</button>' +
+        '<button type="button" data-cmd="open-presets"   title="서식 프리셋" style="font-size:14px;">⭐</button>' +
+        '<button type="button" data-cmd="removeFormat"   title="서식 지우기">' + svgClear_m + '</button>' +
       '</div>' +
       '<div class="ep-modern-toolbar-sep"></div>' +
       // Typeface
@@ -9716,6 +9764,45 @@
       }
       if (cmd === 'open-presets'){
         try { openPresetModal(); } catch(err){ console.warn(err); }
+        return;
+      }
+      // p22e: 모던 툴바 새 명령
+      if (cmd === 'align-expand'){
+        e.preventDefault(); e.stopPropagation();
+        try { openAlignPopover(btn); } catch(err){ console.warn(err); }
+        return;
+      }
+      if (cmd === 'highlight-expand'){
+        e.preventDefault(); e.stopPropagation();
+        try { if (typeof openPalette === 'function') openPalette(btn); } catch(err){ console.warn(err); }
+        return;
+      }
+      if (cmd === 'sup' || cmd === 'sub'){
+        try { toggleSupSub(cmd); } catch(err){ console.warn(err); }
+        return;
+      }
+      if (cmd === 'ruby'){
+        try { insertRuby(); } catch(err){ console.warn(err); }
+        return;
+      }
+      if (cmd === 'emphasis'){
+        try { toggleEmphasisDot(); } catch(err){ console.warn(err); }
+        return;
+      }
+      if (cmd === 'letter-spacing' || cmd === 'line-height'){
+        try { _showStubToast((cmd === 'letter-spacing' ? '자간' : '줄간격') + ' — 다음 배포에서 지원됩니다'); } catch(_){}
+        return;
+      }
+      if (cmd === 'strikeThrough'){
+        try { document.execCommand('strikeThrough', false, null); } catch(_){}
+        return;
+      }
+      if (cmd === 'removeFormat'){
+        try { clearInlineFormat(); } catch(_){}
+        return;
+      }
+      if (cmd === 'list-expand'){
+        try { _showStubToast('불릿/목록 — 다음 배포에서 지원됩니다'); } catch(_){}
         return;
       }
       // Size 버튼 활성 토글
@@ -16824,8 +16911,8 @@
       '<button data-cmd="align-expand" title="정렬"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg></button>' +
       // 7. 글자색▾ (A + 살구색 하단 바)
       '<button data-cmd="text-color" class="ftb-textcolor" title="글자색"><span class="tc-letter">A</span><span class="tc-bar"></span></button>' +
-      // 8. 형광펜▾ (p22d: A 버튼처럼 아이콘 + 하단 색상 바)
-      '<button data-cmd="highlight-expand" class="ftb-hlcolor" title="형광펜"><span class="tc-letter">가</span><span class="tc-bar"></span></button>' +
+      // 8. 형광펜▾ (p22e: '가' 글자 제거 · 실제 형광펜 마커 아이콘 + 하단 색상 바)
+      '<button data-cmd="highlight-expand" class="ftb-hlcolor" title="형광펜"><span class="tc-letter tc-hl-icon">' + _svg_hl + '</span><span class="tc-bar"></span></button>' +
       '<span class="ftb-sep"></span>' +
       // 9. 불릿▾ (기존 list-expand 를 사용)
       '<button data-cmd="list-expand" title="불릿/목록"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg></button>' +
