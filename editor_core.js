@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23d';
+  var VERSION = 'v2.0-β-p23e';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -17740,81 +17740,134 @@
     }
   }
 
+  // p23e: execCommand 폐기 · 수동 DOM 재작성
+  //   기존 execCommand('insertUnorderedList') 는 Chromium/Ghost sanitizer 조합에서
+  //   <p><ul><li></li></ul></p> 처럼 P 안에 UL 을 밀어넣어 HTML 규격 위반을 만들었다.
+  //   그 결과 setTimeout 지연 승격을 거쳐도 UL 에 contenteditable=true 가 없어서
+  //   Enter 시 브라우저 기본 리스트 이어짐 동작이 발화하지 않고 P 블록이 새로 생겼다.
+  //
+  //   새 방식:
+  //     1) 현재 커서가 이미 li 안이면 → 스타일/프레임만 갈아끼우고 종료 (재클릭 대응)
+  //     2) 현재 커서가 있는 편집기 블록(editor-block) 을 찾는다.
+  //        - 블록 안 편집 요소(P/H1~H6 등) 의 텍스트를 그대로 첫 <li> 로 이관
+  //        - 블록의 내용을 <ul contenteditable="true"> 또는 <ol contenteditable="true"> 로 교체
+  //        - block-handle 은 유지, data-block-type / data-bullet-style / data-frame 도 함께 설정
+  //     3) 커서를 첫 <li> 안 원 위치(대개 끝) 로 복원
+  //   UL/OL 자체에 contenteditable="true" 를 부여하는 것이 핵심.
+  //   이렇게 하면 Enter 를 눌렀을 때 브라우저가 li 안에서 실행되는 것을 인식하고
+  //   자동으로 다음 li 를 이어 만든다 (Enter 핸들러의 e.target.closest('li') 조기 return 이 정상 작동).
   function applyBulletStyle(style, frame){
     var isOL = BULLET_STYLES_OL.indexOf(style) !== -1;
     var applyFrame = isOL ? (frame || 'none') : 'none';
+    var listTag = isOL ? 'ol' : 'ul';
 
-    // 리스트 생성 (execCommand)
-    try { document.execCommand(isOL ? 'insertOrderedList' : 'insertUnorderedList'); } catch(_){}
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    var range = sel.getRangeAt(0);
+    var startNode = range.startContainer;
+    var startEl = startNode.nodeType === 1 ? startNode : startNode.parentElement;
+    if (!startEl) return;
 
-    // 생성된 list 의 상위 editor-block 에 data-* 설정 + P>UL 승격
-    setTimeout(function(){
-      var sel2 = window.getSelection();
-      if (!sel2 || sel2.rangeCount === 0) return;
-      var node = sel2.getRangeAt(0).startContainer;
-      var el   = node.nodeType === 1 ? node : node.parentElement;
-      if (!el) return;
-      var block = el.closest && el.closest('.editor-block');
-      if (!block) {
-        var li = el.closest && el.closest('li');
-        block = li && li.closest && li.closest('.editor-block');
-      }
-      if (!block) return;
+    var block = startEl.closest && startEl.closest('.editor-block');
+    if (!block) return;
 
-      // p23d: <p><ul></ul></p> 패턴을 <ul></ul> 로 승격 (P 는 UL 을 담을 수 없음 · HTML 규격)
-      //   execCommand 가 편집기 블록 안 <p> 를 그대로 두고 그 안에 <ul> 을 넣어버려서
-      //   1) 브라우저 렌더 시 P 앞뒤로 빈 <p> 자동 생성 → 사진 속 위/아래 빈 블록
-      //   2) Enter 시 li 부모 구조 이상해서 리스트 자동 이어짐 실패
-      try {
-        var pWithList = block.querySelectorAll('p > ul, p > ol');
-        pWithList.forEach(function(list){
-          var pParent = list.parentElement;
-          if (!pParent || pParent.tagName !== 'P') return;
-          var pGrand = pParent.parentElement;
-          if (!pGrand) return;
-          // P 안 UL 앞 텍스트/요소는 P 로 유지, UL 은 P 뒤로 승격
-          // 여기서는 단순화: P 는 통째로 벗겨내고 UL 만 남김
-          // (P 안에 UL 외 다른 내용이 있으면 그것도 처리해야 하지만,
-          //  execCommand insertUnorderedList 는 P 내용을 li 로 옮기므로 P 는 대개 UL 만 담김)
-          pGrand.insertBefore(list, pParent);
-          // P 가 이제 비었으면 제거, 남은 내용 있으면 유지
-          var remainText = (pParent.textContent || '').replace(/\u200B|\u00A0/g, '').trim();
-          if (remainText.length === 0) {
-            pParent.remove();
-          }
-        });
-      } catch(err){ if (window.__DDL_DBG_BULLET_DOM) console.warn('[BULLET] P>UL 승격 오류:', err); }
-
-      // p23d: block 안 빈 <p> (br 만 있거나 완전 빈) 제거 - block-handle 은 보호
-      try {
-        Array.from(block.children).forEach(function(child){
-          if (child.classList && child.classList.contains('block-handle')) return;
-          if (child.tagName !== 'P') return;
-          var t = (child.textContent || '').replace(/\u200B|\u00A0/g, '').trim();
-          if (t.length > 0) return;
-          // <br> 만 있는지
-          var onlyBr = true;
-          for (var i = 0; i < child.children.length; i++){
-            if (child.children[i].tagName !== 'BR') { onlyBr = false; break; }
-          }
-          if (onlyBr || child.children.length === 0) child.remove();
-        });
-      } catch(err){ if (window.__DDL_DBG_BULLET_DOM) console.warn('[BULLET] 빈 P 정리 오류:', err); }
-
+    function _finalizeMeta(list){
+      // block 메타 갱신
+      block.setAttribute('data-block-type', listTag);
       block.setAttribute('data-bullet-style', style);
       if (applyFrame && applyFrame !== 'none') block.setAttribute('data-frame', applyFrame);
       else block.removeAttribute('data-frame');
-
-      // p23c: 진단 · window.__DDL_DBG_BULLET_DOM=true 로 켜면 DOM 구조 출력
-      if (window.__DDL_DBG_BULLET_DOM) {
-        try {
-          console.log('[BULLET-DOM] block.outerHTML =', block.outerHTML);
-          if (block.previousElementSibling) console.log('[BULLET-DOM] prev sibling =', block.previousElementSibling.outerHTML);
-          if (block.nextElementSibling)     console.log('[BULLET-DOM] next sibling =', block.nextElementSibling.outerHTML);
-        } catch(_){}
+      // 리스트에 contenteditable 부여 (핵심 · Enter 자동 이어짐 활성)
+      if (list && list.getAttribute('contenteditable') !== 'true'){
+        list.setAttribute('contenteditable', 'true');
       }
-      try { if (window.__DDL_DBG_TB_CMD) console.log('[BULLET] applied', style, 'frame=', applyFrame, block); } catch(_){}
-    }, 30);
+    }
+
+    function _placeCursorEnd(node){
+      try {
+        var r = document.createRange();
+        r.selectNodeContents(node);
+        r.collapse(false); // 끝으로
+        var s = window.getSelection();
+        s.removeAllRanges();
+        s.addRange(r);
+      } catch(_){}
+    }
+
+    // Case 1: 이미 리스트 블록 · 스타일/프레임만 변경 (혹은 UL↔OL 스왑)
+    var existingList = block.querySelector(':scope > ul, :scope > ol');
+    if (existingList){
+      // 태그가 바뀌어야 하면 새 태그로 교체하되 li 는 그대로 이동
+      if (existingList.tagName.toLowerCase() !== listTag){
+        var newList = document.createElement(listTag);
+        // 자식 li 를 그대로 이동
+        while (existingList.firstChild) newList.appendChild(existingList.firstChild);
+        existingList.parentNode.replaceChild(newList, existingList);
+        existingList = newList;
+      }
+      _finalizeMeta(existingList);
+      // 커서 복원 시도 - 기존 li 안에 커서가 이미 있으면 유지, 없으면 첫 li 끝으로
+      var curLi = startEl.closest && startEl.closest('li');
+      if (!curLi){
+        var firstLi = existingList.querySelector('li');
+        if (firstLi) _placeCursorEnd(firstLi);
+      }
+      try { if (window.__DDL_DBG_TB_CMD) console.log('[BULLET] restyle', style, 'frame=', applyFrame, block); } catch(_){}
+      return;
+    }
+
+    // Case 2: 리스트가 없는 편집기 블록 · 내용을 <ul>/<ol> 로 감싸기
+    // 블록 안 편집 가능 자식(P/H1~H6/div[contenteditable]) 을 모두 수집
+    var editables = [];
+    Array.from(block.children).forEach(function(child){
+      if (child.classList && child.classList.contains('block-handle')) return;
+      // handle 이외 요소는 편집 대상 · 텍스트/구조 있는 것만
+      editables.push(child);
+    });
+
+    var list = document.createElement(listTag);
+    list.setAttribute('contenteditable', 'true');
+
+    if (editables.length === 0){
+      // 편집 요소가 하나도 없으면 빈 li 하나
+      var emptyLi = document.createElement('li');
+      emptyLi.innerHTML = '<br>';
+      list.appendChild(emptyLi);
+    } else {
+      // 각 편집 요소를 li 로 변환 (한 블록 안에 여러 P/H 가 있는 드문 케이스 대비)
+      editables.forEach(function(el){
+        var li = document.createElement('li');
+        // <br> 만 있는 텍스트는 빈 li 로
+        var htmlSrc = (el.innerHTML || '').trim();
+        if (htmlSrc === '' || htmlSrc.toLowerCase() === '<br>'){
+          li.innerHTML = '<br>';
+        } else {
+          li.innerHTML = htmlSrc;
+        }
+        list.appendChild(li);
+      });
+      // 원 편집 요소 제거
+      editables.forEach(function(el){ if (el.parentNode) el.parentNode.removeChild(el); });
+    }
+
+    // block 안 handle 은 유지하고 그 다음에 list 삽입
+    block.appendChild(list);
+
+    _finalizeMeta(list);
+
+    // 커서를 첫 li 끝으로 (사용자가 이전에 P 안에서 입력했던 텍스트가 li 로 옮겨졌으므로 자연스러움)
+    var firstLi2 = list.querySelector('li');
+    if (firstLi2) _placeCursorEnd(firstLi2);
+
+    // 진단 훅 유지
+    if (window.__DDL_DBG_BULLET_DOM){
+      try {
+        console.log('[BULLET-DOM] block.outerHTML =', block.outerHTML);
+        if (block.previousElementSibling) console.log('[BULLET-DOM] prev sibling =', block.previousElementSibling.outerHTML);
+        if (block.nextElementSibling)     console.log('[BULLET-DOM] next sibling =', block.nextElementSibling.outerHTML);
+      } catch(_){}
+    }
+    try { if (window.__DDL_DBG_TB_CMD) console.log('[BULLET] applied (manual)', style, 'frame=', applyFrame, block); } catch(_){}
   }
 
   function setBulletMarkerScale(scale){
