@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23p';
+  var VERSION = 'v2.0-β-p23q';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -10690,6 +10690,74 @@
     p:  '기본 (본문)'
   };
 
+  // ============================================================
+  // p23q: 프리셋/스타일 공용 유틸리티 (공용 스코프)
+  //   헤더/형광펜/글자색/블록 프리셋들이 공통으로 쓰는 유틸.
+  //   이전에는 openHeadingMiniPopover 내부 클로저에만 있어서
+  //   applyHeaderPresetToBlock 에서 접근 불가 → color 값이 var(...) 그대로
+  //   editable.style.color 에 들어가 Ghost 상태에 따라 적용 안 될 수 있음.
+  //   이제 module 스코프로 올린다.
+  // ============================================================
+
+  //   { id, name, isDefault, style: {...} } 새 구조 · 또는 { ..., fontFamily: ... } 이전 구조
+  function _resolvePresetStyle(item){
+    if (!item) return {};
+    var s = (item.style && typeof item.style === 'object') ? item.style : item;
+    return s || {};
+  }
+
+  //   var(--color, #0F3A3A) 패턴에서 fallback hex 부분 추출
+  //   var(--color) 이면 기본 딥 그린 반환
+  //   그 외는 원본 그대로
+  function _resolveColorValue(v){
+    if (!v) return '';
+    var s = String(v);
+    var m = s.match(/var\(\s*--[\w-]+\s*,\s*([^)]+)\s*\)/);
+    if (m) return m[1].trim();
+    if (s.indexOf('var(') === 0) return '#0F3A3A';
+    return s;
+  }
+
+  //   미리보기용 fontSize 축소 · 원본 ×0.72, 11~24px clamp
+  function _shrinkPreviewFontSize(fs){
+    if (!fs) return null;
+    var m = String(fs).match(/^(\d+(?:\.\d+)?)\s*(px|em|rem)?$/);
+    if (!m) return null;
+    var v = parseFloat(m[1]);
+    var unit = m[2] || 'px';
+    var px = unit === 'px' ? v : v * 16;
+    var out = Math.round(px * 0.72);
+    if (out < 11) out = 11;
+    if (out > 24) out = 24;
+    return out;
+  }
+
+  //   미리보기 인라인 style 문자열 생성 (카드에 적용)
+  function _buildPreviewStyleString(item){
+    var st = _resolvePresetStyle(item);
+    var s = '';
+    if (st.fontFamily)    s += 'font-family:' + st.fontFamily + ';';
+    var newFs = _shrinkPreviewFontSize(st.fontSize);
+    if (newFs)            s += 'font-size:' + newFs + 'px;';
+    if (st.fontWeight)    s += 'font-weight:' + st.fontWeight + ';';
+    if (st.letterSpacing) s += 'letter-spacing:' + st.letterSpacing + ';';
+    if (st.lineHeight)    s += 'line-height:' + st.lineHeight + ';';
+    if (st.color){
+      var c = _resolveColorValue(st.color);
+      if (c) s += 'color:' + c + ';';
+    }
+    s += 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    return s;
+  }
+
+  try {
+    window.__DDL_EDITOR = window.__DDL_EDITOR || {};
+    window.__DDL_EDITOR._resolvePresetStyle    = _resolvePresetStyle;
+    window.__DDL_EDITOR._resolveColorValue     = _resolveColorValue;
+    window.__DDL_EDITOR._shrinkPreviewFontSize = _shrinkPreviewFontSize;
+    window.__DDL_EDITOR._buildPreviewStyleString = _buildPreviewStyleString;
+  } catch(_){}
+
   // 샜 프리셋을 만들 때 보이는 기본 값이자 그룹이 비었을 때 사용되는 초기 프리셋
   function _headerDefaults(groupKey){
     var d = {
@@ -17718,69 +17786,9 @@
       return used;
     }
 
-    // p23p: **미리보기 시스템 완전 재설계**
-    //
-    //   지난 라운드 버그: 프리셋 구조가 { id, name, style: { fontFamily, fontSize, ... } } 인데
-    //   _previewStyle 이 item.fontFamily 를 직접 읽어서 모두 undefined → 미리보기 미적용
-    //   새 계약: item.style.* 을 우선 읽고, 없으면 item.* 로 fallback (구조 호환)
-    //
-    //   다른 개선점:
-    //     · CSS var(--color) 가 팝오버에서 해석 안될 수있어 hex 값 fallback 매핑
-    //     · fontSize 를 비율 유지 축소: 다음 방식으로 상대적 크기 차이가 눈에 보임
-    //       - H1 (32px) → 22px, H2 (26px) → 19px, H3 (22px) → 17px, ...
-    //       - min 11px, max 24px (카드 눈이 안 데지게 및 H1↔H6 차이 보이게)
-    //   이 공용 함수는 향후 형광펜/글자색/폰트/블록 프리셋에도 재사용 예정.
-
-    function _resolvePresetStyle(item){
-      // 새/이전 구조 모두 처리
-      if (!item) return {};
-      var s = (item.style && typeof item.style === 'object') ? item.style : item;
-      return s || {};
-    }
-
-    // CSS var() 가 팝오버에서 레더링 안 될 때를 대비해 hex 변환
-    function _resolveColorValue(v){
-      if (!v) return '';
-      var s = String(v);
-      // var(--color, #0F3A3A) 패턴 → fallback 부분 추출
-      var m = s.match(/var\(\s*--[\w-]+\s*,\s*([^)]+)\s*\)/);
-      if (m) return m[1].trim();
-      // var(--color) 이면 기본 deep-green
-      if (s.indexOf('var(') === 0) return '#0F3A3A';
-      return s;
-    }
-
-    // 미리보기 fontSize 축소 · 원본 px 기준 22를 최대로 잡고 비례로
-    function _shrinkPreviewFontSize(fs){
-      if (!fs) return null;
-      var m = String(fs).match(/^(\d+(?:\.\d+)?)\s*(px|em|rem)?$/);
-      if (!m) return null;
-      var v = parseFloat(m[1]);
-      var unit = m[2] || 'px';
-      var px = unit === 'px' ? v : v * 16;
-      // 32px → 22px 으로 압축 · 기본 비율 ×0.7 (11~24 clamp)
-      var out = Math.round(px * 0.72);
-      if (out < 11) out = 11;
-      if (out > 24) out = 24;
-      return out;
-    }
-
+    // p23q: 미리보기 인라인 style 은 이제 module 스코프 공용 유틸리티 사용 (오보를 위해 단순 램퍼만 유지)
     function _previewStyle(item){
-      var st = _resolvePresetStyle(item);
-      var s = '';
-      if (st.fontFamily)    s += 'font-family:' + st.fontFamily + ';';
-      var newFs = _shrinkPreviewFontSize(st.fontSize);
-      if (newFs)            s += 'font-size:' + newFs + 'px;';
-      if (st.fontWeight)    s += 'font-weight:' + st.fontWeight + ';';
-      if (st.letterSpacing) s += 'letter-spacing:' + st.letterSpacing + ';';
-      if (st.lineHeight)    s += 'line-height:' + st.lineHeight + ';';
-      if (st.color){
-        var c = _resolveColorValue(st.color);
-        if (c) s += 'color:' + c + ';';
-      }
-      // 미리보기는 한 줄로 보이되 너무 넘치면 자르게
-      s += 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-      return s;
+      return _buildPreviewStyleString(item);
     }
 
     // p23o: 그룹별 고정 샘플 텍스트 — 이름이 아니라 폰트/크기/색이 어떻게 나오는지 보여주는 샘플
@@ -17987,14 +17995,20 @@
       block.setAttribute('data-block-type', targetTag.toLowerCase());
     }
 
-    // p23p: 인라인 스타일 부여 · item.style 우선 (실제 프리셋 구조) · fallback 은 item 직접
-    //   지난 라운드까지 item.fontFamily 을 읽어서 실제로 인라인 스타일이 부여 안 되었음
-    var st = (item.style && typeof item.style === 'object') ? item.style : item;
+    // p23q: 인라인 스타일 부여 · module 유틸리티 사용 · color 는 var(...) 을 hex 로 변환
+    //   사용자 지난 라운드 지적: "누르면 색깔 적용 안됨. 폰트종류와 굵기만 적용됨"
+    //   원인: item.style.color = 'var(--color, #0F3A3A)' 이 값이 그대로 newEl.style.color 에 들어감.
+    //         Ghost sanitizer 또는 편집기 CSS 변수 정의 범위 이슈로 var(...) 적용 실패.
+    //   해결: _resolveColorValue 로 hex 값만 추출해서 직접 심음 → 사이트에서도 무조건 표시.
+    var st = _resolvePresetStyle(item);
     var s = newEl.style;
     if (st.fontFamily)    s.fontFamily    = st.fontFamily;
     if (st.fontSize)      s.fontSize      = st.fontSize;
     if (st.fontWeight)    s.fontWeight    = st.fontWeight;
-    if (st.color)         s.color         = st.color;
+    if (st.color){
+      var _c = _resolveColorValue(st.color);
+      if (_c) s.color = _c;
+    }
     if (st.letterSpacing) s.letterSpacing = st.letterSpacing;
     if (st.lineHeight)    s.lineHeight    = String(st.lineHeight);
     if (st.marginBottom)  s.marginBottom  = st.marginBottom;
