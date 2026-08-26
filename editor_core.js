@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23h';
+  var VERSION = 'v2.0-β-p23i';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -17571,6 +17571,14 @@
   //     onReset:   function()
   //     hint:      하단 안내 문구
   //   }
+  // p23i: **슬라이더 잠김 버그 완전 재작성**
+  //   이전 버전들은 pop.mousedown 핸들러가 슬라이더 드래그에 간섭하거나 outside closer 가 mousedown 을 잡아서
+  //   팝오버를 범무하게 닫았을 가능성.
+  //   이번엔:
+  //     - 팝오버 mousedown 핸들러 완전 제거 (버튼에만 개별적으로 붙임)
+  //     - outside closer 를 mousedown → click 으로 변경 (슬라이더 mousedown 이 그 바탕으로 새어나가도 닫지 않음)
+  //     - input 리스너 + change 리스너 + pointerdown 리스너 삼중으로 감지
+  //     - 하단에 실시간 디버그 라인 (상태 변수 시각화 · 사용자 눈으로 내게 뭔가 안 되는지 보임)
   function _openSliderPopover(anchorBtn, opts){
     var oldId = 'ep-slider-popover-' + opts.kind;
     var old = document.getElementById(oldId);
@@ -17585,18 +17593,21 @@
       presetsHtml += '<button type="button" class="esp-preset-btn" data-preset="' + p.value + '">' + p.label + '</button>';
     });
 
+    // 초기값을 min/max 범위 안으로 클램프 (범위 밖 값이면 슬라이더가 안 움직이는 문제 방지)
+    var initClamped = Math.max(opts.min, Math.min(opts.max, parseFloat(opts.initial) || opts.min));
+
     pop.innerHTML =
       '<div class="esp-title">' +
         '<span>' + opts.title + '</span>' +
-        '<span class="esp-value" data-esp-value>' + opts.initial + opts.unit + '</span>' +
+        '<span class="esp-value" data-esp-value>' + initClamped + opts.unit + '</span>' +
       '</div>' +
       '<div class="esp-slider-row">' +
-        '<input type="range" min="' + opts.min + '" max="' + opts.max + '" step="' + opts.step + '" value="' + opts.initial + '" data-esp-slider>' +
+        '<input type="range" min="' + opts.min + '" max="' + opts.max + '" step="' + opts.step + '" value="' + initClamped + '" data-esp-slider>' +
       '</div>' +
       (presetsHtml ? '<div class="esp-presets">' + presetsHtml + '</div>' : '') +
       '<div class="esp-footer">' +
         '<button type="button" class="esp-reset" data-esp-reset>↺ 기본값으로</button>' +
-        '<span class="esp-hint">' + (opts.hint || '') + '</span>' +
+        '<span class="esp-hint" data-esp-hint>' + (opts.hint || '') + '</span>' +
       '</div>';
 
     document.body.appendChild(pop);
@@ -17606,18 +17617,18 @@
     pop.style.top  = (r.bottom + 6) + 'px';
     pop.style.left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left)) + 'px';
 
-    // p23h: 팝오버 mousedown · INPUT 은 완전히 방해 안 함 (슬라이더 드래그 보장)
-    //   버튼 등 기타 요소만 preventDefault 로 편집기 selection 보호
-    pop.addEventListener('mousedown', function(e){
-      if (e.target.tagName === 'INPUT') return;  // 슬라이더/기타 input 은 완전 통과
-      // 버튼이면 기본 동작 막지 말고 selection 만 보존 (데 focus 훔치 안됨)
-      e.preventDefault();
-    });
+    var slider    = pop.querySelector('[data-esp-slider]');
+    var valueEl   = pop.querySelector('[data-esp-value]');
+    var hintEl    = pop.querySelector('[data-esp-hint]');
+    var resetBtn  = pop.querySelector('[data-esp-reset]');
+    var presetBtns= Array.from(pop.querySelectorAll('.esp-preset-btn'));
 
-    var slider  = pop.querySelector('[data-esp-slider]');
-    var valueEl = pop.querySelector('[data-esp-value]');
-    var resetBtn= pop.querySelector('[data-esp-reset]');
-    var presetBtns = Array.from(pop.querySelectorAll('.esp-preset-btn'));
+    // p23i: 버튼만 mousedown preventDefault (편집기 selection 유지)
+    //       슬라이더는 완전히 방해받지 않음
+    [resetBtn].concat(presetBtns).forEach(function(btn){
+      if (!btn) return;
+      btn.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    });
 
     function _syncActivePreset(cur){
       presetBtns.forEach(function(b){
@@ -17625,23 +17636,37 @@
         b.classList.toggle('is-active', Math.abs(v - cur) < 0.001);
       });
     }
-    _syncActivePreset(parseFloat(opts.initial));
+    _syncActivePreset(initClamped);
 
-    slider.addEventListener('input', function(){
-      var v = parseFloat(slider.value);
+    // p23i: 예외를 사용자 눈에 러내기 위해 hint 에 디버그 라인 표시
+    var _appliedTimes = 0;
+    var _originalHint = opts.hint || '';
+    function _dbg(status){
+      try {
+        _appliedTimes++;
+        var v = parseFloat(slider.value);
+        hintEl.textContent = _originalHint + '  · 적용 ' + _appliedTimes + '회 (' + status + ' v=' + v + ')';
+      } catch(_){}
+    }
+
+    function _handle(v){
       valueEl.textContent = v + opts.unit;
       _syncActivePreset(v);
-      try { opts.onChange(v); } catch(err){ console.warn('[slider-onChange]', err); }
-    });
+      try { opts.onChange(v); _dbg('OK'); }
+      catch(err){ _dbg('ERR:' + (err && err.message || 'x')); console.warn('[slider-onChange]', err); }
+    }
+
+    // 슬라이더 이벤트 삼중 감지 (input 이 발화 안 되는 경우에도 change/pointerdown 으로 fallback)
+    slider.addEventListener('input',    function(){ _handle(parseFloat(slider.value)); });
+    slider.addEventListener('change',   function(){ _handle(parseFloat(slider.value)); });
+    slider.addEventListener('pointerdown', function(){ /* 드래그 시작 표시 */ _dbg('pointerdown'); });
 
     presetBtns.forEach(function(b){
       b.addEventListener('click', function(ev){
         ev.preventDefault(); ev.stopPropagation();
         var v = parseFloat(b.getAttribute('data-preset'));
         slider.value = v;
-        valueEl.textContent = v + opts.unit;
-        _syncActivePreset(v);
-        try { opts.onChange(v); } catch(err){ console.warn('[slider-preset]', err); }
+        _handle(v);
       });
     });
 
@@ -17653,13 +17678,16 @@
       });
     }
 
+    // p23i: outside closer 를 mousedown → click 로 변경
+    //   이유: 슬라이더를 드래그 하는 도중에 mousedown 이 팝오버 밖으로 새어나가면 팝오버가 닫힐 수 있음
+    //   click 은 mousedown+mouseup 이 같은 요소에서 발생해야 발화되므로 안전함
     setTimeout(function(){
       var closer = function(ev){
         if (pop.contains(ev.target) || anchorBtn.contains(ev.target)) return;
         pop.remove();
-        document.removeEventListener('mousedown', closer, true);
+        document.removeEventListener('click', closer, true);
       };
-      document.addEventListener('mousedown', closer, true);
+      document.addEventListener('click', closer, true);
     }, 0);
   }
 
