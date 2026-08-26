@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22a';
+  var VERSION = 'v2.0-β-p22b';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1512,6 +1512,27 @@
     '  padding-left: 0.35em;',
     '  border-left: 1px solid rgba(15,58,58,0.15) !important;',
     '}',
+    /* p22b: 툴바 글자색 A 버튼 · 사각형 + 하단 살구색 바 */
+    '.ep-float-toolbar .ftb-textcolor {',
+    '  display: inline-flex !important;',
+    '  flex-direction: column;',
+    '  align-items: center;',
+    '  justify-content: center;',
+    '  gap: 2px;',
+    '  min-width: 1.9em !important;',
+    '  padding: 0.25em 0.35em !important;',
+    '  line-height: 1 !important;',
+    '}',
+    '.ep-float-toolbar .ftb-textcolor .tc-letter {',
+    '  font-size: 0.95em; font-weight: 700; line-height: 1;',
+    '  color: #0F3A3A;',
+    '}',
+    '.ep-float-toolbar .ftb-textcolor .tc-bar {',
+    '  width: 1.1em; height: 3px; border-radius: 1px;',
+    '  background: #FF9A76;',
+    '}',
+    '.ep-float-toolbar .ftb-textcolor:hover .tc-letter { color: var(--point, #FF9A76); }',
+    '.ep-float-toolbar .ftb-textcolor.is-active .tc-letter { color: var(--point, #FF9A76); }',
     // p19l: 모던 툴바 (참고 이미지 스타일 — 팝오버 + 말꼬리 + 라벨-값 섹션)
     // 프레임은 .ep-popup-v2 와 별개. 이유: 툴바는 드래그 X, 헤더 X, 탭 X.
     '.ep-modern-toolbar {',
@@ -16773,7 +16794,10 @@
       '<button data-cmd="createLink" title="링크">' + _svg_link + '</button>' +
       '<button data-cmd="removeFormat" title="서식 지우기">' + _svg_clear + '</button>' +
       '<span class="ftb-sep"></span>' +
-      '<button data-cmd="heading-expand" title="헤딩 (H1-H6)" style="font-weight:700;">H<span style="font-size:0.7em;">▸</span></button>' + '<button data-cmd="align-expand" title="정렬"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg></button>' + '<button data-cmd="list-expand" title="목록"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg></button>' + '<span class="ftb-sep"></span>' +
+      '<button data-cmd="heading-expand" title="헤딩 (H1-H6)" style="font-weight:700;">H<span style="font-size:0.7em;">▸</span></button>' + '<button data-cmd="align-expand" title="정렬"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg></button>' +
+      /* p22b: 글자색 A 버튼 (정렬 오른쪽) */
+      '<button data-cmd="text-color" class="ftb-textcolor" title="글자색"><span class="tc-letter">A</span><span class="tc-bar"></span></button>' +
+      '<button data-cmd="list-expand" title="목록"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg></button>' + '<span class="ftb-sep"></span>' +
       // p19m: 글자 크기 ±2px 단계 조절
       '<button data-cmd="font-size-down" title="글자 크기 준임 (-2px)">' + _svg_font_down + '</button>' +
       '<button data-cmd="font-size-up"   title="글자 크기 키움 (+2px)">' + _svg_font_up   + '</button>' +
@@ -17009,6 +17033,11 @@
         // p19m: 정렬 3종 팝오버
         e.preventDefault(); e.stopPropagation();
         openAlignPopover(btn);
+      } else if (cmd === 'text-color') {
+        // p22b: 글자색 미니 팝오버
+        e.preventDefault(); e.stopPropagation();
+        saveRange();
+        openTextColorMini(btn);
       } else if (cmd === 'heading-expand') {
         // p19m: H▸ 드롭다운 (껍데기 - 설정 안내)
         e.preventDefault(); e.stopPropagation();
@@ -17023,8 +17052,220 @@
       }
       updateBar();
     });
-    log('플로팅 툴바 설치 (p19m)');
+    log('플로팅 툴바 설치 (p19m + p22b · 글자색 A 버튼 추가)');
   }
+
+  // ═══════════════════════════════════════════════════════════
+  // p22b. 글자색 미니 팝오버 (createMiniPopover 실전 첫 배선)
+  // ═══════════════════════════════════════════════════════════
+  //
+  // 사용법: openTextColorMini(anchorBtn)
+  //   → 앵커 아래에 팝오버 열림
+  //   → 스와치 클릭 시 현재 선택된 텍스트에 foreColor 적용
+  //   → 하단 "색깔 지우기" 클릭 시 색 인라인 스타일 제거
+  //
+  // 팩토리 팔레트 4색 (DESIGN_RULES 3색 + 흐림 2단):
+  //   기본(딥그린) · 포인트(살구) · 흐림50% · 흐림25%
+  //
+  // 저장:
+  //   localStorage 'ddl_user_text_colors' = JSON.stringify([{color:'#xxx'}, ...])
+  // ═══════════════════════════════════════════════════════════
+  var TC_STORAGE_KEY = 'ddl_user_text_colors';
+  var TC_FACTORY = [
+    { color: '#0F3A3A', factory: true, title: '기본 (딥그린)' },
+    { color: '#FF9A76', factory: true, title: '포인트 (실구)' },
+    { color: '#87A0A0', factory: true, title: '흐림 50%' },
+    { color: '#C3CFCF', factory: true, title: '흐림 25%' }
+  ];
+
+  function loadUserTextColors(){
+    try {
+      var raw = localStorage.getItem(TC_STORAGE_KEY);
+      if (!raw) return [];
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch(_){ return []; }
+  }
+  function saveUserTextColors(arr){
+    try { localStorage.setItem(TC_STORAGE_KEY, JSON.stringify(arr || [])); } catch(_){}
+  }
+  function addUserTextColor(color){
+    if (!color) return;
+    var arr = loadUserTextColors();
+    // 중복 제거
+    arr = arr.filter(function(it){ return it.color !== color; });
+    arr.unshift({ color: color });
+    if (arr.length > 20) arr = arr.slice(0, 20);   // 최대 20개
+    saveUserTextColors(arr);
+  }
+  function removeUserTextColor(color){
+    var arr = loadUserTextColors();
+    arr = arr.filter(function(it){ return it.color !== color; });
+    saveUserTextColors(arr);
+  }
+
+  // 현재 선택된 텍스트에서 사용된 색 자동 감지 ("이 페이지 사용 색")
+  function scanPageUsedColors(){
+    var used = {};
+    var canvas = document.querySelector('.editor-canvas');
+    if (!canvas) return [];
+    // 인라인 style color 을 가진 요소 스캔
+    var nodes = canvas.querySelectorAll('[style*="color"]');
+    nodes.forEach(function(el){
+      var c = el.style && el.style.color;
+      if (!c) return;
+      // rgb → hex 정규화
+      var m = c.match(/rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+      if (m) {
+        var toHex = function(n){ n = parseInt(n,10); var h = n.toString(16); return h.length < 2 ? '0'+h : h; };
+        c = '#' + toHex(m[1]) + toHex(m[2]) + toHex(m[3]);
+      }
+      if (/^#[0-9a-fA-F]{6}$/.test(c)) used[c.toLowerCase()] = true;
+    });
+    return Object.keys(used).slice(0, 10);
+  }
+
+  // A 버튼 하단 살구 바를 현재 색으로 갱신
+  var _lastTextColor = '#FF9A76';
+  function updateTextColorButton(){
+    var btns = document.querySelectorAll('.ep-float-toolbar .ftb-textcolor .tc-bar, .ep-modern-toolbar .ftb-textcolor .tc-bar');
+    btns.forEach(function(b){ b.style.background = _lastTextColor; });
+  }
+
+  function applyTextColor(color){
+    if (!color) return;
+    restoreRange();
+    try { document.execCommand('foreColor', false, color); } catch(_){}
+    _lastTextColor = color;
+    updateTextColorButton();
+    // 사용자 색 저장 (팩토리 아닌 것만)
+    var isFactory = TC_FACTORY.some(function(f){ return f.color === color; });
+    if (!isFactory) addUserTextColor(color);
+  }
+
+  function clearTextColor(){
+    restoreRange();
+    // 방법: 선택 범위 안 모든 요소의 color 인라인 스타일 제거
+    try {
+      var sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      var range = sel.getRangeAt(0);
+      var walker = document.createTreeWalker(range.commonAncestorContainer, NodeFilter.SHOW_ELEMENT, {
+        acceptNode: function(node){
+          if (!range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
+          if (node.style && node.style.color) return NodeFilter.FILTER_ACCEPT;
+          return NodeFilter.FILTER_SKIP;
+        }
+      });
+      var toStrip = [];
+      var n; while ((n = walker.nextNode())) toStrip.push(n);
+      toStrip.forEach(function(el){ el.style.removeProperty('color'); });
+      // 상위 요소도 확인 (선택 범위 시작 컨테이너)
+      var startEl = range.startContainer.nodeType === 3 ? range.startContainer.parentNode : range.startContainer;
+      var cur = startEl;
+      while (cur && cur.nodeType === 1 && !cur.classList.contains('editor-canvas')) {
+        if (cur.style && cur.style.color) cur.style.removeProperty('color');
+        cur = cur.parentNode;
+      }
+    } catch(err){
+      try { if (window.__DDL_DBG_TB_CMD) console.warn('[TC-CLEAR]', err); } catch(_){}
+    }
+  }
+
+  function openTextColorMini(anchor){
+    var pageUsed = scanPageUsedColors().map(function(c){ return { color: c }; });
+    var userColors = loadUserTextColors();
+
+    var sections = [];
+    if (pageUsed.length) {
+      sections.push({
+        label: '이 페이지 사용 색',
+        key: 'page',
+        items: pageUsed,
+        showAdd: false
+      });
+    }
+    sections.push({
+      label: '기본 팔레트',
+      key: 'factory',
+      items: TC_FACTORY,
+      showAdd: false
+    });
+    if (userColors.length) {
+      sections.push({
+        label: '내 색',
+        key: 'user',
+        items: userColors,
+        showAdd: true       // 마지막이므로 ＋ 카드 노출
+      });
+    } else {
+      // 사용자 색이 아직 없어도 ＋ 카드는 노출되어야 함 → factory 섹션에 showAdd=true
+      sections[sections.length - 1].showAdd = true;
+    }
+
+    var mp = window.__DDL_EDITOR.createMiniPopover({
+      anchor: anchor,
+      title: 'Text Color',
+      variant: 'palette',
+      sections: sections,
+      showAddBtn: true,
+      showExpand: true,
+      onExpand: function(){
+        // p23 예정: 색깔 전용 큰 편집창 (헤더 프리셋 편집창과 동일 골격)
+        _showStubToast('색깔 전용 편집창 — 다음 배포에서 지원됩니다');
+      },
+      onPick: function(item){
+        if (!item || !item.color) return;
+        applyTextColor(item.color);
+        mp.close();
+      },
+      onAdd: function(){
+        // native color picker 열기
+        var input = document.createElement('input');
+        input.type = 'color';
+        input.value = _lastTextColor || '#0F3A3A';
+        input.style.position = 'fixed';
+        input.style.left = '-9999px';
+        document.body.appendChild(input);
+        input.addEventListener('change', function(){
+          var c = input.value;
+          if (c) applyTextColor(c);
+          try { document.body.removeChild(input); } catch(_){}
+          mp.close();
+        });
+        input.addEventListener('blur', function(){
+          setTimeout(function(){ try { document.body.removeChild(input); } catch(_){} }, 100);
+        });
+        input.click();
+      },
+      onDelete: function(item, ctx){
+        if (!item || !item.color || item.factory) return;
+        if (ctx.sectionKey === 'user') {
+          removeUserTextColor(item.color);
+          // 팝오버 다시 열기 (갱신)
+          mp.close();
+          setTimeout(function(){ openTextColorMini(anchor); }, 50);
+        }
+      },
+      manageLabel: '이 그룹 관리',
+      onManage: function(){
+        _showStubToast('그룹 관리 — 다음 배포에서 지원됩니다');
+      },
+      clearLabel: '색깔 지우기',
+      onClear: function(){
+        clearTextColor();
+        mp.close();
+      }
+    });
+    mp.open();
+  }
+
+  try {
+    window.__DDL_EDITOR = window.__DDL_EDITOR || {};
+    window.__DDL_EDITOR.openTextColorMini = openTextColorMini;
+    window.__DDL_EDITOR.applyTextColor    = applyTextColor;
+    window.__DDL_EDITOR.clearTextColor    = clearTextColor;
+  } catch(_){}
 
   // ═══════════════════════════════════════════════════════════
   // β-2. 인라인 서식 프리셋
