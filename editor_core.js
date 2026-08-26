@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22k';
+  var VERSION = 'v2.0-β-p22l';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -9960,7 +9960,8 @@
       '<div class="ep-modern-toolbar-sep"></div>' +
       // 3행: 첨자▾ · A+ · A− · <>
       '<div class="ep-modern-toolbar-icons">' +
-        '<button type="button" data-cmd="supsub-expand"  data-expand="true" title="첨자·루비·강조점">' + svgSupSub_m + '</button>' +
+        '<button type="button" data-cmd="supsub-expand"  data-expand="true" title="첨자·강조점">' + svgSupSub_m + '</button>' +
+        '<button type="button" data-cmd="ruby-open"      title="윗글씨 (루비)" style="font-family:Cafe24Danjunghae, Gowun Batang, serif;"><span style="display:inline-block; line-height:1;"><span style="display:block; font-size:0.55em; line-height:1;">가나</span><span style="display:block; font-size:0.85em; line-height:1;">Ru</span></span></button>' +
         '<button type="button" data-cmd="font-size-up"   title="글자 크게">' + svgFontUp   + '</button>' +
         '<button type="button" data-cmd="font-size-down" title="글자 작게">' + svgFontDown + '</button>' +
         '<button type="button" data-cmd="inline-code"    title="코드">' + svgCode + '</button>' +
@@ -10070,6 +10071,15 @@
           if (window.__DDL_EDITOR && window.__DDL_EDITOR.openSupSubMini) window.__DDL_EDITOR.openSupSubMini(btn);
           else if (typeof openSupSubMini === 'function') openSupSubMini(btn);
         } catch(err){ console.warn(err); }
+        return;
+      }
+      // p22l: 모던 툴바 루비 전용 버튼 — 원본 큰 다이얼로그 직결
+      if (cmd === 'ruby-open'){
+        e.preventDefault(); e.stopPropagation();
+        try { saveRange(); } catch(_){}
+        try {
+          if (typeof insertRuby === 'function') insertRuby();
+        } catch(err){ console.warn('[RUBY-OPEN modern]', err); }
         return;
       }
       // p22f: 글자색 (모던 툴바도 새 미니 팝오버 사용)
@@ -17216,8 +17226,10 @@
       '<span class="ftb-sep"></span>' +
       // 9. 불릿▾ (기존 list-expand 를 사용 · p22g: data-expand)
       '<button data-cmd="list-expand" data-expand="true" title="불릿/목록"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg></button>' +
-      // 10. 첨자▾ (위·아래·루비·강조점 4개 통합 · p22g: data-expand)
-      '<button data-cmd="supsub-expand" data-expand="true" title="첨자·루비·강조점" style="font-size:0.85em;">X<sup style="font-size:0.7em;">²</sup></button>' +
+      // 10. 첨자▾ (위·아래·강조점 3개 통합 · p22l: 루비 분리)
+      '<button data-cmd="supsub-expand" data-expand="true" title="첨자·강조점" style="font-size:0.85em;">X<sup style="font-size:0.7em;">²</sup></button>' +
+      // 10.5 루비 (p22l: 옛날 원본 큰 다이얼로그 복원 · 팝오버 selection 소실 회피)
+      '<button data-cmd="ruby-open" title="윗글씨 (루비)" style="font-size:0.75em; font-family:Cafe24Danjunghae, Gowun Batang, serif;"><span style="display:inline-block; line-height:1;"><span style="display:block; font-size:0.55em; line-height:1;">가나</span><span style="display:block; line-height:1;">Ru</span></span></button>' +
       '<span class="ftb-sep"></span>' +
       // 11-12. A+ / A−
       '<button data-cmd="font-size-up"   title="글자 크게">' + _svg_font_up   + '</button>' +
@@ -17468,10 +17480,17 @@
         if (typeof openPalette === 'function') openPalette(btn);
         else _showStubToast('형광펜 — 준비 중');
       } else if (cmd === 'supsub-expand') {
-        // p22c: 첨자·루비·강조점 4개 통합 미니
+        // p22c: 첨자·강조점 통합 미니 (p22l: 루비 분리)
         e.preventDefault(); e.stopPropagation();
         saveRange();
         openSupSubMini(btn);
+      } else if (cmd === 'ruby-open') {
+        // p22l: 루비 전용 버튼 — 원본 큰 다이얼로그 직결
+        e.preventDefault(); e.stopPropagation();
+        saveRange();
+        try {
+          if (typeof insertRuby === 'function') insertRuby();
+        } catch(err){ console.warn('[RUBY-OPEN]', err); }
       } else if (cmd === 'heading-expand') {
         // p19m: H▸ 드롭다운 (껍데기 - 설정 안내)
         e.preventDefault(); e.stopPropagation();
@@ -17511,40 +17530,15 @@
       buttons: [
         { html: 'X<sup style="font-size:0.7em;">2</sup>', title: '위첨자' },
         { html: 'X<sub style="font-size:0.7em;">2</sub>', title: '아래첨자' },
-        { html: _svg_rubyMini(),                          title: '루비' },
         { html: '<span style="font-family:Cafe24Danjunghae,Gowun Batang,serif;">·가·</span>', title: '강조점(방점)' }
       ],
+      // p22l: 루비 아이템 제거 (툴바 전용 버튼으로 분리 이관 — selection 소실 문제 근본 해결)
       onPick: function(btn, ctx){
-        // p22j: 루비 완전 복구 — 팝오버 닫기 전에 range 복사본 보관, 닫은 후 명시적으로 selection 재설정
-        // 기존 버그: mp.close() → restoreRange() 이어서도 sel.isCollapsed 가 true이려 "선택 필요" 컴펌 뜼는 문제
-        if (ctx.itemIndex === 2) {
-          // 루비: 현재 savedRange 를 명시적으로 복사 (팝오버 닫거나 다른 이벤트로 날아가지 않도록)
-          var _rubyRangeBackup = savedRange ? savedRange.cloneRange() : null;
-          mp.close();
-          setTimeout(function(){
-            // 백업된 range 로 직접 selection 재설정
-            if (_rubyRangeBackup) {
-              try {
-                var sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(_rubyRangeBackup);
-                // savedRange 가 높게 보존되게 되돌림
-                savedRange = _rubyRangeBackup.cloneRange();
-              } catch(err){ console.warn('[RUBY-RESTORE]', err); }
-            }
-            try {
-              if (typeof insertRuby === 'function') insertRuby();
-            } catch(err) {
-              console.warn('[RUBY]', err);
-            }
-          }, 20);
-          return;
-        }
         restoreRange();
         try {
           if (ctx.itemIndex === 0)      { if (typeof toggleSupSub === 'function') toggleSupSub('sup'); }
           else if (ctx.itemIndex === 1) { if (typeof toggleSupSub === 'function') toggleSupSub('sub'); }
-          else if (ctx.itemIndex === 3) { if (typeof toggleEmphasisDot === 'function') toggleEmphasisDot(); }
+          else if (ctx.itemIndex === 2) { if (typeof toggleEmphasisDot === 'function') toggleEmphasisDot(); }
         } catch(err) {
           try { if (window.__DDL_DBG_TB_CMD) console.warn('[SUPSUB]', err); } catch(_){}
         }
