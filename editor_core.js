@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p24b';
+  var VERSION = 'v2.0-β-p24c';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2690,17 +2690,29 @@
     '  border-top-left-radius: 6px; border-top-right-radius: 6px;',
     '}',
     '.ep-mini-header-left { display: flex; align-items: center; gap: 6px; }',
-    /* p24b: 확장가능 모드 — title 라벨 전체가 클릭 버튼으로 인식 되게 */
+    /* p24c: 확장가능 모드 — title span 과 ▸ 버튼을 모두 잔로 함께 큼둟이로 클릭 가능하게
+       · hLeft 자체가 flex 로 높이만 대종 차지 (즐기는 자식 큰기) — 그래서 hover 가 span 위에서 안 뜜다 */
     '.ep-mini-header-left.is-clickable {',
-    '  cursor: pointer; padding: 2px 8px; margin: -2px -4px; border-radius: 4px;',
+    '  cursor: pointer; padding: 4px 10px; margin: -4px -6px; border-radius: 4px;',
     '  transition: background 120ms ease, color 120ms ease;',
     '  user-select: none;',
+    '  align-items: center;',
+    '}',
+    /* span, button 모두에 클릭/hover 적용 — 그리고 hover 시간 범위를 상승시키기 */
+    '.ep-mini-header-left.is-clickable:hover,',
+    '.ep-mini-header-left.is-clickable > * {',
+    '  /* 자식들이 부모의 hover 상태 자명 받도록 */',
     '}',
     '.ep-mini-header-left.is-clickable:hover {',
-    '  background: rgba(255,154,118,0.10); color: var(--point, #FF9A76);',
+    '  background: rgba(255,154,118,0.12); color: var(--point, #FF9A76);',
     '}',
+    '.ep-mini-header-left.is-clickable:hover > span,',
     '.ep-mini-header-left.is-clickable:hover .ep-mini-expand-btn {',
     '  color: var(--point, #FF9A76);',
+    '}',
+    '.ep-mini-header-left.is-clickable > span {',
+    '  cursor: pointer; padding: 2px 4px; border-radius: 3px;',
+    '  transition: color 120ms ease;',
     '}',
     '.ep-mini-expand-btn {',
     '  background: transparent; border: none;',
@@ -9909,13 +9921,20 @@
           if (onExpand) onExpand(api);
         });
         hLeft.appendChild(expBtn);
-        // p24b: title 라벨 전체가 클릭 버튼으로 인식 되게 (사용자: "이름 전체가 선택되게 해주세요")
+        // p24c: title 라벨 전체가 클릭 버튼 — span 과 ▸ 모두에 명시적으로 클릭 리스너 붙임
+        // (p24b 에서는 hLeft 에만 붙였는데 span 이 다른 슬 달리는 것으로 보임)
         hLeft.classList.add('is-clickable');
         hLeft.title = '전용 편집창 열기';
         hLeft.setAttribute('role', 'button');
         hLeft.setAttribute('tabindex', '0');
+        // span 자체에도 직접 클릭 리스너 (부모 위임이 어쩌든 생 경우 대비)
+        titleEl.style.cursor = 'pointer';
+        titleEl.addEventListener('click', function(e){
+          e.stopPropagation();
+          if (onExpand) onExpand(api);
+        });
+        // hLeft 자체 클릭 (자식 사이 난지 여백 난지 영역)
         hLeft.addEventListener('click', function(e){
-          // expBtn 이 따로 stopPropagation 으로 이미 멈춤 — 여기는 헤더 난지 영역 클릭만 담당
           e.stopPropagation();
           if (onExpand) onExpand(api);
         });
@@ -12002,7 +12021,9 @@
             + ' transition: background 120ms, border-color 120ms;';
           var sample = document.createElement('div');
           sample.textContent = '가나다';
-          sample.style.cssText = 'font-family: ' + f.value + '; font-size: 16px; color: var(--color, #0F3A3A); margin-bottom: 3px; line-height: 1.2;';
+          // p24c: 폰트 카드 미리보기에도 현재 설정된 색을 반영 — 사용자가 살구색 설정 상태에서도 카드의 "가나다"를 살구색으로 볼 수 있도록
+          var _sampleColor = (current.style && current.style.color) ? current.style.color : 'var(--color, #0F3A3A)';
+          sample.style.cssText = 'font-family: ' + f.value + '; font-size: 16px; color: ' + _sampleColor + '; margin-bottom: 3px; line-height: 1.2;';
           var lbl = document.createElement('div');
           lbl.textContent = f.label;
           lbl.style.cssText = 'font-size: 10px; opacity: 0.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
@@ -12692,7 +12713,9 @@
       var s = current.style || {};
       previewBox.style.fontFamily    = s.fontFamily || 'inherit';
       previewBox.style.fontSize      = s.fontSize || '16px';
-      previewBox.style.color         = s.color || 'inherit';
+      // p24c: color 가 비었거나 'inherit' 면 부모 배경(#F5F5F5) 위 기본 색으로 보임 —
+            //       사용자 어록으로 "검은 글자" 보임. 명시적으로 fallback 색 지정.
+      previewBox.style.color         = s.color || 'var(--color, #0F3A3A)';
       previewBox.style.fontWeight    = s.fontWeight || 400;
       previewBox.style.letterSpacing = s.letterSpacing || '0';
       previewBox.style.lineHeight    = s.lineHeight || 1.5;
