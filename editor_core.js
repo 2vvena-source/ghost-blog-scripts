@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22t';
+  var VERSION = 'v2.0-β-p22u';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -16271,7 +16271,9 @@
       + '</div>';
     wrap.appendChild(slidersBox);
 
-    // 슬라이더 이벤트 - editable 요소에 데이터셋으로 값 저장 (확인 클릭 시 읽음)
+    // p22u: 슬라이더 이벤트 - 전역 변수에 즉시 저장 (다이얼로그 닫혀도 콜백에서 읽을 수 있게)
+    // 원인: openEditorDialog close() 가 overlay.remove() 를 먼저 하므로 콜백 시점에 editable 은 이미 사라짐
+    try { window.__DDL_RUBY_PENDING = { size: _rubyInitSize, offset: _rubyInitOffset }; } catch(_){}
     editable.dataset.rubySize = String(_rubyInitSize);
     editable.dataset.rubyOffset = String(_rubyInitOffset);
     slidersBox.addEventListener('input', function(e){
@@ -16280,8 +16282,8 @@
       var v = parseFloat(e.target.value);
       var lbl = slidersBox.querySelector('[data-rlbl="' + s + '"]');
       if (lbl) lbl.textContent = v + '%';
-      if (s === 'size') editable.dataset.rubySize = String(v);
-      else if (s === 'offset') editable.dataset.rubyOffset = String(v);
+      if (s === 'size') { editable.dataset.rubySize = String(v); try { window.__DDL_RUBY_PENDING.size = v; } catch(_){} }
+      else if (s === 'offset') { editable.dataset.rubyOffset = String(v); try { window.__DDL_RUBY_PENDING.offset = v; } catch(_){} }
     });
 
     // p22m: p19j-fix3 원본 복원 — 이전에 실수로 'toolbar' 가 'bar' 로 오타 나서
@@ -16366,15 +16368,15 @@
       el.setAttribute('title', rubyHtml.replace(/<[^>]+>/g,''));
       el.style.background = 'transparent';
       el.style.color = 'inherit';
-      // p22t: 편집창 슬라이더 값 반영 (개별 루비별 크기·위치 저장)
+      // p22u: 편집창 슬라이더 값 반영 - 전역 변수에서 읽기 (다이얼로그가 이미 닫혔으므로)
       try {
-        var _mo = document.querySelector('.ep-ruby-editable');
-        if (_mo){
-          var _sz = parseFloat(_mo.dataset.rubySize);
-          var _of = parseFloat(_mo.dataset.rubyOffset);
-          if (!isNaN(_sz)) el.style.setProperty('--ddl-ruby-size', (_sz / 100) + 'em');
-          if (!isNaN(_of)) el.style.setProperty('--ddl-ruby-offset', _of + '%');
+        var _pend = window.__DDL_RUBY_PENDING;
+        if (_pend){
+          if (!isNaN(_pend.size))   el.style.setProperty('--ddl-ruby-size', (_pend.size / 100) + 'em');
+          if (!isNaN(_pend.offset)) el.style.setProperty('--ddl-ruby-offset', _pend.offset + '%');
         }
+        // 다음 루비 대비 초기화
+        try { window.__DDL_RUBY_PENDING = null; } catch(_){}
       } catch(_){}
       // HTML 이면 편집 중 시각화용 rt-span 삽입 (저장 시 제거됨)
       if (rubyHtml.indexOf('<') >= 0) {
