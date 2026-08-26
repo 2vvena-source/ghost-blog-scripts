@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22m';
+  var VERSION = 'v2.0-β-p22n';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -9961,21 +9961,21 @@
       // 3행 (p22m): 첨자 · 루비 · A+ · A− (코드 제거)
       '<div class="ep-modern-toolbar-icons">' +
         '<button type="button" data-cmd="supsub-expand"  data-expand="true" title="첨자·강조점">' + svgSupSub_m + '</button>' +
-        '<button type="button" data-cmd="ruby-open"      title="윗글씨 (루비)" style="font-family:Cafe24Danjunghae, Gowun Batang, serif;"><span style="display:inline-block; line-height:1;"><span style="display:block; font-size:0.55em; line-height:1;">가나</span><span style="display:block; font-size:0.85em; line-height:1;">Ru</span></span></button>' +
+        '<button type="button" data-cmd="ruby-open"      title="윗글씨 (루비)" style="font-family:Cafe24Danjunghae, Gowun Batang, serif; line-height:1.2;"><span style="display:inline-flex; flex-direction:column; align-items:center; justify-content:center; line-height:1;"><span style="font-size:0.55em; opacity:0.75; margin-bottom:1px;">가나</span><span style="font-size:0.95em;">Ru</span></span></button>' +
         '<button type="button" data-cmd="font-size-up"   title="글자 크게">' + svgFontUp   + '</button>' +
         '<button type="button" data-cmd="font-size-down" title="글자 작게">' + svgFontDown + '</button>' +
       '</div>' +
       '<div class="ep-modern-toolbar-sep"></div>' +
-      // 4행 (p22m): 코드 · 링크 · 자간 · 줄간격 · [세로구분] · 서식지우기
+      // 4행 (p22n): 코드 · 링크 · 자간 · 줄간격 | 서식지우기 · 1행 구조 그대로 사용
       '<div class="ep-modern-toolbar-row">' +
-        '<div class="ep-modern-toolbar-row-cell" style="display:flex; gap:4px; flex:1;">' +
+        '<div class="ep-modern-toolbar-row-cell ep-modern-toolbar-row-cell-4">' +
           '<button type="button" data-cmd="inline-code"    title="코드">' + svgCode + '</button>' +
           '<button type="button" data-cmd="createLink"     title="링크">' + svgLink + '</button>' +
           '<button type="button" data-cmd="letter-spacing" data-expand="true" title="자간">' + svgLetterSp + '</button>' +
           '<button type="button" data-cmd="line-height"    data-expand="true" title="줄간격">' + svgLineH + '</button>' +
         '</div>' +
         '<div class="ep-modern-toolbar-vsep"></div>' +
-        '<div class="ep-modern-toolbar-row-cell" style="display:flex; gap:4px;">' +
+        '<div class="ep-modern-toolbar-row-cell">' +
           '<button type="button" data-cmd="removeFormat"   title="서식 지우기">' + svgClear_m + '</button>' +
         '</div>' +
       '</div>' +
@@ -17232,7 +17232,7 @@
       // 10. 첨자▾ (위·아래·강조점 3개 통합 · p22l: 루비 분리)
       '<button data-cmd="supsub-expand" data-expand="true" title="첨자·강조점" style="font-size:0.85em;">X<sup style="font-size:0.7em;">²</sup></button>' +
       // 10.5 루비 (p22l: 옛날 원본 큰 다이얼로그 복원 · 팝오버 selection 소실 회피)
-      '<button data-cmd="ruby-open" title="윗글씨 (루비)" style="font-size:0.75em; font-family:Cafe24Danjunghae, Gowun Batang, serif;"><span style="display:inline-block; line-height:1;"><span style="display:block; font-size:0.55em; line-height:1;">가나</span><span style="display:block; line-height:1;">Ru</span></span></button>' +
+      '<button data-cmd="ruby-open" title="윗글씨 (루비)" style="font-family:Cafe24Danjunghae, Gowun Batang, serif; line-height:1.2;"><span style="display:inline-flex; flex-direction:column; align-items:center; justify-content:center; line-height:1;"><span style="font-size:0.5em; opacity:0.75; margin-bottom:1px;">가나</span><span style="font-size:0.8em;">Ru</span></span></button>' +
       '<span class="ftb-sep"></span>' +
       // 11-12. A+ / A−
       '<button data-cmd="font-size-up"   title="글자 크게">' + _svg_font_up   + '</button>' +
