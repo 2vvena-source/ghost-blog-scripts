@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22h';
+  var VERSION = 'v2.0-β-p22i';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2512,6 +2512,10 @@
     '.editor-block[data-bullet-style="disc"] > ul, .editor-block[data-bullet-style="disc"] ul { list-style-type: disc; }',
     '.editor-block[data-bullet-style="circle"] > ul, .editor-block[data-bullet-style="circle"] ul { list-style-type: circle; }',
     '.editor-block[data-bullet-style="square"] > ul, .editor-block[data-bullet-style="square"] ul { list-style-type: square; }',
+    /* p22i: square-hollow (속이 빈 사각형) — CSS 표준 없음 → ::before 커스텀 */
+    '.editor-block[data-bullet-style="square-hollow"] ul { list-style: none; padding-left: 1.2em; }',
+    '.editor-block[data-bullet-style="square-hollow"] ul > li { position: relative; }',
+    '.editor-block[data-bullet-style="square-hollow"] ul > li::before { content: "\\25A1\\A0"; color: currentColor; margin-left: -1.2em; }',
     /* 심볼 마름모 · 별표 · ※ 은 CSS list-style-type 없음 → ::marker 커스텀 */
     '.editor-block[data-bullet-style="diamond-solid"] ul { list-style: none; padding-left: 1.2em; }',
     '.editor-block[data-bullet-style="diamond-solid"] ul > li::before { content: "\\25C6\\A0"; color: currentColor; margin-left: -1.2em; }',
@@ -2539,35 +2543,37 @@
     '.editor-block[data-bullet-style="hangul"] ol { list-style-type: hangul; }',
     /* 프레임 (원·사각·직사각) — counter-based 커스텀 마커 */
     /* 이때 ol 기본 마커를 끄고 counter로 직접 그린다 */
+    /* p22i: 프레임 마커 수직 중앙 정렬 — top: 50% + translateY(-50%) + line-height 보정 */
+    /* line-height: 1.6 에서 li 첫줄 baseline 기준이 아니라 첫줄 하간브냐 중상으로 맞춤 */
     '.editor-block[data-frame="circle"] ol { list-style: none; counter-reset: bl-frame; padding-left: 2.2em; }',
     '.editor-block[data-frame="circle"] ol > li { counter-increment: bl-frame; position: relative; }',
     '.editor-block[data-frame="circle"] ol > li::before {',
     '  content: counter(bl-frame, var(--bl-marker, decimal));',
-    '  position: absolute; left: -1.9em; top: 0.05em;',
-    '  width: 1.4em; height: 1.4em;',
+    '  position: absolute; left: -1.9em; top: 0.8em; transform: translateY(-50%);',
+    '  width: 1.4em; height: 1.4em; box-sizing: border-box;',
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  border: 1px solid currentColor; border-radius: 50%;',
-    '  font-size: 0.75em; line-height: 1;',
+    '  font-size: 0.75em; line-height: 1; padding: 0;',
     '}',
     '.editor-block[data-frame="square"] ol { list-style: none; counter-reset: bl-frame; padding-left: 2.2em; }',
     '.editor-block[data-frame="square"] ol > li { counter-increment: bl-frame; position: relative; }',
     '.editor-block[data-frame="square"] ol > li::before {',
     '  content: counter(bl-frame, var(--bl-marker, decimal));',
-    '  position: absolute; left: -1.9em; top: 0.05em;',
-    '  width: 1.4em; height: 1.4em;',
+    '  position: absolute; left: -1.9em; top: 0.8em; transform: translateY(-50%);',
+    '  width: 1.4em; height: 1.4em; box-sizing: border-box;',
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  border: 1px solid currentColor; border-radius: 3px;',
-    '  font-size: 0.75em; line-height: 1;',
+    '  font-size: 0.75em; line-height: 1; padding: 0;',
     '}',
     '.editor-block[data-frame="tall"] ol { list-style: none; counter-reset: bl-frame; padding-left: 2.2em; }',
     '.editor-block[data-frame="tall"] ol > li { counter-increment: bl-frame; position: relative; }',
     '.editor-block[data-frame="tall"] ol > li::before {',
     '  content: counter(bl-frame, var(--bl-marker, decimal));',
-    '  position: absolute; left: -1.9em; top: -0.05em;',
-    '  width: 1.1em; height: 1.6em;',
+    '  position: absolute; left: -1.9em; top: 0.8em; transform: translateY(-50%);',
+    '  width: 1.1em; height: 1.6em; box-sizing: border-box;',
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  border: 1px solid currentColor; border-radius: 3px;',
-    '  font-size: 0.72em; line-height: 1;',
+    '  font-size: 0.72em; line-height: 1; padding: 0;',
     '}',
     /* 프레임이 적용된 ol — counter marker 변수를 data-bullet-style 에서 설정 */
     '.editor-block[data-bullet-style="decimal"] { --bl-marker: decimal; }',
@@ -17508,11 +17514,22 @@
         { html: '<span style="font-family:Cafe24Danjunghae,Gowun Batang,serif;">·가·</span>', title: '강조점(방점)' }
       ],
       onPick: function(btn, ctx){
+        // p22i: 루비는 팝오버를 먼저 닫고 range를 확실히 복원해야 다이얼로그가 정상적으로 뜼다
+        // (다이얼로그 open 시 팝오버가 outside-click으로 닫히거나 range가 날아가는 문제 방지)
+        if (ctx.itemIndex === 2) {
+          // 루비: 팝오버 먼저 닫기
+          mp.close();
+          // range 복원 후 insertRuby (savedRange 는 이미 setupFloatingToolbar 에서 저장된 상태)
+          setTimeout(function(){
+            restoreRange();
+            try { if (typeof insertRuby === 'function') insertRuby(); } catch(err) { console.warn('[RUBY]', err); }
+          }, 10);
+          return;
+        }
         restoreRange();
         try {
           if (ctx.itemIndex === 0)      { if (typeof toggleSupSub === 'function') toggleSupSub('sup'); }
           else if (ctx.itemIndex === 1) { if (typeof toggleSupSub === 'function') toggleSupSub('sub'); }
-          else if (ctx.itemIndex === 2) { if (typeof insertRuby === 'function') insertRuby(); }
           else if (ctx.itemIndex === 3) { if (typeof toggleEmphasisDot === 'function') toggleEmphasisDot(); }
         } catch(err) {
           try { if (window.__DDL_DBG_TB_CMD) console.warn('[SUPSUB]', err); } catch(_){}
@@ -17780,21 +17797,114 @@
   }
   try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.openBulletPopover = openBulletPopover; } catch(_){}
 
-  // p22h. Tab / Shift+Tab 들여쓰기 (li 안에서만 작동)
+  // p22i. 노션 스타일 불릿 동작
+  //   · Tab      → 하위 계층 (indent)
+  //   · Shift+Tab→ 상위 계층 (outdent) · 최상위면 리스트 종료 시도
+  //   · Enter    → 빈 li 이면 자동 종료 (불릿 밖 일반 문단으로 변환)
+  //   · Backspace→ 빈 li 메이이면 outdent · 데로 내려가마말기
   function _setupBulletTabHandler(){
-    document.addEventListener('keydown', function(e){
-      if (e.key !== 'Tab') return;
+    // 리스트 내부인지 유효성 체크 감지 헬퍼
+    function _getCurrentLi(){
       var sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) return;
+      if (!sel || sel.rangeCount === 0) return null;
       var node = sel.getRangeAt(0).startContainer;
       var el   = node.nodeType === 1 ? node : node.parentElement;
-      var li   = el && el.closest && el.closest('li');
-      if (!li) return;
-      e.preventDefault();
-      if (e.shiftKey) {
-        try { document.execCommand('outdent'); } catch(_){}
-      } else {
-        try { document.execCommand('indent'); } catch(_){}
+      return el && el.closest && el.closest('li');
+    }
+    // li 가 비어있어 거 가 있는지 판단 (야새 <br> 뿐 혹은 빈 문자열)
+    function _isLiEmpty(li){
+      if (!li) return false;
+      var text = (li.textContent || '').replace(/\u200B|\u00A0/g, '').trim();
+      if (text.length > 0) return false;
+      // 자식이 내부 li (중첩 리스트) 를 가지면 생략
+      var innerList = li.querySelector('ul, ol');
+      if (innerList) return false;
+      return true;
+    }
+
+    document.addEventListener('keydown', function(e){
+      // Tab / Shift+Tab — li 안에서만
+      if (e.key === 'Tab') {
+        var li = _getCurrentLi();
+        if (!li) return;
+        e.preventDefault();
+        if (e.shiftKey) {
+          try { document.execCommand('outdent'); } catch(_){}
+        } else {
+          try { document.execCommand('indent'); } catch(_){}
+        }
+        return;
+      }
+      // Enter — 빈 li 이면 리스트 종료
+      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        var li2 = _getCurrentLi();
+        if (!li2) return;
+        if (!_isLiEmpty(li2)) return;   // 비어있지 않으면 버이저 기본 동작
+        e.preventDefault();
+        // 이런 경우: 중첩 li 면 outdent → 한 단계 나옴, 이미 최상위면 새 문단으로
+        var parentList = li2.parentElement;   // ul / ol
+        var grandParent = parentList && parentList.parentElement;
+        var isNested = grandParent && (grandParent.tagName === 'LI');
+        if (isNested) {
+          try { document.execCommand('outdent'); } catch(_){}
+        } else {
+          // 최상위 li → 리스트 밖으로 새 문단 생성
+          try { document.execCommand('outdent'); } catch(_){}
+          // outdent 가 안 되는 브라우저가 있으니 보강적으로 li 삭제 후 <p> 삽입
+          setTimeout(function(){
+            if (li2 && li2.parentElement && (li2.parentElement.tagName === 'UL' || li2.parentElement.tagName === 'OL')) {
+              // 이런 경우 outdent 가 안 먹혀음: 직접 변환
+              var block = parentList.closest && parentList.closest('.editor-block');
+              var p = document.createElement('p');
+              p.setAttribute('contenteditable', 'true');
+              p.innerHTML = '<br>';
+              try {
+                li2.remove();
+                if (parentList.children.length === 0) {
+                  // 불릿이 비어 있으면 명질 대체
+                  parentList.parentNode.insertBefore(p, parentList.nextSibling);
+                  parentList.remove();
+                  if (block) block.removeAttribute('data-bullet-style');
+                } else {
+                  parentList.parentNode.insertBefore(p, parentList.nextSibling);
+                }
+                // 커서를 새 <p> 로 이동
+                var range = document.createRange();
+                range.selectNodeContents(p);
+                range.collapse(true);
+                var sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+              } catch(err){ console.warn('[BULLET-ENTER]', err); }
+            }
+          }, 10);
+        }
+        return;
+      }
+      // Backspace — 빈 li 이면 outdent
+      if (e.key === 'Backspace') {
+        var sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) return;
+        // 커서가 li 몞멘에 있을 때만
+        var range = sel.getRangeAt(0);
+        if (!range.collapsed) return;
+        var li3 = _getCurrentLi();
+        if (!li3) return;
+        // li 첫 문자 위치있는지 확인 (단순 판단: startOffset === 0)
+        if (range.startOffset !== 0) return;
+        // 그리고 startContainer 가 li 첫번째 텍스트 노드 이면
+        var firstChild = li3.firstChild;
+        while (firstChild && firstChild.nodeType === 1 && firstChild.tagName === 'BR') firstChild = firstChild.nextSibling;
+        if (range.startContainer !== li3 && range.startContainer !== firstChild) return;
+        // 중첩 li 면 outdent, 최상위 li 면 기본 Backspace 허용
+        var parentList2 = li3.parentElement;
+        var grandParent2 = parentList2 && parentList2.parentElement;
+        if (grandParent2 && grandParent2.tagName === 'LI') {
+          e.preventDefault();
+          try { document.execCommand('outdent'); } catch(_){}
+          return;
+        }
+        // 최상위 li: 기본 동작 감수 (삭제 되면 li 삭제)
       }
     }, true);
   }
@@ -19279,9 +19389,67 @@
     log('복사 방식 설치');
   }
 
+  // p22i. 외부 붙여넣기 sanitize — 굴음(이미지처럼 굴음) 버그 수정
+  //   외부 HTML이 contenteditable="false" 또는 data-block-* 로 오염되면
+  //   해당 영역이 이미지처럼 괳음 → sanitize 로 제거
+  function _sanitizePastedHtml(html){
+    if (!html) return html;
+    // 자안적으로 contenteditable, data-block-*, class-"is-editing-focus", class-"is-selected" 제거
+    html = html.replace(/\s+contenteditable=("[^"]*"|'[^']*'|false|true)/gi, '');
+    html = html.replace(/\s+data-block-container=("[^"]*"|'[^']*')/gi, '');
+    // 혹시모로 CE=false 인라인 style 있으면 제거
+    html = html.replace(/user-select\s*:\s*none\s*;?/gi, '');
+    html = html.replace(/pointer-events\s*:\s*none\s*;?/gi, '');
+    return html;
+  }
+
+  // 페이지 내 이미 붙은 li/p/h1-6 등 필수 가능한 요소가 contenteditable=false 로 오염되었다면 복구
+  function _repairContentEditable(){
+    if (!contentEl) return 0;
+    var fixed = 0;
+    try {
+      // .editor-block 안의 p/h1-6/blockquote/ul/ol/pre/li 가 CE=false 면 CE=true 로 되돌림
+      var edibles = contentEl.querySelectorAll('.editor-block > p, .editor-block > h1, .editor-block > h2, .editor-block > h3, .editor-block > h4, .editor-block > h5, .editor-block > h6, .editor-block > blockquote, .editor-block > ul, .editor-block > ol, .editor-block > pre');
+      edibles.forEach(function(el){
+        if (el.getAttribute('contenteditable') === 'false') {
+          el.setAttribute('contenteditable', 'true');
+          fixed++;
+        }
+      });
+      // li 가 CE=false 면 CE=true 젬보기
+      var lis = contentEl.querySelectorAll('.editor-block li');
+      lis.forEach(function(li){
+        if (li.getAttribute('contenteditable') === 'false') {
+          li.removeAttribute('contenteditable');
+          fixed++;
+        }
+      });
+      // 이상한 user-select:none 인라인 style 제거
+      var frozen = contentEl.querySelectorAll('.editor-block *[style*="user-select"]');
+      frozen.forEach(function(el){
+        if (/user-select\s*:\s*none/i.test(el.getAttribute('style') || '')) {
+          el.style.userSelect = '';
+          fixed++;
+        }
+      });
+      var noPtr = contentEl.querySelectorAll('.editor-block *[style*="pointer-events"]');
+      noPtr.forEach(function(el){
+        if (/pointer-events\s*:\s*none/i.test(el.getAttribute('style') || '')) {
+          el.style.pointerEvents = '';
+          fixed++;
+        }
+      });
+    } catch(err){ console.warn('[REPAIR-CE]', err); }
+    if (fixed > 0) log('[REPAIR-CE] contenteditable ' + fixed + '개 복구됨');
+    return fixed;
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.repairContentEditable = _repairContentEditable; } catch(_){}
+
   // p1: 붙여넣기: 클립보드에 .editor-block HTML 있으면 블록 복원, 아니면 브라우저 기본
   function setupPasteHandler(){
     contentEl.addEventListener('paste', function(e){
+      // p22i: 붙여넣기 후 300ms 뒤에 CE 복구 한번 실행 (외부 HTML이 CE=false 가 들어오는 경우 대비)
+      setTimeout(_repairContentEditable, 300);
       // p15a: 이미지 데이터가 클립보드에 있으면 이미지 블록으로 삽입
       if (e.clipboardData && e.clipboardData.items) {
         var items = e.clipboardData.items;
@@ -19354,7 +19522,18 @@
 
       log('블록 붙여넣기: ' + pastedBlocks.length + '개');
     });
-    log('붙여넣기 핸들러 설치');
+
+    // p22i: 외부 텍스트 붙여넣기 후 CE 복구를 위해
+    //   1. focus 이석으로 계속 모니터링 (블록에 클릭할 때마다 복구)
+    //   2. selectionchange 이벤트에서도 한상 대응
+    document.addEventListener('focusin', function(e){
+      var block = e.target && e.target.closest && e.target.closest('.editor-block');
+      if (!block) return;
+      // 붙여넣기 직후 또는 간헑으로 CE=false 가 발생했다면 자동 복구
+      _repairContentEditable();
+    }, true);
+
+    log('붙여넣기 핸들러 설치 (p22i: CE 복구 포함)');
   }
 
   // p15a: 이미지 드래그&드롭 핸들러
