@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22u';
+  var VERSION = 'v2.0-β-p22v';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -16339,6 +16339,8 @@
     } catch(_){}
   }
 
+  // p22v: 루비 전용 다이얼로그 - openEditorDialog 우회 (타이밍 문제 원천 제거)
+  //       B/I/U 서식 툴바 + 크기 슬라이더 + 위치 슬라이더 통합
   function insertRuby(){
     if (!savedRange) return;
     restoreRange();
@@ -16349,36 +16351,124 @@
     }
     var baseText = sel.toString();
     saveRange();
-    openEditorDialog('윗글씨 (루비)', [
-      { key:'ruby', label:'"' + baseText + '" 위에 표시할 내용', default:'', placeholder:'서식 툴바로 굵기·색 지정 가능' }
-    ], function(vals){
-      if (!vals) return;
-      var rubyHtml = (vals.ruby || '').trim();
-      if (!rubyHtml || rubyHtml === '<br>') return;
+
+    // 초기값
+    var _initOffset = 55;
+    try { var _s = localStorage.getItem('ddl.rubyOffset'); if (_s != null && !isNaN(parseFloat(_s))) _initOffset = parseFloat(_s); } catch(_){}
+    var _initSize = 50;
+
+    // 다이얼로그 DOM 직접 구성
+    var existing = document.getElementById('ep-dialog-overlay');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'ep-dialog-overlay';
+    overlay.className = 'ep-dialog-overlay';
+
+    var box = document.createElement('div');
+    box.className = 'ep-dialog';
+    box.innerHTML =
+      '<div class="ep-dialog-header"><span>윗글씨 (루비)</span>' +
+        '<button type="button" class="ep-dialog-close" data-ruby-cancel="1">×</button>' +
+      '</div>' +
+      '<div class="ep-dialog-body">' +
+        '<div class="ep-dialog-row">' +
+          '<label class="ep-dialog-label">"' + escapeHtml(baseText) + '" 위에 표시할 내용</label>' +
+          '<div id="ruby-editable" contenteditable="true" style="min-height:1.8em; padding:0.4em 0.6em; background:transparent; border:none; border-bottom:1px solid rgba(15,58,58,0.35); font-family:inherit; color:var(--color,#0F3A3A); box-sizing:border-box; outline:none; font-size:0.9em; line-height:1.5;" data-placeholder="서식 툴바로 굵기·색 지정 가능"></div>' +
+          '<div id="ruby-fmttoolbar" style="display:flex; gap:4px; margin-top:6px; align-items:center; flex-wrap:wrap;">' +
+            '<button type="button" data-rcmd="bold"       class="pop-btn" style="font-weight:800;" title="굵게">B</button>' +
+            '<button type="button" data-rcmd="italic"     class="pop-btn" style="font-style:italic; font-family:serif;" title="기울임">I</button>' +
+            '<button type="button" data-rcmd="underline"  class="pop-btn" style="text-decoration:underline;" title="밑줄">U</button>' +
+            '<button type="button" data-rcmd="clearFormat" class="pop-btn" title="서식 지우기" style="margin-left:auto;">✕서식</button>' +
+          '</div>' +
+          '<div style="margin-top:12px; padding:10px 12px; background:rgba(15,58,58,0.03); border-radius:6px; display:flex; flex-direction:column; gap:10px;">' +
+            '<div>' +
+              '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">' +
+                '<span style="font-size:11.5px; font-weight:600; color:#0F3A3A;">루비 크기</span>' +
+                '<span id="ruby-lbl-size" style="font-size:11px; color:rgba(15,58,58,0.6); font-variant-numeric:tabular-nums;">' + _initSize + '%</span>' +
+              '</div>' +
+              '<input id="ruby-slider-size" type="range" min="30" max="90" step="5" value="' + _initSize + '" style="width:100%; accent-color:#FF9A76;" />' +
+              '<div style="display:flex; justify-content:space-between; font-size:9.5px; color:rgba(15,58,58,0.4); margin-top:1px;"><span>작게</span><span>기본</span><span>크게</span></div>' +
+            '</div>' +
+            '<div>' +
+              '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">' +
+                '<span style="font-size:11.5px; font-weight:600; color:#0F3A3A;">루비 위치 (위↔아래)</span>' +
+                '<span id="ruby-lbl-offset" style="font-size:11px; color:rgba(15,58,58,0.6); font-variant-numeric:tabular-nums;">' + _initOffset + '%</span>' +
+              '</div>' +
+              '<input id="ruby-slider-offset" type="range" min="0" max="100" step="5" value="' + _initOffset + '" style="width:100%; accent-color:#FF9A76;" />' +
+              '<div style="display:flex; justify-content:space-between; font-size:9.5px; color:rgba(15,58,58,0.4); margin-top:1px;"><span>위</span><span>기본</span><span>아래</span></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ep-dialog-footer">' +
+        '<button type="button" class="ep-btn-ghost" data-ruby-cancel="1">취소</button>' +
+        '<button type="button" class="ep-btn-primary" data-ruby-ok="1">확인</button>' +
+      '</div>';
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    var editable    = box.querySelector('#ruby-editable');
+    var fmtToolbar  = box.querySelector('#ruby-fmttoolbar');
+    var sliderSize  = box.querySelector('#ruby-slider-size');
+    var sliderOff   = box.querySelector('#ruby-slider-offset');
+    var lblSize     = box.querySelector('#ruby-lbl-size');
+    var lblOff      = box.querySelector('#ruby-lbl-offset');
+
+    // 로컬 상태 (클로저)
+    var _curSize   = _initSize;
+    var _curOffset = _initOffset;
+
+    // 슬라이더 이벤트
+    sliderSize.addEventListener('input', function(){
+      _curSize = parseFloat(sliderSize.value);
+      lblSize.textContent = _curSize + '%';
+    });
+    sliderOff.addEventListener('input', function(){
+      _curOffset = parseFloat(sliderOff.value);
+      lblOff.textContent = _curOffset + '%';
+    });
+
+    // 서식 툴바 - mousedown preventDefault 로 selection 유지 (p22m 교훈)
+    fmtToolbar.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    fmtToolbar.addEventListener('click', function(e){
+      var btn = e.target.closest('[data-rcmd]');
+      if (!btn) return;
+      var cmd = btn.getAttribute('data-rcmd');
+      editable.focus();
+      if (cmd === 'bold') document.execCommand('bold', false, null);
+      else if (cmd === 'italic') document.execCommand('italic', false, null);
+      else if (cmd === 'underline') document.execCommand('underline', false, null);
+      else if (cmd === 'clearFormat') document.execCommand('removeFormat', false, null);
+    });
+
+    // editable 포커스
+    setTimeout(function(){ try { editable.focus(); } catch(_){} }, 30);
+
+    function _closeRuby(){ if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+
+    function _applyRuby(){
+      var rubyHtml = (editable.innerHTML || '').trim();
+      if (!rubyHtml || rubyHtml === '<br>') { _closeRuby(); return; }
+      // 색 관련 태그 제거 (사용자 지시: 색은 본문 상속)
+      rubyHtml = rubyHtml.replace(/<font\b[^>]*>/gi, '').replace(/<\/font>/gi, '')
+                          .replace(/\s*color\s*:\s*[^;"]+;?/gi, '');
+
       restoreRange();
       var sel2 = window.getSelection();
-      if (!sel2 || sel2.rangeCount === 0) return;
+      if (!sel2 || sel2.rangeCount === 0) { _closeRuby(); return; }
       var range = sel2.getRangeAt(0);
       var el = document.createElement('mark');
       el.className = 'ddl-ruby';
-      // p19j-fix3: 색 관련 태그 제거 (사용자 지시: 색은 본문 상속)
-      rubyHtml = rubyHtml.replace(/<font\b[^>]*>/gi, '').replace(/<\/font>/gi, '')
-                          .replace(/\s*color\s*:\s*[^;"]+;?/gi, '');
       el.setAttribute('data-rt', rubyHtml);
       el.setAttribute('title', rubyHtml.replace(/<[^>]+>/g,''));
       el.style.background = 'transparent';
       el.style.color = 'inherit';
-      // p22u: 편집창 슬라이더 값 반영 - 전역 변수에서 읽기 (다이얼로그가 이미 닫혔으므로)
-      try {
-        var _pend = window.__DDL_RUBY_PENDING;
-        if (_pend){
-          if (!isNaN(_pend.size))   el.style.setProperty('--ddl-ruby-size', (_pend.size / 100) + 'em');
-          if (!isNaN(_pend.offset)) el.style.setProperty('--ddl-ruby-offset', _pend.offset + '%');
-        }
-        // 다음 루비 대비 초기화
-        try { window.__DDL_RUBY_PENDING = null; } catch(_){}
-      } catch(_){}
-      // HTML 이면 편집 중 시각화용 rt-span 삽입 (저장 시 제거됨)
+      // p22v: 클로저 로컬 상태에서 직접 인라인 style 세팅 (전역 변수 우회)
+      el.style.setProperty('--ddl-ruby-size', (_curSize / 100) + 'em');
+      el.style.setProperty('--ddl-ruby-offset', _curOffset + '%');
+      // HTML 서식 있으면 rt-span
       if (rubyHtml.indexOf('<') >= 0) {
         var _rtSpan = document.createElement('span');
         _rtSpan.className = 'ddl-ruby-rt';
@@ -16390,8 +16480,7 @@
       try {
         el.appendChild(range.extractContents());
         range.insertNode(el);
-        // p22s: mark 뒤에 zero-width space 텍스트 노드 삽입하고 커서를 그 뒤로.
-        //   → mark 안 편집으로 폭이 늘어나 루비 위치가 흔들리는 문제 방지
+        // mark 뒤 zero-width space + 커서 이동 (p22s 방어)
         var _zwsp = document.createTextNode('\u200B');
         if (el.parentNode){
           if (el.nextSibling) el.parentNode.insertBefore(_zwsp, el.nextSibling);
@@ -16403,9 +16492,21 @@
         nr.collapse(true);
         sel2.addRange(nr);
         saveRange();
-      } catch(err){ console.warn('[p19i] ruby error', err); }
+      } catch(err){ console.warn('[p22v] ruby error', err); }
+      _closeRuby();
+    }
+
+    // 버튼 클릭
+    overlay.addEventListener('click', function(e){
+      if (e.target === overlay) { _closeRuby(); return; }
+      if (e.target.closest('[data-ruby-cancel]')) { _closeRuby(); return; }
+      if (e.target.closest('[data-ruby-ok]'))     { _applyRuby(); return; }
     });
-    setTimeout(function(){ _augmentRubyDialogWithToolbar(''); }, 30);
+    // 키보드
+    editable.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _applyRuby(); }
+      else if (e.key === 'Escape') { e.preventDefault(); _closeRuby(); }
+    });
   }
 
   function toggleSupSub(which){
@@ -17935,8 +18036,12 @@
   //   · Shift+Tab→ 상위 계층 (outdent) · 최상위면 리스트 종료 시도
   //   · Enter    → 빈 li 이면 자동 종료 (불릿 밖 일반 문단으로 변환)
   //   · Backspace→ 빈 li 메이이면 outdent · 데로 내려가마말기
+  // p22v: 노션식 불릿 완전 재작성 (execCommand 대체)
+  //   - _customIndent(li): Tab → 이전 형제 li 안 sublist 로 편입
+  //   - _customOutdent(li): Shift+Tab → 부모 li 뒤로 이동, 뒤 형제 li 들은 현재 li 안 sublist 로
+  //   - 빈 li Enter: 편집기 블록(<p>) 로 변환 + 커서 이동
+  //   - Backspace 빈 li 맨앞: outdent 또는 리스트 종료
   function _setupBulletTabHandler(){
-    // 리스트 내부인지 유효성 체크 감지 헬퍼
     function _getCurrentLi(){
       var sel = window.getSelection();
       if (!sel || sel.rangeCount === 0) return null;
@@ -17944,100 +18049,134 @@
       var el   = node.nodeType === 1 ? node : node.parentElement;
       return el && el.closest && el.closest('li');
     }
-    // li 가 비어있어 거 가 있는지 판단 (야새 <br> 뿐 혹은 빈 문자열)
     function _isLiEmpty(li){
       if (!li) return false;
       var text = (li.textContent || '').replace(/\u200B|\u00A0/g, '').trim();
       if (text.length > 0) return false;
-      // 자식이 내부 li (중첩 리스트) 를 가지면 생략
       var innerList = li.querySelector('ul, ol');
       if (innerList) return false;
       return true;
     }
+    function _placeCursor(node, atStart){
+      try {
+        var range = document.createRange();
+        range.selectNodeContents(node);
+        range.collapse(atStart !== false);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch(_){}
+    }
+
+    // Tab: 이전 형제 li 안 sublist 로 편입
+    function _customIndent(li){
+      if (!li) return false;
+      var prev = li.previousElementSibling;
+      if (!prev || prev.tagName !== 'LI') return false;
+      var parentList = li.parentElement;
+      var sublist = prev.querySelector(':scope > ul, :scope > ol');
+      if (!sublist){
+        sublist = document.createElement(parentList.tagName);
+        prev.appendChild(sublist);
+      }
+      sublist.appendChild(li);
+      _placeCursor(li, true);
+      return true;
+    }
+
+    // Shift+Tab: 부모 li 뒤로 이동, 뒤 형제 li 들은 현재 li 안 sublist 로
+    function _customOutdent(li){
+      if (!li) return false;
+      var parentList = li.parentElement;                // ul/ol
+      var grandParent = parentList.parentElement;       // li 또는 다른 것
+
+      // 뒤 형제 li 수집
+      var following = [];
+      var next = li.nextElementSibling;
+      while (next){ following.push(next); next = next.nextElementSibling; }
+      if (following.length > 0){
+        var newSub = document.createElement(parentList.tagName);
+        following.forEach(function(s){ newSub.appendChild(s); });
+        li.appendChild(newSub);
+      }
+
+      if (grandParent && grandParent.tagName === 'LI'){
+        // 중첩 → 부모 li 뒤로
+        var greatGrand = grandParent.parentElement;
+        greatGrand.insertBefore(li, grandParent.nextSibling);
+        if (parentList.children.length === 0) parentList.remove();
+        _placeCursor(li, true);
+        return 'outdent-nested';
+      } else {
+        // 최상위 → 리스트 밖으로 편집기 블록 <p> 생성
+        var editorBlock = parentList.closest && parentList.closest('.editor-block');
+        var newP = document.createElement('p');
+        newP.setAttribute('contenteditable', 'true');
+        newP.innerHTML = li.innerHTML || '<br>';
+        if (editorBlock){
+          var wrapper = document.createElement('div');
+          wrapper.className = 'editor-block';
+          wrapper.setAttribute('data-block-type', 'P');
+          if (typeof makeBlockHandle === 'function') wrapper.appendChild(makeBlockHandle());
+          wrapper.appendChild(newP);
+          editorBlock.parentNode.insertBefore(wrapper, editorBlock.nextSibling);
+          // 리스트가 비면 editorBlock 도 제거
+          li.remove();
+          if (parentList.children.length === 0){
+            editorBlock.parentNode.removeChild(editorBlock);
+          }
+        } else {
+          // fallback: parentList 옆에 삽입
+          parentList.parentNode.insertBefore(newP, parentList.nextSibling);
+          li.remove();
+          if (parentList.children.length === 0) parentList.remove();
+        }
+        _placeCursor(newP, true);
+        return 'outdent-toplevel';
+      }
+    }
 
     document.addEventListener('keydown', function(e){
-      // Tab / Shift+Tab — li 안에서만
-      if (e.key === 'Tab') {
+      // Tab / Shift+Tab
+      if (e.key === 'Tab'){
         var li = _getCurrentLi();
         if (!li) return;
         e.preventDefault();
-        if (e.shiftKey) {
-          try { document.execCommand('outdent'); } catch(_){}
-        } else {
-          try { document.execCommand('indent'); } catch(_){}
-        }
+        if (e.shiftKey) _customOutdent(li);
+        else            _customIndent(li);
         return;
       }
-      // Enter — 빈 li 이면 리스트 종료
-      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      // Enter — 빈 li 이면 outdent 또는 리스트 종료
+      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey){
         var li2 = _getCurrentLi();
         if (!li2) return;
-        if (!_isLiEmpty(li2)) return;   // 비어있지 않으면 버이저 기본 동작
+        if (!_isLiEmpty(li2)) return;   // 내용 있으면 기본 동작
         e.preventDefault();
-        // 이런 경우: 중첩 li 면 outdent → 한 단계 나옴, 이미 최상위면 새 문단으로
-        var parentList = li2.parentElement;   // ul / ol
-        var grandParent = parentList && parentList.parentElement;
-        var isNested = grandParent && (grandParent.tagName === 'LI');
-        if (isNested) {
-          try { document.execCommand('outdent'); } catch(_){}
-        } else {
-          // 최상위 li → 리스트 밖으로 새 문단 생성
-          try { document.execCommand('outdent'); } catch(_){}
-          // outdent 가 안 되는 브라우저가 있으니 보강적으로 li 삭제 후 <p> 삽입
-          setTimeout(function(){
-            if (li2 && li2.parentElement && (li2.parentElement.tagName === 'UL' || li2.parentElement.tagName === 'OL')) {
-              // 이런 경우 outdent 가 안 먹혀음: 직접 변환
-              var block = parentList.closest && parentList.closest('.editor-block');
-              var p = document.createElement('p');
-              p.setAttribute('contenteditable', 'true');
-              p.innerHTML = '<br>';
-              try {
-                li2.remove();
-                if (parentList.children.length === 0) {
-                  // 불릿이 비어 있으면 명질 대체
-                  parentList.parentNode.insertBefore(p, parentList.nextSibling);
-                  parentList.remove();
-                  if (block) block.removeAttribute('data-bullet-style');
-                } else {
-                  parentList.parentNode.insertBefore(p, parentList.nextSibling);
-                }
-                // 커서를 새 <p> 로 이동
-                var range = document.createRange();
-                range.selectNodeContents(p);
-                range.collapse(true);
-                var sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(range);
-              } catch(err){ console.warn('[BULLET-ENTER]', err); }
-            }
-          }, 10);
-        }
+        _customOutdent(li2);
         return;
       }
-      // Backspace — 빈 li 이면 outdent
-      if (e.key === 'Backspace') {
+      // Backspace — 빈 li 맨앞이면 outdent 또는 리스트 종료
+      if (e.key === 'Backspace'){
         var sel = window.getSelection();
         if (!sel || sel.rangeCount === 0) return;
-        // 커서가 li 몞멘에 있을 때만
         var range = sel.getRangeAt(0);
         if (!range.collapsed) return;
         var li3 = _getCurrentLi();
         if (!li3) return;
-        // li 첫 문자 위치있는지 확인 (단순 판단: startOffset === 0)
-        if (range.startOffset !== 0) return;
-        // 그리고 startContainer 가 li 첫번째 텍스트 노드 이면
-        var firstChild = li3.firstChild;
-        while (firstChild && firstChild.nodeType === 1 && firstChild.tagName === 'BR') firstChild = firstChild.nextSibling;
-        if (range.startContainer !== li3 && range.startContainer !== firstChild) return;
-        // 중첩 li 면 outdent, 최상위 li 면 기본 Backspace 허용
-        var parentList2 = li3.parentElement;
-        var grandParent2 = parentList2 && parentList2.parentElement;
-        if (grandParent2 && grandParent2.tagName === 'LI') {
-          e.preventDefault();
-          try { document.execCommand('outdent'); } catch(_){}
-          return;
+        // 커서가 li 맨앞인지 (li 가 완전히 빈 상태거나, 첫 텍스트 노드 offset 0)
+        var isAtStart = false;
+        if (_isLiEmpty(li3)) {
+          isAtStart = true;
+        } else {
+          if (range.startOffset === 0){
+            var firstChild = li3.firstChild;
+            while (firstChild && firstChild.nodeType === 1 && firstChild.tagName === 'BR') firstChild = firstChild.nextSibling;
+            if (range.startContainer === li3 || range.startContainer === firstChild) isAtStart = true;
+          }
         }
-        // 최상위 li: 기본 동작 감수 (삭제 되면 li 삭제)
+        if (!isAtStart) return;
+        e.preventDefault();
+        _customOutdent(li3);
       }
     }, true);
   }
