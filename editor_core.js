@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22p';
+  var VERSION = 'v2.0-β-p22q';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1662,7 +1662,9 @@
     '.ep-modern-toolbar-sep { border-top: 1px solid rgba(15,58,58,0.1); margin: 4px -2px 6px; }',
     /* p22f: 1행 전용 · 헤더 + 세로 구분선 + BIUS 4개 (flex row) */
     '.ep-modern-toolbar-row {',
+    /* p22q: width 100% 추가 - 4행이 자식 크기에 맞춰 shrink 되어 오른쪽으로 몰리던 문제 수정 */
     '  display: flex; align-items: center; gap: 6px;',
+    '  width: 100%; box-sizing: border-box;',
     '  margin-bottom: 4px;',
     '}',
     '.ep-modern-toolbar-row-cell {',
@@ -19779,7 +19781,7 @@
     '  left: 50% !important;',
     '  bottom: 100% !important;',
     /* p22p: translateY 로 아래로 밀어 원 텍스트에 가깝게 배치 (사용자 요청: 너무 위에 붕 뜸) */
-    '  transform: translateX(-50%) translateY(35%) !important;',
+    '  transform: translateX(-50%) translateY(55%) !important;',
     '  font-size: 0.5em !important;',
     '  line-height: 1 !important;',
     '  white-space: nowrap !important;',
@@ -19794,7 +19796,7 @@
     '  left: 50% !important;',
     '  bottom: 100% !important;',
     /* p22p: HTML 서식 있는 루비도 동일하게 아래로 이동 */
-    '  transform: translateX(-50%) translateY(35%) !important;',
+    '  transform: translateX(-50%) translateY(55%) !important;',
     '  font-size: 0.5em !important;',
     '  line-height: 1 !important;',
     '  white-space: nowrap !important;',
