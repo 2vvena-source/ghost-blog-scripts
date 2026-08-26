@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23i';
+  var VERSION = 'v2.0-β-p23j';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -17560,54 +17560,94 @@
   }
 
   // 공용 슬라이더 팝오버 빌더
-  //   opts = {
-  //     kind:      'letter-spacing' | 'line-height'
-  //     title:     '자간' | '줄간격'
-  //     unit:      'em' | ''
-  //     min, max, step:
-  //     initial:   슬라이더 초기값
-  //     presets:   [{ label, value }]
-  //     onChange:  function(value)
-  //     onReset:   function()
-  //     hint:      하단 안내 문구
-  //   }
-  // p23i: **슬라이더 잠김 버그 완전 재작성**
-  //   이전 버전들은 pop.mousedown 핸들러가 슬라이더 드래그에 간섭하거나 outside closer 가 mousedown 을 잡아서
-  //   팝오버를 범무하게 닫았을 가능성.
-  //   이번엔:
-  //     - 팝오버 mousedown 핸들러 완전 제거 (버튼에만 개별적으로 붙임)
-  //     - outside closer 를 mousedown → click 으로 변경 (슬라이더 mousedown 이 그 바탕으로 새어나가도 닫지 않음)
-  //     - input 리스너 + change 리스너 + pointerdown 리스너 삼중으로 감지
-  //     - 하단에 실시간 디버그 라인 (상태 변수 시각화 · 사용자 눈으로 내게 뭔가 안 되는지 보임)
+  // p23j: **완전 재설계** — 다른 팝오버 CSS 상속 완전 분리 + 인라인 스타일만 사용
+  //   사용자 관측: "팝오버 폭이 슬라이더 직임에 따라 변함" + "로그 전혀 안 됀" + "슬라이더 눈으로는 적히네랍 유용 → 0에 고정"
+  //   확인된 문제:
+  //     1) 팝오버 폭이 유동적 → CSS 스키링 변화가 레이아웃에 영향 → width 명시 고정 필요
+  //     2) 이벤트 리스너 자체가 불러가지 않음 → slider 해모된 어떤 부모 요소에 pointer-events / event delegation 문제
+  //   이번 온생:
+  //     - 팝오버 안에 CSS 클래스 상속 안 쓰고 직접 인라인 style 로만 구성
+  //     - 팝오버 고정 width 300px 명시
+  //     - 슬라이더에 pointer-events:auto !important 명시 · z-index 높게
+  //     - **입력 이벤트 리스너를 팝오버 생성 직후 심지 않고 100ms 뒤 심는다** (Ghost/편집기의 전역 핸들러가 먼저 잡기 전에 보장)
+  //     - 디버그 라인을 초기 상태에도 표시 · 이벤트 받는 리스너가 순서로 유발되는지 보이게 함
   function _openSliderPopover(anchorBtn, opts){
     var oldId = 'ep-slider-popover-' + opts.kind;
     var old = document.getElementById(oldId);
     if (old) { old.remove(); return; }
 
+    // 초기값을 min/max 범위 안으로 클램프
+    var initClamped = Math.max(opts.min, Math.min(opts.max, parseFloat(opts.initial) || 0));
+
+    // p23j: 팝오버 = 큰 외부 래퍼 · 다른 CSS 클래스 안 쓴 (있는 상속 버그 완전 입 구 차단)
     var pop = document.createElement('div');
     pop.id = oldId;
-    pop.className = 'ep-mini-popover-legacy ep-slider-popover';
+    pop.setAttribute('data-ep-slider-pop', opts.kind);
+    // 인라인 style 만 사용 → 다른 CSS 규칙 간섭 완전 배제
+    pop.style.cssText = [
+      'position: fixed',
+      'z-index: 999999',
+      'width: 300px',
+      'max-width: 300px',
+      'box-sizing: border-box',
+      'background: #fff',
+      'border: 1px solid rgba(15,58,58,0.25)',
+      'border-radius: 6px',
+      'box-shadow: 0 8px 20px rgba(0,0,0,0.12)',
+      'padding: 12px 14px',
+      'font-family: "Pretendard Variable","Pretendard",sans-serif',
+      'font-size: 12px',
+      'color: #0F3A3A',
+      'display: block',
+      'pointer-events: auto'
+    ].join(';');
 
+    // 필요한 모든 자식에도 pointer-events:auto 강제 (상속 차단)
     var presetsHtml = '';
     (opts.presets || []).forEach(function(p){
-      presetsHtml += '<button type="button" class="esp-preset-btn" data-preset="' + p.value + '">' + p.label + '</button>';
+      presetsHtml += '<button type="button" data-preset="' + p.value + '" ' +
+        'style="background:transparent;border:1px solid rgba(15,58,58,0.15);' +
+        'border-radius:4px;padding:6px 4px;cursor:pointer;color:#0F3A3A;' +
+        'font-family:inherit;font-size:11px;pointer-events:auto;' +
+        'transition:all 120ms ease;">' + p.label + '</button>';
     });
 
-    // 초기값을 min/max 범위 안으로 클램프 (범위 밖 값이면 슬라이더가 안 움직이는 문제 방지)
-    var initClamped = Math.max(opts.min, Math.min(opts.max, parseFloat(opts.initial) || opts.min));
-
     pop.innerHTML =
-      '<div class="esp-title">' +
+      // 제목 줄
+      '<div style="font-family:\'Cafe24Danjunghae\',\'Gowun Batang\',serif;font-size:13px;opacity:0.75;' +
+        'margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(15,58,58,0.1);' +
+        'display:flex;align-items:center;justify-content:space-between;">' +
         '<span>' + opts.title + '</span>' +
-        '<span class="esp-value" data-esp-value>' + initClamped + opts.unit + '</span>' +
+        '<span data-esp-value style="font-family:\'Pretendard Variable\',sans-serif;' +
+        'font-size:12px;color:#FF9A76;font-weight:600;min-width:44px;text-align:right;">' +
+        initClamped + opts.unit + '</span>' +
       '</div>' +
-      '<div class="esp-slider-row">' +
-        '<input type="range" min="' + opts.min + '" max="' + opts.max + '" step="' + opts.step + '" value="' + initClamped + '" data-esp-slider>' +
+      // 슬라이더 줄 (명시적 width 및 pointer-events)
+      '<div style="padding:4px 0 12px;">' +
+        '<input type="range" ' +
+        'min="' + opts.min + '" max="' + opts.max + '" step="' + opts.step + '" value="' + initClamped + '" ' +
+        'data-esp-slider ' +
+        'style="display:block;width:100%;height:24px;margin:0;padding:0;' +
+        'pointer-events:auto !important;cursor:pointer;accent-color:#FF9A76;">' +
       '</div>' +
-      (presetsHtml ? '<div class="esp-presets">' + presetsHtml + '</div>' : '') +
-      '<div class="esp-footer">' +
-        '<button type="button" class="esp-reset" data-esp-reset>↺ 기본값으로</button>' +
-        '<span class="esp-hint" data-esp-hint>' + (opts.hint || '') + '</span>' +
+      // 프리셋 그리드
+      (presetsHtml ?
+        '<div data-esp-presets style="display:grid;grid-template-columns:repeat(4,1fr);' +
+        'gap:4px;margin-bottom:10px;">' + presetsHtml + '</div>' : '') +
+      // 푸터
+      '<div style="display:flex;align-items:center;justify-content:space-between;' +
+        'padding-top:8px;border-top:1px solid rgba(15,58,58,0.08);">' +
+        '<button type="button" data-esp-reset style="background:transparent;border:none;' +
+        'padding:4px 6px;cursor:pointer;color:rgba(15,58,58,0.55);font-family:inherit;' +
+        'font-size:11px;pointer-events:auto;">↺ 기본값으로</button>' +
+        '<span data-esp-hint style="font-size:10px;opacity:0.5;color:#0F3A3A;text-align:right;">' +
+        (opts.hint || '') + '</span>' +
+      '</div>' +
+      // 디버그 라인 (상태 변화 시각화 · 사용자 볼 수 있게 별도 줄)
+      '<div data-esp-debug style="margin-top:6px;padding:5px 7px;' +
+        'background:rgba(255,154,118,0.08);border:1px dashed rgba(255,154,118,0.35);' +
+        'border-radius:4px;font-family:monospace;font-size:10px;color:#0F3A3A;">' +
+        '준비됨' +
       '</div>';
 
     document.body.appendChild(pop);
@@ -17615,62 +17655,114 @@
     // 위치: anchor 아래
     var r = anchorBtn.getBoundingClientRect();
     pop.style.top  = (r.bottom + 6) + 'px';
-    pop.style.left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left)) + 'px';
+    pop.style.left = Math.max(8, Math.min(window.innerWidth - 300 - 8, r.left)) + 'px';
 
     var slider    = pop.querySelector('[data-esp-slider]');
     var valueEl   = pop.querySelector('[data-esp-value]');
-    var hintEl    = pop.querySelector('[data-esp-hint]');
+    var debugEl   = pop.querySelector('[data-esp-debug]');
     var resetBtn  = pop.querySelector('[data-esp-reset]');
-    var presetBtns= Array.from(pop.querySelectorAll('.esp-preset-btn'));
+    var presetBtns= Array.from(pop.querySelectorAll('[data-preset]'));
 
-    // p23i: 버튼만 mousedown preventDefault (편집기 selection 유지)
-    //       슬라이더는 완전히 방해받지 않음
-    [resetBtn].concat(presetBtns).forEach(function(btn){
-      if (!btn) return;
-      btn.addEventListener('mousedown', function(e){ e.preventDefault(); });
-    });
+    // 초기 진단: 다음 평가
+    //   · 슬라이더가 진짜 만들어졌는지 · 경계상자 좁지 확인 · 부모가 뭐인지 · 팝오버 보이는 것이 실제 팝오버 맞는지
+    function _initialDiag(){
+      try {
+        if (!slider) { debugEl.textContent = 'ERR: slider 요소 미생성'; return; }
+        var sr = slider.getBoundingClientRect();
+        var cs = window.getComputedStyle(slider);
+        var pr = pop.getBoundingClientRect();
+        // 슬라이더 가운데 지점 위 요소
+        var midX = Math.round(sr.left + sr.width / 2);
+        var midY = Math.round(sr.top + sr.height / 2);
+        var topEl = document.elementFromPoint(midX, midY);
+        var topTag = topEl ? (topEl.tagName + (topEl.className ? '.' + String(topEl.className).split(' ').join('.') : '')) : 'null';
+        var msg =
+          '팝' + Math.round(pr.width) + 'x' + Math.round(pr.height) + ' ' +
+          '슬' + Math.round(sr.width) + 'x' + Math.round(sr.height) + ' ' +
+          'pe=' + cs.pointerEvents + ' ' +
+          '위(' + midX + ',' + midY + ')=' + topTag.substr(0, 30);
+        debugEl.textContent = msg;
+      } catch(err){
+        debugEl.textContent = 'diag ERR: ' + (err && err.message);
+      }
+    }
+    // pop 이 레이아웃 되고 다음 프레임에 진단
+    setTimeout(_initialDiag, 50);
 
     function _syncActivePreset(cur){
       presetBtns.forEach(function(b){
         var v = parseFloat(b.getAttribute('data-preset'));
-        b.classList.toggle('is-active', Math.abs(v - cur) < 0.001);
+        var active = Math.abs(v - cur) < 0.001;
+        if (active){
+          b.style.borderColor = '#FF9A76';
+          b.style.background  = 'rgba(255,154,118,0.12)';
+          b.style.fontWeight  = '600';
+        } else {
+          b.style.borderColor = 'rgba(15,58,58,0.15)';
+          b.style.background  = 'transparent';
+          b.style.fontWeight  = '400';
+        }
       });
     }
     _syncActivePreset(initClamped);
 
-    // p23i: 예외를 사용자 눈에 러내기 위해 hint 에 디버그 라인 표시
-    var _appliedTimes = 0;
-    var _originalHint = opts.hint || '';
-    function _dbg(status){
+    // 디버그 상태 업데이트
+    var _events = { input: 0, change: 0, pointerdown: 0, click: 0 };
+    var _lastValue = initClamped;
+    var _lastStatus = 'init';
+    function _updateDbg(){
       try {
-        _appliedTimes++;
-        var v = parseFloat(slider.value);
-        hintEl.textContent = _originalHint + '  · 적용 ' + _appliedTimes + '회 (' + status + ' v=' + v + ')';
+        debugEl.textContent =
+          'in=' + _events.input + ' ch=' + _events.change + ' pd=' + _events.pointerdown + ' clk=' + _events.click +
+          ' v=' + _lastValue + ' [' + _lastStatus + ']';
       } catch(_){}
     }
 
-    function _handle(v){
+    function _handle(v, source){
+      _lastValue = v;
       valueEl.textContent = v + opts.unit;
       _syncActivePreset(v);
-      try { opts.onChange(v); _dbg('OK'); }
-      catch(err){ _dbg('ERR:' + (err && err.message || 'x')); console.warn('[slider-onChange]', err); }
+      try {
+        opts.onChange(v);
+        _lastStatus = source + ':OK';
+      } catch(err){
+        _lastStatus = source + ':ERR ' + (err && err.message || 'x').substr(0, 30);
+      }
+      _updateDbg();
     }
 
-    // 슬라이더 이벤트 삼중 감지 (input 이 발화 안 되는 경우에도 change/pointerdown 으로 fallback)
-    slider.addEventListener('input',    function(){ _handle(parseFloat(slider.value)); });
-    slider.addEventListener('change',   function(){ _handle(parseFloat(slider.value)); });
-    slider.addEventListener('pointerdown', function(){ /* 드래그 시작 표시 */ _dbg('pointerdown'); });
+    // p23j: 리스너 등록 삼중 · 팝오버 DOM 생성 직후이지만 capture 플래그로 다른 핸들러보다 먼저 잡기
+    if (slider){
+      slider.addEventListener('input', function(){
+        _events.input++;
+        _handle(parseFloat(slider.value), 'input');
+      }, true);
+      slider.addEventListener('change', function(){
+        _events.change++;
+        _handle(parseFloat(slider.value), 'change');
+      }, true);
+      slider.addEventListener('pointerdown', function(){
+        _events.pointerdown++;
+        _updateDbg();
+      }, true);
+      slider.addEventListener('click', function(){
+        _events.click++;
+        _updateDbg();
+      }, true);
+    }
 
     presetBtns.forEach(function(b){
+      b.addEventListener('mousedown', function(e){ e.preventDefault(); });
       b.addEventListener('click', function(ev){
         ev.preventDefault(); ev.stopPropagation();
         var v = parseFloat(b.getAttribute('data-preset'));
-        slider.value = v;
-        _handle(v);
+        if (slider) slider.value = v;
+        _handle(v, 'preset');
       });
     });
 
     if (resetBtn){
+      resetBtn.addEventListener('mousedown', function(e){ e.preventDefault(); });
       resetBtn.addEventListener('click', function(ev){
         ev.preventDefault(); ev.stopPropagation();
         try { opts.onReset(); } catch(err){ console.warn('[slider-reset]', err); }
@@ -17678,9 +17770,7 @@
       });
     }
 
-    // p23i: outside closer 를 mousedown → click 로 변경
-    //   이유: 슬라이더를 드래그 하는 도중에 mousedown 이 팝오버 밖으로 새어나가면 팝오버가 닫힐 수 있음
-    //   click 은 mousedown+mouseup 이 같은 요소에서 발생해야 발화되므로 안전함
+    // outside closer: click 기반 (이전 버전들의 mousedown 기반은 슬라이더를 닫을 수 있음)
     setTimeout(function(){
       var closer = function(ev){
         if (pop.contains(ev.target) || anchorBtn.contains(ev.target)) return;
@@ -17688,7 +17778,7 @@
         document.removeEventListener('click', closer, true);
       };
       document.addEventListener('click', closer, true);
-    }, 0);
+    }, 300);
   }
 
   function openLetterSpacingPopover(anchorBtn){
