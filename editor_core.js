@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22z';
+  var VERSION = 'v2.0-β-p23a';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -15104,21 +15104,9 @@
       }
       return '\u27EArt-enc:' + enc + '\u27EB' + inner + '\u27EA/rt-enc\u27EB';
     }
-    // p22x: mark 전체(속성+style 포함) 를 캡처해서 크기/위치 값도 마커에 담기
-    html = html.replace(/<mark\s[^>]*class="ddl-ruby"[^>]*>([\s\S]*?)<\/mark>/g, function(fullMatch, inner){
-      // data-rt 추출
-      var rtMatch = fullMatch.match(/data-rt="([^"]*)"/);
-      if (!rtMatch) return fullMatch;
-      var rt = rtMatch[1];
-      // style 에서 --ddl-ruby-size, --ddl-ruby-offset 값 추출
-      var extras = '';
-      var szMatch = fullMatch.match(/--ddl-ruby-size:\s*([0-9.]+)em/);
-      var ofMatch = fullMatch.match(/--ddl-ruby-offset:\s*([0-9.]+)%/);
-      if (szMatch) { var szPct = Math.round(parseFloat(szMatch[1]) * 100); extras += '|s:' + szPct; }
-      if (ofMatch) { extras += '|o:' + Math.round(parseFloat(ofMatch[1])); }
-      // p22x: extras 를 rt 값 끝에 붙임 (기존 _rubyMarker 로직 그대로 활용하되 rt 를 확장)
-      return _rubyMarker(fullMatch, rt + extras, inner);
-    });
+    // p23a: 크기/위치는 전역 CSS 변수로 관리하므로 마커 인코딩 불필요 (원본 방식으로 되돌림)
+    html = html.replace(/<mark\s[^>]*class="ddl-ruby"[^>]*data-rt="([^"]*)"[^>]*>([\s\S]*?)<\/mark>/g, _rubyMarker);
+    html = html.replace(/<mark\s[^>]*data-rt="([^"]*)"[^>]*class="ddl-ruby"[^>]*>([\s\S]*?)<\/mark>/g, _rubyMarker);
 
     // p13e: 저장 HTML 진단 로그
     log('[SAVE-HTML] 길이:', html.length, '/ 콜아웃:', (html.match(/callout-box/g)||[]).length, '/ 구분선:', (html.match(/ddl-divider-block/g)||[]).length, '/ 버튼:', (html.match(/ddl-button-block/g)||[]).length, '/ kg-card:', (html.match(/kg-card-begin/g)||[]).length);
@@ -16261,11 +16249,16 @@
       + '<button type="button" data-rcmd="clearFormat" class="pop-btn" title="서식 지우기" style="margin-left:auto;">✕서식</button>';
     wrap.appendChild(toolbar);
 
-    // p22z: 크기·위치 슬라이더 - 확실히 발화하도록 modal 안에 배치, 값은 전역 __DDL_RUBY_PENDING 에 저장
+    // p23a: 크기·위치 슬라이더 - 실시간 CSS 변수 변경 방식 (모든 루비에 즉시 반영)
+    //   초기값: localStorage 에서 저장된 값 우선 사용
     var _initOffset = 55;
-    try { var _s = localStorage.getItem('ddl.rubyOffset'); if (_s != null && !isNaN(parseFloat(_s))) _initOffset = parseFloat(_s); } catch(_){}
     var _initSize = 50;
-    try { window.__DDL_RUBY_PENDING = { size: _initSize, offset: _initOffset }; } catch(_){}
+    try {
+      var _so = localStorage.getItem('ddl.rubyOffset');
+      if (_so != null && !isNaN(parseFloat(_so))) _initOffset = parseFloat(_so);
+      var _ss = localStorage.getItem('ddl.rubySize');
+      if (_ss != null && !isNaN(parseFloat(_ss))) _initSize = parseFloat(_ss);
+    } catch(_){}
 
     var slidersBox = document.createElement('div');
     slidersBox.style.cssText = 'margin-top:12px; padding:10px 12px; background:rgba(15,58,58,0.03); border-radius:6px; display:flex; flex-direction:column; gap:10px;';
@@ -16286,6 +16279,8 @@
       + '</div>';
     wrap.appendChild(slidersBox);
 
+    // p23a: 슬라이더 이동 시 즉시 CSS 변수 (:root) 를 갱신 → 모든 루비가 함께 움직임
+    //       localStorage 에도 저장하여 새로고침 후에도 유지
     slidersBox.addEventListener('input', function(e){
       var s = e.target.getAttribute && e.target.getAttribute('data-rslider');
       if (!s) return;
@@ -16293,50 +16288,14 @@
       var lbl = slidersBox.querySelector('[data-rlbl="' + s + '"]');
       if (lbl) lbl.textContent = v + '%';
       try {
-        if (!window.__DDL_RUBY_PENDING) window.__DDL_RUBY_PENDING = {};
-        window.__DDL_RUBY_PENDING[s] = v;
+        if (s === 'size'){
+          document.documentElement.style.setProperty('--ddl-ruby-size', (v / 100) + 'em');
+          localStorage.setItem('ddl.rubySize', String(v));
+        } else if (s === 'offset'){
+          document.documentElement.style.setProperty('--ddl-ruby-offset', v + '%');
+          localStorage.setItem('ddl.rubyOffset', String(v));
+        }
       } catch(_){}
-    });
-
-    // p22t: 크기 + 위치 슬라이더 (개별 루비마다 다른 값 가능)
-    // 초기값: 전역 설정에서 읽어옴 (편집기 설정 팝오버의 값)
-    var _rubyInitOffset = 55;
-    try { var _s = localStorage.getItem('ddl.rubyOffset'); if (_s != null && !isNaN(parseFloat(_s))) _rubyInitOffset = parseFloat(_s); } catch(_){}
-    var _rubyInitSize = 50;  // 0.5em = 50%
-    var slidersBox = document.createElement('div');
-    slidersBox.style.cssText = 'margin-top:12px; padding:10px 12px; background:rgba(15,58,58,0.03); border-radius:6px; display:flex; flex-direction:column; gap:10px;';
-    slidersBox.innerHTML = ''
-      + '<div>'
-      +   '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">'
-      +     '<span style="font-size:11.5px; font-weight:600; color:#0F3A3A;">루비 크기</span>'
-      +     '<span data-rlbl="size" style="font-size:11px; color:rgba(15,58,58,0.6); font-variant-numeric:tabular-nums;">' + _rubyInitSize + '%</span>'
-      +   '</div>'
-      +   '<input data-rslider="size" type="range" min="30" max="90" step="5" value="' + _rubyInitSize + '" style="width:100%; accent-color:#FF9A76;" />'
-      +   '<div style="display:flex; justify-content:space-between; font-size:9.5px; color:rgba(15,58,58,0.4); margin-top:1px;"><span>작게</span><span>기본</span><span>크게</span></div>'
-      + '</div>'
-      + '<div>'
-      +   '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">'
-      +     '<span style="font-size:11.5px; font-weight:600; color:#0F3A3A;">루비 위치 (위↔아래)</span>'
-      +     '<span data-rlbl="offset" style="font-size:11px; color:rgba(15,58,58,0.6); font-variant-numeric:tabular-nums;">' + _rubyInitOffset + '%</span>'
-      +   '</div>'
-      +   '<input data-rslider="offset" type="range" min="0" max="100" step="5" value="' + _rubyInitOffset + '" style="width:100%; accent-color:#FF9A76;" />'
-      +   '<div style="display:flex; justify-content:space-between; font-size:9.5px; color:rgba(15,58,58,0.4); margin-top:1px;"><span>위</span><span>기본</span><span>아래</span></div>'
-      + '</div>';
-    wrap.appendChild(slidersBox);
-
-    // p22u: 슬라이더 이벤트 - 전역 변수에 즉시 저장 (다이얼로그 닫혀도 콜백에서 읽을 수 있게)
-    // 원인: openEditorDialog close() 가 overlay.remove() 를 먼저 하므로 콜백 시점에 editable 은 이미 사라짐
-    try { window.__DDL_RUBY_PENDING = { size: _rubyInitSize, offset: _rubyInitOffset }; } catch(_){}
-    editable.dataset.rubySize = String(_rubyInitSize);
-    editable.dataset.rubyOffset = String(_rubyInitOffset);
-    slidersBox.addEventListener('input', function(e){
-      var s = e.target.getAttribute && e.target.getAttribute('data-rslider');
-      if (!s) return;
-      var v = parseFloat(e.target.value);
-      var lbl = slidersBox.querySelector('[data-rlbl="' + s + '"]');
-      if (lbl) lbl.textContent = v + '%';
-      if (s === 'size') { editable.dataset.rubySize = String(v); try { window.__DDL_RUBY_PENDING.size = v; } catch(_){} }
-      else if (s === 'offset') { editable.dataset.rubyOffset = String(v); try { window.__DDL_RUBY_PENDING.offset = v; } catch(_){} }
     });
 
     // p22m: p19j-fix3 원본 복원 — 이전에 실수로 'toolbar' 가 'bar' 로 오타 나서
@@ -16424,22 +16383,8 @@
       el.setAttribute('title', rubyHtml.replace(/<[^>]+>/g,''));
       el.style.background = 'transparent';
       el.style.color = 'inherit';
-      // p22z: 편집창 슬라이더 값 (window.__DDL_RUBY_PENDING) 을 mark 인라인 style 로 세팅
-      //   슬라이더가 없거나 값 없으면 전역 기본값 사용
-      try {
-        var _pend = window.__DDL_RUBY_PENDING || {};
-        var _sz = _pend.size;
-        var _of = _pend.offset;
-        // 위치 값 없으면 편집기 설정의 전역 값에서 fallback
-        if (_of == null || isNaN(_of)) {
-          var _lg = localStorage.getItem('ddl.rubyOffset');
-          _of = (_lg != null && !isNaN(parseFloat(_lg))) ? parseFloat(_lg) : 55;
-        }
-        if (_sz != null && !isNaN(_sz)) el.style.setProperty('--ddl-ruby-size', (_sz / 100) + 'em');
-        el.style.setProperty('--ddl-ruby-offset', _of + '%');
-        // 다음 루비 대비 초기화
-        try { window.__DDL_RUBY_PENDING = null; } catch(_){}
-      } catch(_){}
+      // p23a: 크기·위치는 전역 CSS 변수 (:root) 로 관리되므로 mark 인라인 style 불필요
+      //       모든 루비가 항상 최신 전역 값을 따름 → 일관된 시각적 통일성
       // HTML 이면 편집 중 시각화용 rt-span
       if (rubyHtml.indexOf('<') >= 0) {
         var _rtSpan = document.createElement('span');
@@ -17215,7 +17160,7 @@
   //   툴바 스타일 선택 + 프리셋 관리 카드 4개 (헤더 / 인라인 서식 / 형광펜 / 코드 스타일) + 단축키 카드
   //   프리셋 카드는 대부분 "다음 라운드" 안내. 인라인 서식만 이미 구현되어 있으므로 openPresetModal 바로 연결.
   //   내부 스크롤은 보이지 않도록 만듦 (.ddl-scroll-invisible)
-  // p22r: 루비 위치(offset) 사용자 설정 · CSS 변수로 반영
+  // p22r + p23a: 루비 위치·크기 CSS 변수 반영
   function _applyRubyOffset(pct){
     try {
       if (pct == null) {
@@ -17226,9 +17171,19 @@
       document.documentElement.style.setProperty('--ddl-ruby-offset', pct + '%');
     } catch(_){}
   }
-  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.applyRubyOffset = _applyRubyOffset; } catch(_){}
+  function _applyRubySize(pct){
+    try {
+      if (pct == null) {
+        var stored = localStorage.getItem('ddl.rubySize');
+        pct = stored != null ? parseFloat(stored) : 50;
+      }
+      if (isNaN(pct)) pct = 50;
+      document.documentElement.style.setProperty('--ddl-ruby-size', (pct / 100) + 'em');
+    } catch(_){}
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.applyRubyOffset = _applyRubyOffset; window.__DDL_EDITOR.applyRubySize = _applyRubySize; } catch(_){}
   // 부팅 시 즉시 1회 반영 (localStorage 값 기반)
-  try { _applyRubyOffset(); } catch(_){}
+  try { _applyRubyOffset(); _applyRubySize(); } catch(_){}
 
   function openDdlSettings(){
     var old = document.getElementById('ddl-settings-modal');
@@ -20176,16 +20131,10 @@
         var mark = document.createElement('mark');
         mark.className = 'ddl-ruby';
         var rtVal = m[2];
-        // p22x: 마커에서 |s:xx|o:xx 값 추출 후 mark 인라인 style 로 복원
-        var _rubyExtras = { size: null, offset: null };
-        rtVal = rtVal.replace(/\|s:(\d+)/g, function(_a, v){ _rubyExtras.size = parseFloat(v); return ''; });
-        rtVal = rtVal.replace(/\|o:(\d+)/g, function(_a, v){ _rubyExtras.offset = parseFloat(v); return ''; });
         mark.setAttribute('data-rt', rtVal);
         mark.setAttribute('title', rtVal.replace(/<[^>]+>/g,''));
         mark.style.background = 'transparent';
         mark.style.color = 'inherit';
-        if (_rubyExtras.size != null)   mark.style.setProperty('--ddl-ruby-size', (_rubyExtras.size / 100) + 'em');
-        if (_rubyExtras.offset != null) mark.style.setProperty('--ddl-ruby-offset', _rubyExtras.offset + '%');
         // rt-html 이면 자식 span 으로 innerHTML 삽입 (CSS ::before 대신)
         // p19j: rt-enc 는 base64url 디코딩, rt-html 은 그대로 (호환성)
         var htmlVal = null;
