@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23w';
+  var VERSION = 'v2.0-β-p23x';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -14049,6 +14049,7 @@
         id: 'hl-grp-basic',
         name: '기본',
         isBuiltin: true,
+        showInToolbar: true,
         presets: basicPresets
       }]
     };
@@ -14070,9 +14071,10 @@
         _saveHighlightLibrary(reseeded);
         return reseeded;
       }
-      // 각 그룹의 presets 배열 보장
+      // 각 그룹의 presets 배열 보장 + p23x: showInToolbar 기본값 보장
       data.groups.forEach(function(g){
         if (!Array.isArray(g.presets)) g.presets = [];
+        if (typeof g.showInToolbar !== 'boolean') g.showInToolbar = true;
       });
       return data;
     } catch(err){
@@ -14110,7 +14112,7 @@
     var lib = _loadHighlightLibrary();
     var newId = _uidHl('hlgrp');
     if (lib.groups.some(function(g){ return g.id === newId; })) return null;
-    var g = { id: newId, name: (name || '새 그룹').trim() || '새 그룹', isBuiltin: false, presets: [] };
+    var g = { id: newId, name: (name || '새 그룹').trim() || '새 그룹', isBuiltin: false, showInToolbar: true, presets: [] };
     lib.groups.push(g);
     _saveHighlightLibrary(lib);
     return g;
@@ -14125,6 +14127,31 @@
     if (typeof patch.name === 'string')      p.name = patch.name;
     if (patch.spec && typeof patch.spec === 'object') p.spec = patch.spec;
     if (typeof patch.isFavorite === 'boolean') p.isFavorite = patch.isFavorite;
+    _saveHighlightLibrary(lib);
+  }
+
+  // p23x: 그룹 툴바 노출 토글
+  function _setHighlightGroupToolbar(groupId, show){
+    var lib = _loadHighlightLibrary();
+    var g = lib.groups.filter(function(x){ return x.id === groupId; })[0];
+    if (!g) return;
+    g.showInToolbar = !!show;
+    _saveHighlightLibrary(lib);
+  }
+
+  // p23x: 프리셋 순서 변경 (항목 위아래)
+  function _moveHighlightPreset(groupId, presetId, delta){
+    var lib = _loadHighlightLibrary();
+    var g = lib.groups.filter(function(x){ return x.id === groupId; })[0];
+    if (!g) return;
+    var idx = -1;
+    g.presets.forEach(function(p, i){ if (p.id === presetId) idx = i; });
+    if (idx < 0) return;
+    var target = idx + delta;
+    if (target < 0 || target >= g.presets.length) return;
+    var tmp = g.presets[idx];
+    g.presets[idx] = g.presets[target];
+    g.presets[target] = tmp;
     _saveHighlightLibrary(lib);
   }
 
@@ -14194,6 +14221,297 @@
         applyHighlightColor(preset.spec);
       }
     } catch(err){ console.warn('[hl-preset-apply]', err); }
+  }
+
+  // ============================================================
+  // p23x: 형광펜 프리셋 관리창 (헤더 관리창과 동일 계층)
+  //   좌: 그룹 리스트 (기본/사용자) + [+ 새 그룹]
+  //   우: 프리셋 카드 리스트 (미리보기/이름/spec 요약/☆/수정/삭제/순서) + 툴바 노출 토글 + 그룹삭제 + [+ 새 프리셋]
+  // ============================================================
+  function openHighlighterPresetManager(){
+    var currentGroupId = null; // 상태: 선택된 그룹 ID
+
+    var popup = window.__DDL_EDITOR.createBlockPopup({
+      title: '형광펜 프리셋 관리',
+      width: '780px',
+      draggable: true,
+      onOpen: function(pp){
+        // 기본 선택 — 첫 그룹
+        var lib0 = _loadHighlightLibrary();
+        if (lib0.groups && lib0.groups.length > 0) currentGroupId = lib0.groups[0].id;
+        _renderHLMBody(pp, function(){ return currentGroupId; }, function(gid){ currentGroupId = gid; });
+      }
+    });
+    popup.show();
+  }
+
+  function _renderHLMBody(pp, getGid, setGid){
+    var body = pp.body || pp.getBody('__single');
+    if (!body) return;
+    body.innerHTML = '';
+    body.style.padding = '0';
+    body.style.display = 'flex';
+    body.style.gap = '0';
+    body.style.minHeight = '460px';
+
+    // 좌: 그룹 리스트
+    var left = document.createElement('div');
+    left.className = 'ddl-scroll-invisible';
+    left.style.cssText = 'width: 220px; border-right: 1px solid rgba(15,58,58,0.1); padding: 12px 8px;'
+      + ' overflow-y: auto; max-height: 62vh; box-sizing: border-box;';
+    body.appendChild(left);
+
+    // 우: 프리셋 상세
+    var right = document.createElement('div');
+    right.className = 'ddl-scroll-invisible';
+    right.style.cssText = 'flex: 1; padding: 14px 18px; overflow-y: auto; max-height: 62vh; box-sizing: border-box;';
+    body.appendChild(right);
+
+    function refresh(){
+      var lib = _loadHighlightLibrary();
+      // 현재 선택된 그룹이 사라졌으면 첫 그룹으로
+      if (!lib.groups.some(function(g){ return g.id === getGid(); })){
+        setGid(lib.groups.length > 0 ? lib.groups[0].id : null);
+      }
+      _renderHLMLeft(left, lib, getGid(), function(gid){ setGid(gid); refresh(); }, function(){
+        // 새 그룹 추가
+        var nm = prompt('새 그룹 이름', '내 형광펜');
+        if (nm && nm.trim()){
+          var g = _addHighlightGroup(nm.trim());
+          if (g) setGid(g.id);
+          refresh();
+        }
+      });
+      _renderHLMRight(right, lib, getGid(), function(){ refresh(); });
+    }
+    refresh();
+  }
+
+  function _renderHLMLeft(leftEl, lib, currentGid, onSelectGroup, onAddGroup){
+    leftEl.innerHTML = '';
+    var head = document.createElement('div');
+    head.style.cssText = 'font-size:11px; opacity:0.55; letter-spacing:0.04em; margin-bottom:8px; padding-left:6px;';
+    head.textContent = '그룹';
+    leftEl.appendChild(head);
+
+    lib.groups.forEach(function(g){
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      var active = (g.id === currentGid);
+      btn.style.cssText = 'display:flex; align-items:center; justify-content:space-between; width:100%;'
+        + ' padding: 8px 10px; margin-bottom: 2px; border: none; border-radius: 6px;'
+        + ' background: ' + (active ? 'rgba(15,58,58,0.08)' : 'transparent') + ';'
+        + ' color: var(--color, #0F3A3A); cursor: pointer; text-align:left;'
+        + ' font-family: inherit; font-size: 13px;';
+      btn.innerHTML =
+        '<span>' + _escHtml(g.name) + '</span>'
+        + '<span style="opacity:0.5; font-size:11px;">' + (g.presets ? g.presets.length : 0) + '</span>';
+      btn.addEventListener('mouseenter', function(){ if (!active) btn.style.background = 'rgba(15,58,58,0.03)'; });
+      btn.addEventListener('mouseleave', function(){ if (!active) btn.style.background = 'transparent'; });
+      (function(gid){
+        btn.addEventListener('click', function(){ onSelectGroup(gid); });
+      })(g.id);
+      leftEl.appendChild(btn);
+    });
+
+    var addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.textContent = '+ 새 그룹';
+    addBtn.style.cssText = 'display:block; width:100%; margin-top:10px; padding: 8px 10px;'
+      + ' background: transparent; border: 1px dashed rgba(15,58,58,0.25); border-radius: 6px;'
+      + ' color: rgba(15,58,58,0.6); cursor: pointer; font-family: inherit; font-size: 12px;'
+      + ' transition: border-color 120ms ease, color 120ms ease;';
+    addBtn.addEventListener('mouseenter', function(){ addBtn.style.borderColor = 'var(--point, #FF9A76)'; addBtn.style.color = 'var(--point, #FF9A76)'; });
+    addBtn.addEventListener('mouseleave', function(){ addBtn.style.borderColor = 'rgba(15,58,58,0.25)'; addBtn.style.color = 'rgba(15,58,58,0.6)'; });
+    addBtn.addEventListener('click', onAddGroup);
+    leftEl.appendChild(addBtn);
+  }
+
+  function _renderHLMRight(rightEl, lib, currentGid, onChanged){
+    rightEl.innerHTML = '';
+    var group = lib.groups.filter(function(g){ return g.id === currentGid; })[0];
+    if (!group){
+      rightEl.innerHTML = '<div style="opacity:0.5; font-size:12px; padding: 20px 0;">그룹을 선택하세요</div>';
+      return;
+    }
+
+    // 상단 바
+    var top = document.createElement('div');
+    top.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; margin-bottom: 12px;'
+      + ' border-bottom: 1px solid rgba(15,58,58,0.1);';
+    var title = document.createElement('div');
+    title.style.cssText = 'font-family: "Cafe24Danjunghae","Gowun Batang", serif; font-size: 15px; letter-spacing: 0.01em;';
+    title.textContent = group.name;
+    top.appendChild(title);
+
+    var actions = document.createElement('div');
+    actions.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+
+    // 툴바 노출 토글
+    var toggleWrap = document.createElement('label');
+    toggleWrap.style.cssText = 'display: inline-flex; align-items: center; gap: 5px; font-size: 12px; opacity: 0.7; cursor: pointer;';
+    var toggleInput = document.createElement('input');
+    toggleInput.type = 'checkbox';
+    toggleInput.checked = !!group.showInToolbar;
+    (function(gId){
+      toggleInput.addEventListener('change', function(){
+        _setHighlightGroupToolbar(gId, toggleInput.checked);
+        onChanged();
+      });
+    })(group.id);
+    var toggleTxt = document.createElement('span');
+    toggleTxt.textContent = '툴바 노출';
+    toggleWrap.appendChild(toggleInput);
+    toggleWrap.appendChild(toggleTxt);
+    actions.appendChild(toggleWrap);
+
+    // 사용자 그룹 삭제 버튼
+    if (!group.isBuiltin){
+      var delGBtn = document.createElement('button');
+      delGBtn.type = 'button';
+      delGBtn.textContent = '그룹 삭제';
+      delGBtn.style.cssText = 'padding: 4px 10px; background: transparent; border: 1px solid rgba(15,58,58,0.15); border-radius: 4px; color: #d33; cursor: pointer; font-family: inherit; font-size: 11px;';
+      (function(gId, gName){
+        delGBtn.addEventListener('click', function(){
+          if (confirm('그룹 "' + gName + '" 과 그 안 모든 프리셋을 삭제합니다. 진행할까요?')){
+            _deleteHighlightGroup(gId);
+            onChanged();
+          }
+        });
+      })(group.id, group.name);
+      actions.appendChild(delGBtn);
+    }
+
+    top.appendChild(actions);
+    rightEl.appendChild(top);
+
+    // 프리셋 리스트
+    if (!group.presets || group.presets.length === 0){
+      var empty = document.createElement('div');
+      empty.style.cssText = 'padding: 20px 0; opacity: 0.5; font-size: 13px; text-align: center;';
+      empty.textContent = '아직 프리셋이 없습니다';
+      rightEl.appendChild(empty);
+    } else {
+      group.presets.forEach(function(p, i){
+        rightEl.appendChild(_createHlPresetCard(group, p, i, function(action){
+          if (action === 'edit'){
+            // p23y 예정: 형광펜 편집창. 지금은 이름만 변경 허용.
+            var nv = prompt('프리셋 이름 변경', p.name || '');
+            if (nv && nv.trim()){
+              _updateHighlightPreset(group.id, p.id, { name: nv.trim() });
+              onChanged();
+            } else {
+              _showStubToast('프리셋 상세 편집창은 다음 라운드에서 지원됩니다');
+            }
+          } else if (action === 'delete'){
+            if (confirm('"' + (p.name || '이름 없음') + '" 프리셋을 삭제합니다.')){
+              _deleteHighlightPreset(group.id, p.id);
+              onChanged();
+            }
+          } else if (action === 'up'){
+            _moveHighlightPreset(group.id, p.id, -1);
+            onChanged();
+          } else if (action === 'down'){
+            _moveHighlightPreset(group.id, p.id, +1);
+            onChanged();
+          } else if (action === 'star'){
+            _updateHighlightPreset(group.id, p.id, { isFavorite: !p.isFavorite });
+            onChanged();
+          }
+        }));
+      });
+    }
+
+    // + 새 프리셋
+    var addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.textContent = '+ 새 프리셋 만들기';
+    addBtn.style.cssText = 'display: block; width: 100%; margin-top: 12px; padding: 10px 14px;'
+      + ' background: transparent; border: 1px dashed rgba(15,58,58,0.25); border-radius: 6px;'
+      + ' color: rgba(15,58,58,0.6); cursor: pointer; font-family: inherit; font-size: 12px;';
+    addBtn.addEventListener('mouseenter', function(){ addBtn.style.borderColor = 'var(--point, #FF9A76)'; addBtn.style.color = 'var(--point, #FF9A76)'; });
+    addBtn.addEventListener('mouseleave', function(){ addBtn.style.borderColor = 'rgba(15,58,58,0.25)'; addBtn.style.color = 'rgba(15,58,58,0.6)'; });
+    (function(gId){
+      addBtn.addEventListener('click', function(){
+        // p23y 예정: 형광펜 편집창. 지금은 노랑 기본값으로 프리셋 추가.
+        _showStubToast('형광펜 편집창(다음 라운드) — 지금은 노랑 임시 프리셋 추가만 가능');
+        _addHighlightPresetToGroup(gId, {
+          name: '새 프리셋',
+          spec: { mode:'marker', c1:'#FFF176', a1:100 }
+        });
+        onChanged();
+      });
+    })(group.id);
+    rightEl.appendChild(addBtn);
+  }
+
+  function _createHlPresetCard(group, preset, idx, onAction){
+    var card = document.createElement('div');
+    card.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 8px;'
+      + ' border: 1px solid rgba(15,58,58,0.12); border-radius: 8px; background: transparent;'
+      + ' transition: border-color 120ms ease;';
+    card.addEventListener('mouseenter', function(){ card.style.borderColor = 'rgba(15,58,58,0.3)'; });
+    card.addEventListener('mouseleave', function(){ card.style.borderColor = 'rgba(15,58,58,0.12)'; });
+
+    // 미리보기 (형광펜이 적용된 "가" 글자)
+    var preview = document.createElement('div');
+    preview.style.cssText = 'flex: 0 0 56px; width: 56px; height: 42px; display: flex; align-items: center; justify-content: center;'
+      + ' border: 1px solid rgba(15,58,58,0.1); border-radius: 6px; background: #fff;';
+    var mk = document.createElement('mark');
+    mk.textContent = '가나다';
+    mk.style.cssText = 'background: ' + _hlSpecToPreview(preset.spec) + ';'
+      + ' padding: 1px 5px; color: inherit; font-size: 14px;';
+    preview.appendChild(mk);
+    card.appendChild(preview);
+
+    // 이름 + 설명
+    var info = document.createElement('div');
+    info.style.cssText = 'flex: 1; min-width: 0;';
+    var nameEl = document.createElement('div');
+    nameEl.style.cssText = 'font-size: 13px; color: var(--color, #0F3A3A); font-weight: 500; margin-bottom: 2px;'
+      + ' white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+    nameEl.innerHTML = _escHtml(preset.name || '(이름 없음)') + (preset.isFavorite ? ' <span style="color:var(--point, #FF9A76); font-size:10px; margin-left:4px;">★</span>' : '');
+    var descEl = document.createElement('div');
+    descEl.style.cssText = 'font-size: 11px; opacity: 0.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+    descEl.textContent = _describeHlSpec(preset.spec);
+    info.appendChild(nameEl);
+    info.appendChild(descEl);
+    card.appendChild(info);
+
+    // 액션 버튼들
+    var acts = document.createElement('div');
+    acts.style.cssText = 'display: flex; gap: 4px; align-items: center;';
+    var mkAct = function(label, title, fn, danger){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.title = title;
+      b.style.cssText = 'padding: 4px 8px; background: transparent; border: 1px solid rgba(15,58,58,0.15); border-radius: 4px;'
+        + ' color:' + (danger ? '#d33' : 'var(--color, #0F3A3A)') + '; cursor: pointer; font-family: inherit; font-size: 11px;';
+      b.addEventListener('click', fn);
+      return b;
+    };
+    acts.appendChild(mkAct(preset.isFavorite ? '★' : '☆', '즐겨찾기', function(){ onAction('star'); }));
+    if (idx > 0) acts.appendChild(mkAct('↑', '위로', function(){ onAction('up'); }));
+    if (idx < (group.presets.length - 1)) acts.appendChild(mkAct('↓', '아래로', function(){ onAction('down'); }));
+    acts.appendChild(mkAct('수정', '프리셋 수정', function(){ onAction('edit'); }));
+    if (!preset.isBuiltin){
+      acts.appendChild(mkAct('삭제', '프리셋 삭제', function(){ onAction('delete'); }, true));
+    }
+    card.appendChild(acts);
+
+    return card;
+  }
+
+  function _describeHlSpec(spec){
+    if (!spec) return '';
+    var parts = [];
+    var modeMap = { marker:'마커', fade:'끝 흐림', paint:'페인트', solid:'단색', gradient:'그라데이션', pattern:'패턴' };
+    parts.push(modeMap[spec.mode] || spec.mode || '마커');
+    if (spec.c1) parts.push(spec.c1);
+    if (spec.mode === 'paint' && spec.pos) parts.push(spec.pos);
+    if (typeof spec.a1 === 'number' && spec.a1 < 100) parts.push('투명도 ' + spec.a1 + '%');
+    return parts.join(' · ');
   }
 
   // ============================================================
@@ -14271,14 +14589,14 @@
     gear.addEventListener('click', function(e){
       e.preventDefault(); e.stopPropagation();
       pop.remove();
-      // p23w 예정: 형광펜 프리셋 관리창. 지금은 안내 토스트.
+      // p23x: 형광펜 프리셋 관리창 연결 완료
       try {
         if (typeof openHighlighterPresetManager === 'function'){
           openHighlighterPresetManager();
         } else {
-          _showStubToast('형광펜 관리창 — 다음 라운드에서 지원됩니다');
+          _showStubToast('형광펜 관리창 — 로드 실패');
         }
-      } catch(_){}
+      } catch(err){ console.warn('[hl-manager]', err); }
     });
     topbar.appendChild(gear);
     pop.appendChild(topbar);
@@ -14611,7 +14929,8 @@
     window.__DDL_EDITOR.saveHeaderColorLibrary  = _saveHeaderColorLibrary;   // p23t
     window.__DDL_EDITOR.loadHighlightLibrary    = _loadHighlightLibrary;    // p23v
     window.__DDL_EDITOR.saveHighlightLibrary    = _saveHighlightLibrary;    // p23v
-    window.__DDL_EDITOR.openHighlighterMiniPopover = openHighlighterMiniPopover; // p23v
+    window.__DDL_EDITOR.openHighlighterMiniPopover  = openHighlighterMiniPopover;  // p23v
+    window.__DDL_EDITOR.openHighlighterPresetManager = openHighlighterPresetManager; // p23x
   } catch(_){}
 
   // 부팅 시 자동 로드 (편집기 페이지)
