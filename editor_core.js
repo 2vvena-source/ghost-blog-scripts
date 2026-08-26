@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23m';
+  var VERSION = 'v2.0-β-p23n';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1834,14 +1834,14 @@
     '  border-color: var(--point, #FF9A76); color: var(--point, #FF9A76);',
     '}',
 
-    /* p23m: 헤더 미니 팝오버 · 갤러리 형식 (참고 이미지에 맞춰 디자인) */
+    /* p23n: 헤더 미니 팝오버 · 3열 그리드 + 그룹별 대표 1~3개 + 투명 스크롤 */
     '.ep-heading-mini {',
     '  position: fixed; z-index: 9996;',
     '  width: 380px; max-width: 380px; box-sizing: border-box;',
     '  background: #fff;',
     '  border: 1px solid rgba(15,58,58,0.15);',
-    '  border-radius: 10px;',
-    '  box-shadow: 0 8px 24px rgba(15,58,58,0.12);',
+    '  border-radius: 12px;',
+    '  box-shadow: 0 10px 32px rgba(15,58,58,0.14);',
     '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
     '  overflow: hidden;',
     '  animation: mtb-in 140ms ease-out;',
@@ -1874,54 +1874,95 @@
     '  transition: all 120ms ease;',
     '}',
     '.ep-heading-mini-gear:hover { background: rgba(15,58,58,0.06); color: var(--color, #0F3A3A); }',
-    /* 그리드 카드 목록 */
+    /* 그리드 카드 목록 · 투명 스크롤 */
     '.ep-heading-mini-body {',
-    '  padding: 10px; max-height: 420px; overflow-y: auto;',
+    '  padding: 8px 10px 10px; max-height: 380px; overflow-y: auto;',
     '  background: #fff;',
+    '  scrollbar-width: thin;',
+    '  scrollbar-color: rgba(15,58,58,0.15) transparent;',
     '}',
     '.ep-heading-mini-body::-webkit-scrollbar { width: 6px; }',
-    '.ep-heading-mini-body::-webkit-scrollbar-thumb { background: rgba(15,58,58,0.15); border-radius: 3px; }',
+    '.ep-heading-mini-body::-webkit-scrollbar-track { background: transparent; }',
+    '.ep-heading-mini-body::-webkit-scrollbar-thumb { background: rgba(15,58,58,0.12); border-radius: 3px; }',
+    '.ep-heading-mini-body::-webkit-scrollbar-thumb:hover { background: rgba(15,58,58,0.22); }',
+    /* p23n: 그룹 섹션 (그룹 라벨 + 그 그룹의 3열 그리드) */
+    '.ep-heading-mini-section {',
+    '  margin-top: 12px;',
+    '}',
+    '.ep-heading-mini-section:first-child { margin-top: 4px; }',
+    '.ep-heading-mini-section-label {',
+    '  display: flex; align-items: center; gap: 6px;',
+    '  font-size: 10px; font-weight: 600; letter-spacing: 0.06em;',
+    '  color: rgba(15,58,58,0.42);',
+    '  padding: 0 2px 6px; text-transform: uppercase;',
+    '}',
+    '.ep-heading-mini-section-label::after {',
+    '  content: ""; flex: 1; height: 1px;',
+    '  background: linear-gradient(to right, rgba(15,58,58,0.1), transparent);',
+    '}',
+    /* p23n: 3열 그리드 */
     '.ep-heading-mini-grid {',
-    '  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;',
+    '  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;',
     '}',
     '.ep-heading-mini-card {',
-    '  position: relative; padding: 12px 12px 10px;',
+    '  position: relative; padding: 10px 8px 8px;',
     '  background: #fff;',
-    '  border: 1px solid rgba(15,58,58,0.12);',
+    '  border: 1px solid rgba(15,58,58,0.1);',
     '  border-radius: 8px; cursor: pointer;',
-    '  transition: all 120ms ease;',
-    '  display: flex; flex-direction: column; gap: 4px;',
-    '  min-height: 60px;',
+    '  transition: all 140ms ease;',
+    '  display: flex; flex-direction: column; gap: 3px;',
+    '  min-height: 56px;',
+    '  overflow: hidden;',
     '}',
     '.ep-heading-mini-card:hover {',
-    '  border-color: rgba(255,154,118,0.5); background: rgba(255,154,118,0.03);',
-    '  transform: translateY(-1px); box-shadow: 0 2px 6px rgba(15,58,58,0.06);',
+    '  border-color: rgba(255,154,118,0.55); background: rgba(255,154,118,0.04);',
+    '  transform: translateY(-1px); box-shadow: 0 3px 10px rgba(255,154,118,0.15);',
     '}',
     '.ep-heading-mini-card.is-active {',
-    '  border-color: var(--point, #FF9A76); background: rgba(255,154,118,0.08);',
-    '  box-shadow: 0 0 0 2px rgba(255,154,118,0.15);',
+    '  border-color: var(--point, #FF9A76); background: rgba(255,154,118,0.1);',
+    '  box-shadow: 0 0 0 2px rgba(255,154,118,0.2);',
     '}',
+    /* p23n: 그룹별 색 액센트 (좌측 가늘게 3px) */
+    '.ep-heading-mini-card::before {',
+    '  content: ""; position: absolute; left: 0; top: 0; bottom: 0;',
+    '  width: 3px; background: transparent;',
+    '  border-top-left-radius: 8px; border-bottom-left-radius: 8px;',
+    '  transition: background 140ms ease;',
+    '}',
+    '.ep-heading-mini-card[data-group="h1"]::before { background: rgba(15,58,58,0.5); }',
+    '.ep-heading-mini-card[data-group="h2"]::before { background: rgba(15,58,58,0.4); }',
+    '.ep-heading-mini-card[data-group="h3"]::before { background: rgba(15,58,58,0.3); }',
+    '.ep-heading-mini-card[data-group="h4"]::before { background: rgba(15,58,58,0.22); }',
+    '.ep-heading-mini-card[data-group="h5"]::before { background: rgba(15,58,58,0.16); }',
+    '.ep-heading-mini-card[data-group="h6"]::before { background: rgba(15,58,58,0.12); }',
+    '.ep-heading-mini-card[data-group="p"]::before  { background: rgba(255,154,118,0.35); }',
+    '.ep-heading-mini-card:not([data-group="h1"]):not([data-group="h2"]):not([data-group="h3"]):not([data-group="h4"]):not([data-group="h5"]):not([data-group="h6"]):not([data-group="p"])::before { background: rgba(255,154,118,0.25); }',
+    '.ep-heading-mini-card:hover::before { background: var(--point, #FF9A76); }',
+    '.ep-heading-mini-card.is-active::before { background: var(--point, #FF9A76); }',
     '.ep-heading-mini-card-preview {',
-    '  font-size: 17px; color: var(--color, #0F3A3A); line-height: 1.1;',
+    '  font-size: 14px; color: var(--color, #0F3A3A); line-height: 1.15;',
     '  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
+    '  padding-left: 3px;',
     '}',
     '.ep-heading-mini-card-meta {',
-    '  font-size: 10px; color: rgba(15,58,58,0.5); font-weight: 400;',
+    '  font-size: 9px; color: rgba(15,58,58,0.45); font-weight: 400;',
     '  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
     '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
+    '  padding-left: 3px; letter-spacing: 0.02em;',
     '}',
     /* 카드 우상단 즐겨찾기 별표 */
     '.ep-heading-mini-card-fav {',
-    '  position: absolute; top: 6px; right: 6px;',
-    '  width: 18px; height: 18px; border: 0; background: transparent;',
+    '  position: absolute; top: 4px; right: 4px;',
+    '  width: 16px; height: 16px; border: 0; background: transparent;',
     '  cursor: pointer; padding: 0;',
-    '  font-size: 12px; line-height: 1;',
-    '  color: rgba(15,58,58,0.25);',
-    '  border-radius: 4px;',
+    '  font-size: 11px; line-height: 1;',
+    '  color: rgba(15,58,58,0.2);',
+    '  border-radius: 3px;',
     '  transition: all 120ms ease;',
     '  display: inline-flex; align-items: center; justify-content: center;',
+    '  z-index: 2;',
     '}',
-    '.ep-heading-mini-card-fav:hover { color: var(--point, #FF9A76); background: rgba(255,154,118,0.1); }',
+    '.ep-heading-mini-card-fav:hover { color: var(--point, #FF9A76); background: rgba(255,154,118,0.12); transform: scale(1.15); }',
     '.ep-heading-mini-card-fav.is-fav { color: var(--point, #FF9A76); }',
     /* 빈 상태 */
     '.ep-heading-mini-empty {',
@@ -17657,12 +17698,9 @@
     topbar.appendChild(gear);
     pop.appendChild(topbar);
 
-    // 그리드 영역
+    // p23n: 그리드 영역 · bodyEl 안에 섹션마다 자체 grid 를 만들어 붙임
     var bodyEl = document.createElement('div');
     bodyEl.className = 'ep-heading-mini-body';
-    var grid = document.createElement('div');
-    grid.className = 'ep-heading-mini-grid';
-    bodyEl.appendChild(grid);
     pop.appendChild(bodyEl);
 
     // '이 글에서' 필터용 — contentEl 안 사용 중 preset ID 수집
@@ -17691,32 +17729,123 @@
       return s;
     }
 
+    // p23n: 하나의 카드 DOM 생성
+    function _makeCard(groupKey, item){
+      var card = document.createElement('div');
+      card.className = 'ep-heading-mini-card';
+      card.setAttribute('data-preset-id', item.id || '');
+      card.setAttribute('data-group', groupKey);
+
+      var prev = document.createElement('div');
+      prev.className = 'ep-heading-mini-card-preview';
+      prev.setAttribute('style', _previewStyle(item));
+      prev.textContent = item.name || '제목 예시';
+      card.appendChild(prev);
+
+      var meta = document.createElement('div');
+      meta.className = 'ep-heading-mini-card-meta';
+      var groupLabel = HEADER_GROUP_LABELS[groupKey] || groupKey;
+      // 3열 이므로 공간 좁음 → 그룹 또는 이름 하나만 표시
+      meta.textContent = item.name || groupLabel;
+      card.appendChild(meta);
+
+      var fav = document.createElement('button');
+      fav.type = 'button';
+      fav.className = 'ep-heading-mini-card-fav';
+      fav.textContent = item.isFavorite ? '★' : '☆';
+      if (item.isFavorite) fav.classList.add('is-fav');
+      fav.title = item.isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가';
+      fav.addEventListener('mousedown', function(e){ e.preventDefault(); });
+      fav.addEventListener('click', function(e){
+        e.preventDefault(); e.stopPropagation();
+        item.isFavorite = !item.isFavorite;
+        saveHeaderPresets(data);
+        _renderGrid();
+      });
+      card.appendChild(fav);
+
+      card.addEventListener('mousedown', function(e){
+        if (e.target !== fav) e.preventDefault();
+      });
+      card.addEventListener('click', function(e){
+        if (e.target === fav) return;
+        e.preventDefault(); e.stopPropagation();
+        try { restoreRange(); } catch(_){}
+        applyHeaderPresetToBlock(groupKey, item);
+        bodyEl.querySelectorAll('.ep-heading-mini-card').forEach(function(k){ k.classList.remove('is-active'); });
+        card.classList.add('is-active');
+      });
+
+      return card;
+    }
+
+    // p23n: 그룹별 대표 1~3개 선별 (즐겨찾기 우선, 그 다음 items 순서)
+    function _pickRepresentatives(items){
+      if (!items || items.length === 0) return [];
+      var favs = items.filter(function(it){ return it.isFavorite; });
+      var rest = items.filter(function(it){ return !it.isFavorite; });
+      var picked = favs.concat(rest);
+      return picked.slice(0, 3);
+    }
+
     function _renderGrid(){
-      grid.innerHTML = '';
+      bodyEl.innerHTML = '';
       var used = _collectUsedPresetIds();
-      var allCards = [];
-      // 그룹 순회: 내장 순서 + 사용자 그룹
       var groupOrder = HEADER_BUILTIN_GROUPS.concat(
         Object.keys(data).filter(function(k){ return HEADER_BUILTIN_GROUPS.indexOf(k) === -1; })
       );
+
+      var anyRendered = false;
+
       groupOrder.forEach(function(gk){
         var g = data[gk];
         if (!g || !g.showInToolbar) return;
         var items = g.items || [];
-        // 아이템이 하나도 없으면 skip (을벼므로 빈 그룹은 안 보임)
         if (items.length === 0) return;
-        items.forEach(function(it, idx){
-          if (filter === 'fav' && !it.isFavorite) return;
-          if (filter === 'used' && !used[it.id]) return;
-          allCards.push({ groupKey: gk, group: g, item: it, idx: idx });
+
+        // 필터 적용
+        var filtered = items;
+        if (filter === 'fav'){
+          filtered = items.filter(function(it){ return it.isFavorite; });
+        } else if (filter === 'used'){
+          filtered = items.filter(function(it){ return used[it.id]; });
+        }
+        if (filtered.length === 0) return;
+
+        // 그룹별 대표 1~3개 추출
+        //   · 전체 탭이면: 즐겨찾기 우선 + 순서상 위에서 3개만
+        //   · ★ 필터이면: filtered 자체가 즐겨찾기만 → 앞 3개만 를 보이기
+        //   · 이 글에서: 해당 모두 (파약해도 3개 이내)
+        var picked;
+        if (filter === 'all')      picked = _pickRepresentatives(filtered);
+        else                       picked = filtered.slice(0, 3);
+
+        if (picked.length === 0) return;
+
+        // 그룹 섹션 만들기
+        var section = document.createElement('div');
+        section.className = 'ep-heading-mini-section';
+
+        var lbl = document.createElement('div');
+        lbl.className = 'ep-heading-mini-section-label';
+        lbl.textContent = HEADER_GROUP_LABELS[gk] || gk;
+        section.appendChild(lbl);
+
+        var grid = document.createElement('div');
+        grid.className = 'ep-heading-mini-grid';
+        picked.forEach(function(it){
+          grid.appendChild(_makeCard(gk, it));
         });
+        section.appendChild(grid);
+        bodyEl.appendChild(section);
+        anyRendered = true;
       });
 
-      if (allCards.length === 0){
+      if (!anyRendered){
         var em = document.createElement('div');
         em.className = 'ep-heading-mini-empty';
         if (filter === 'fav'){
-          em.innerHTML = '즐겨찾기한 프리셋이 없습니다.<br>카드 모서리의 ★ 를 눌러 추가하세요.';
+          em.innerHTML = '즐겨찾기한 프리셋이 없습니다.<br>카드 모서리의 ☆ 를 눌러 추가하세요.';
         } else if (filter === 'used'){
           em.innerHTML = '이 글에서 사용 중인 프리셋이 없습니다.';
         } else {
@@ -17727,62 +17856,8 @@
             try { openHeaderPresetManager(); } catch(_){}
           });
         }
-        grid.appendChild(em);
-        return;
+        bodyEl.appendChild(em);
       }
-
-      allCards.forEach(function(c){
-        var card = document.createElement('div');
-        card.className = 'ep-heading-mini-card';
-        card.setAttribute('data-preset-id', c.item.id || '');
-
-        // 미리보기 텍스트
-        var prev = document.createElement('div');
-        prev.className = 'ep-heading-mini-card-preview';
-        prev.setAttribute('style', _previewStyle(c.item));
-        prev.textContent = c.item.name || '제목 예시';
-        card.appendChild(prev);
-
-        // 소제목 (그룹 · 이름)
-        var meta = document.createElement('div');
-        meta.className = 'ep-heading-mini-card-meta';
-        var groupLabel = HEADER_GROUP_LABELS[c.groupKey] || c.groupKey;
-        meta.textContent = groupLabel + ' · ' + (c.item.name || '이름없음');
-        card.appendChild(meta);
-
-        // 즐겨찾기 별표
-        var fav = document.createElement('button');
-        fav.type = 'button';
-        fav.className = 'ep-heading-mini-card-fav';
-        fav.textContent = c.item.isFavorite ? '★' : '☆';
-        if (c.item.isFavorite) fav.classList.add('is-fav');
-        fav.title = c.item.isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가';
-        fav.addEventListener('mousedown', function(e){ e.preventDefault(); });
-        fav.addEventListener('click', function(e){
-          e.preventDefault(); e.stopPropagation();
-          c.item.isFavorite = !c.item.isFavorite;
-          saveHeaderPresets(data);
-          _renderGrid();
-        });
-        card.appendChild(fav);
-
-        // 카드 클릭 → 프리셋 적용
-        card.addEventListener('mousedown', function(e){
-          // 별표 버튼은 자체 핸들러로 처리되므로 preventDefault 만
-          if (e.target !== fav) e.preventDefault();
-        });
-        card.addEventListener('click', function(e){
-          if (e.target === fav) return;
-          e.preventDefault(); e.stopPropagation();
-          try { restoreRange(); } catch(_){}
-          applyHeaderPresetToBlock(c.groupKey, c.item);
-          // 적용 후 닫는 대신 활성 표시만 갱신
-          grid.querySelectorAll('.ep-heading-mini-card').forEach(function(k){ k.classList.remove('is-active'); });
-          card.classList.add('is-active');
-        });
-
-        grid.appendChild(card);
-      });
     }
 
     _renderGrid();
@@ -18094,13 +18169,21 @@
         'font-size:12px;color:#FF9A76;font-weight:600;min-width:44px;text-align:right;">' +
         initClamped + opts.unit + '</span>' +
       '</div>' +
-      // 슬라이더 줄 (명시적 width 및 pointer-events)
-      '<div style="padding:4px 0 12px;">' +
+      // p23n: 슬라이더 줄 + -/+ stepper 병용 (슬라이더 안되어도 버튼으로 조절 가능)
+      '<div style="display:flex;align-items:center;gap:6px;padding:4px 0 12px;">' +
+        '<button type="button" data-esp-step="-1" ' +
+        'style="width:28px;height:28px;flex:0 0 28px;border:1px solid rgba(15,58,58,0.15);' +
+        'border-radius:6px;background:#fff;cursor:pointer;color:#0F3A3A;font-size:14px;' +
+        'font-weight:600;padding:0;line-height:1;">−</button>' +
         '<input type="range" ' +
         'min="' + opts.min + '" max="' + opts.max + '" step="' + opts.step + '" value="' + initClamped + '" ' +
         'data-esp-slider ' +
-        'style="display:block;width:100%;height:24px;margin:0;padding:0;' +
+        'style="flex:1;min-width:0;display:block;height:24px;margin:0;padding:0;' +
         'pointer-events:auto !important;cursor:pointer;accent-color:#FF9A76;">' +
+        '<button type="button" data-esp-step="+1" ' +
+        'style="width:28px;height:28px;flex:0 0 28px;border:1px solid rgba(15,58,58,0.15);' +
+        'border-radius:6px;background:#fff;cursor:pointer;color:#0F3A3A;font-size:14px;' +
+        'font-weight:600;padding:0;line-height:1;">+</button>' +
       '</div>' +
       // 프리셋 그리드
       (presetsHtml ?
@@ -18233,6 +18316,39 @@
         var v = parseFloat(b.getAttribute('data-preset'));
         if (slider) slider.value = v;
         _handle(v, 'preset');
+      });
+    });
+
+    // p23n: -/+ stepper 버튼 · 슬라이더 유무와 관계없이 작동
+    var stepBtns = Array.from(pop.querySelectorAll('[data-esp-step]'));
+    stepBtns.forEach(function(sb){
+      sb.addEventListener('mousedown', function(e){ e.preventDefault(); });
+      // hover 효과
+      sb.addEventListener('mouseenter', function(){
+        sb.style.borderColor = 'rgba(255,154,118,0.5)';
+        sb.style.color = 'var(--point, #FF9A76)';
+      });
+      sb.addEventListener('mouseleave', function(){
+        sb.style.borderColor = 'rgba(15,58,58,0.15)';
+        sb.style.color = '#0F3A3A';
+      });
+      sb.addEventListener('click', function(ev){
+        ev.preventDefault(); ev.stopPropagation();
+        var dir = parseFloat(sb.getAttribute('data-esp-step')) || 0;
+        var step = parseFloat(opts.step) || 0.01;
+        var cur = slider ? parseFloat(slider.value) : (opts.initial || 0);
+        // 부동소수 오차 방지 · step 가 0.01 이면 소수점 2자리까지
+        var next = cur + dir * step;
+        // step 마다 반올림 → 미세한 부동소수 잡음 방지
+        var decimals = 0;
+        var stepStr = String(step);
+        if (stepStr.indexOf('.') !== -1) decimals = stepStr.split('.')[1].length;
+        next = parseFloat(next.toFixed(decimals));
+        // 범위 클램프
+        if (next < opts.min) next = opts.min;
+        if (next > opts.max) next = opts.max;
+        if (slider) slider.value = next;
+        _handle(next, 'stepper');
       });
     });
 
