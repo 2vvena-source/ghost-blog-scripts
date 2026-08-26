@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22i';
+  var VERSION = 'v2.0-β-p22k';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2543,33 +2543,34 @@
     '.editor-block[data-bullet-style="hangul"] ol { list-style-type: hangul; }',
     /* 프레임 (원·사각·직사각) — counter-based 커스텀 마커 */
     /* 이때 ol 기본 마커를 끄고 counter로 직접 그린다 */
-    /* p22i: 프레임 마커 수직 중앙 정렬 — top: 50% + translateY(-50%) + line-height 보정 */
-    /* line-height: 1.6 에서 li 첫줄 baseline 기준이 아니라 첫줄 하간브냐 중상으로 맞춤 */
+    /* p22j: 프레임 마커 수직 중앙 정렬 v3 — transform 제거 · top 값 직접 보정 */
+    /* li 첫줄 텍스트는 baseline 이 약 line-height/2 + em/2 ≈ 0.85em 지점.                      */
+    /* 마커 높이 1.4em (변환 안 함) → 상단이 약 li 상단에서 0.15em~0.2em 서로 닉은 것이 관적으로 적합. */
     '.editor-block[data-frame="circle"] ol { list-style: none; counter-reset: bl-frame; padding-left: 2.2em; }',
-    '.editor-block[data-frame="circle"] ol > li { counter-increment: bl-frame; position: relative; }',
+    '.editor-block[data-frame="circle"] ol > li { counter-increment: bl-frame; position: relative; min-height: 1.6em; }',
     '.editor-block[data-frame="circle"] ol > li::before {',
     '  content: counter(bl-frame, var(--bl-marker, decimal));',
-    '  position: absolute; left: -1.9em; top: 0.8em; transform: translateY(-50%);',
+    '  position: absolute; left: -1.9em; top: 0.2em;',
     '  width: 1.4em; height: 1.4em; box-sizing: border-box;',
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  border: 1px solid currentColor; border-radius: 50%;',
     '  font-size: 0.75em; line-height: 1; padding: 0;',
     '}',
     '.editor-block[data-frame="square"] ol { list-style: none; counter-reset: bl-frame; padding-left: 2.2em; }',
-    '.editor-block[data-frame="square"] ol > li { counter-increment: bl-frame; position: relative; }',
+    '.editor-block[data-frame="square"] ol > li { counter-increment: bl-frame; position: relative; min-height: 1.6em; }',
     '.editor-block[data-frame="square"] ol > li::before {',
     '  content: counter(bl-frame, var(--bl-marker, decimal));',
-    '  position: absolute; left: -1.9em; top: 0.8em; transform: translateY(-50%);',
+    '  position: absolute; left: -1.9em; top: 0.2em;',
     '  width: 1.4em; height: 1.4em; box-sizing: border-box;',
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  border: 1px solid currentColor; border-radius: 3px;',
     '  font-size: 0.75em; line-height: 1; padding: 0;',
     '}',
     '.editor-block[data-frame="tall"] ol { list-style: none; counter-reset: bl-frame; padding-left: 2.2em; }',
-    '.editor-block[data-frame="tall"] ol > li { counter-increment: bl-frame; position: relative; }',
+    '.editor-block[data-frame="tall"] ol > li { counter-increment: bl-frame; position: relative; min-height: 1.8em; }',
     '.editor-block[data-frame="tall"] ol > li::before {',
     '  content: counter(bl-frame, var(--bl-marker, decimal));',
-    '  position: absolute; left: -1.9em; top: 0.8em; transform: translateY(-50%);',
+    '  position: absolute; left: -1.9em; top: 0.1em;',
     '  width: 1.1em; height: 1.6em; box-sizing: border-box;',
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  border: 1px solid currentColor; border-radius: 3px;',
@@ -17514,16 +17515,29 @@
         { html: '<span style="font-family:Cafe24Danjunghae,Gowun Batang,serif;">·가·</span>', title: '강조점(방점)' }
       ],
       onPick: function(btn, ctx){
-        // p22i: 루비는 팝오버를 먼저 닫고 range를 확실히 복원해야 다이얼로그가 정상적으로 뜼다
-        // (다이얼로그 open 시 팝오버가 outside-click으로 닫히거나 range가 날아가는 문제 방지)
+        // p22j: 루비 완전 복구 — 팝오버 닫기 전에 range 복사본 보관, 닫은 후 명시적으로 selection 재설정
+        // 기존 버그: mp.close() → restoreRange() 이어서도 sel.isCollapsed 가 true이려 "선택 필요" 컴펌 뜼는 문제
         if (ctx.itemIndex === 2) {
-          // 루비: 팝오버 먼저 닫기
+          // 루비: 현재 savedRange 를 명시적으로 복사 (팝오버 닫거나 다른 이벤트로 날아가지 않도록)
+          var _rubyRangeBackup = savedRange ? savedRange.cloneRange() : null;
           mp.close();
-          // range 복원 후 insertRuby (savedRange 는 이미 setupFloatingToolbar 에서 저장된 상태)
           setTimeout(function(){
-            restoreRange();
-            try { if (typeof insertRuby === 'function') insertRuby(); } catch(err) { console.warn('[RUBY]', err); }
-          }, 10);
+            // 백업된 range 로 직접 selection 재설정
+            if (_rubyRangeBackup) {
+              try {
+                var sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(_rubyRangeBackup);
+                // savedRange 가 높게 보존되게 되돌림
+                savedRange = _rubyRangeBackup.cloneRange();
+              } catch(err){ console.warn('[RUBY-RESTORE]', err); }
+            }
+            try {
+              if (typeof insertRuby === 'function') insertRuby();
+            } catch(err) {
+              console.warn('[RUBY]', err);
+            }
+          }, 20);
           return;
         }
         restoreRange();
@@ -19408,21 +19422,31 @@
     if (!contentEl) return 0;
     var fixed = 0;
     try {
-      // .editor-block 안의 p/h1-6/blockquote/ul/ol/pre/li 가 CE=false 면 CE=true 로 되돌림
-      var edibles = contentEl.querySelectorAll('.editor-block > p, .editor-block > h1, .editor-block > h2, .editor-block > h3, .editor-block > h4, .editor-block > h5, .editor-block > h6, .editor-block > blockquote, .editor-block > ul, .editor-block > ol, .editor-block > pre');
+      // .editor-block 안의 p/h1-6/blockquote/ul/ol/pre/li 가 CE=false 이거나 속성 없이 오면 CE=true 로 되돌림
+      // p22k: 속성 자체가 없는 경우도 명시적으로 setAttribute 하여 Ghost auto-save 후 재편집 보장
+      var edibles = contentEl.querySelectorAll('.editor-block > p, .editor-block > h1, .editor-block > h2, .editor-block > h3, .editor-block > h4, .editor-block > h5, .editor-block > h6, .editor-block > blockquote, .editor-block > ul, .editor-block > ol, .editor-block > pre, .editor-block > div');
       edibles.forEach(function(el){
-        if (el.getAttribute('contenteditable') === 'false') {
+        var v = el.getAttribute('contenteditable');
+        if (v !== 'true') {
           el.setAttribute('contenteditable', 'true');
           fixed++;
         }
       });
-      // li 가 CE=false 면 CE=true 젬보기
+      // li 는 부모 ul/ol 의 CE 를 상속받으므로 명시적 false 만 지움
       var lis = contentEl.querySelectorAll('.editor-block li');
       lis.forEach(function(li){
         if (li.getAttribute('contenteditable') === 'false') {
           li.removeAttribute('contenteditable');
           fixed++;
         }
+      });
+      // p22k: 외부 붙여넣기로 들어온 wrapper <div> 안 문단도 편집 가능하게
+      var deepEdibles = contentEl.querySelectorAll('.editor-block p[contenteditable="false"], .editor-block h1[contenteditable="false"], .editor-block h2[contenteditable="false"], .editor-block h3[contenteditable="false"], .editor-block h4[contenteditable="false"], .editor-block h5[contenteditable="false"], .editor-block h6[contenteditable="false"], .editor-block blockquote[contenteditable="false"], .editor-block ul[contenteditable="false"], .editor-block ol[contenteditable="false"], .editor-block pre[contenteditable="false"]');
+      deepEdibles.forEach(function(el){
+        // .block-handle 안이나 콜아웃/접은글 UI 자산은 건드리지 않음 (그건 CE=false 유지가 정상)
+        if (el.closest && (el.closest('.block-handle') || el.closest('.callout-resizer') || el.closest('.ddl-fold-resizer'))) return;
+        el.setAttribute('contenteditable', 'true');
+        fixed++;
       });
       // 이상한 user-select:none 인라인 style 제거
       var frozen = contentEl.querySelectorAll('.editor-block *[style*="user-select"]');
@@ -19444,6 +19468,60 @@
     return fixed;
   }
   try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.repairContentEditable = _repairContentEditable; } catch(_){}
+
+  // ═══════════════════════════════════════════════════════════
+  // p22k: 외부 붙여넣기 굳음 대응 · MutationObserver 상시 감시
+  //   - Ghost 자동저장 후 innerHTML 재설정될 때 CE 속성이 사라지는 문제 해결
+  //   - contenteditable 속성이 편집기 안에서 false/삭제되면 즉시 복구
+  //   - childList 변화 (블록 삽입/치환) 시에도 복구
+  // ═══════════════════════════════════════════════════════════
+  var _ddlCEObserver = null;
+  function _setupPersistentCERepair(){
+    if (!contentEl) return;
+    if (_ddlCEObserver) { try { _ddlCEObserver.disconnect(); } catch(_){} }
+    var debounceTimer = null;
+    function scheduleRepair(){
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function(){
+        try { _repairContentEditable(); } catch(_){}
+      }, 80);
+    }
+    _ddlCEObserver = new MutationObserver(function(muts){
+      var need = false;
+      for (var i = 0; i < muts.length; i++){
+        var m = muts[i];
+        if (m.type === 'attributes' && m.attributeName === 'contenteditable'){
+          var t = m.target;
+          if (t && t.closest && t.closest('.editor-block')){
+            var newVal = t.getAttribute('contenteditable');
+            if (newVal === 'false' || newVal === null){
+              need = true; break;
+            }
+          }
+        } else if (m.type === 'childList' && m.addedNodes && m.addedNodes.length){
+          for (var j = 0; j < m.addedNodes.length; j++){
+            var n = m.addedNodes[j];
+            if (n && n.nodeType === 1 && (n.classList && n.classList.contains && n.classList.contains('editor-block')
+                || (n.closest && n.closest('.editor-block')))){
+              need = true; break;
+            }
+          }
+          if (need) break;
+        }
+      }
+      if (need) scheduleRepair();
+    });
+    try {
+      _ddlCEObserver.observe(contentEl, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+        attributeFilter: ['contenteditable']
+      });
+      log('[REPAIR-CE p22k] MutationObserver 설치');
+    } catch(e){ warn('[REPAIR-CE p22k] observer 설치 실패:', e); }
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.setupPersistentCERepair = _setupPersistentCERepair; } catch(_){}
 
   // p1: 붙여넣기: 클립보드에 .editor-block HTML 있으면 블록 복원, 아니면 브라우저 기본
   function setupPasteHandler(){
@@ -19533,7 +19611,21 @@
       _repairContentEditable();
     }, true);
 
-    log('붙여넣기 핸들러 설치 (p22i: CE 복구 포함)');
+    // p22k: mousedown 캡처링에서도 즉시 복구 (focusin 이 발화 안 되는 경우 대비)
+    document.addEventListener('mousedown', function(e){
+      var t = e.target;
+      if (t && t.closest && t.closest('.editor-block')){
+        try { _repairContentEditable(); } catch(_){}
+      }
+    }, true);
+
+    // p22k: MutationObserver 상시 감시 설치 (Ghost auto-save 후 CE 소실 방지)
+    try { _setupPersistentCERepair(); } catch(_){}
+
+    // p22k: 최초 로드 직후에도 1회 즉시 복구 (기존 저장분에 CE 없는 상태)
+    setTimeout(function(){ try { _repairContentEditable(); } catch(_){} }, 500);
+
+    log('붙여넣기 핸들러 설치 (p22k: MutationObserver + mousedown 캡처링)');
   }
 
   // p15a: 이미지 드래그&드롭 핸들러
