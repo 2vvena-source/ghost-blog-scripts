@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p24f';
+  var VERSION = 'v2.0-β-p24g';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -9700,6 +9700,7 @@
       body: null,               // setTab 에서 갱신
       close: closePopup,
       show: showPopup,
+      open: showPopup,          // p24g: show 의 별칭 (open() 으로 호출하려는 곳 대응)
       setTab: setTab,
       getBody: function(key){ return tabBodies[key] || null; },
     };
@@ -14502,10 +14503,16 @@
   function _applyHighlightPreset(preset){
     try {
       if (typeof applyHighlightColor === 'function' && preset && preset.spec){
-        // p24f: preset.id 를 spec 에 실어서 전달 → applyHighlightColor 가 mark 에 data-hl-preset 붙임 → "이 글에서" 탭 동작
+        // p24f: preset.id 를 spec 에 실어서 전달 → applyHighlightColor 가 mark 에 data-hl-preset 붙임 → "현재 페이지" 탭 동작
         var specWithId = Object.assign({}, preset.spec);
         if (preset.id) specWithId.presetId = preset.id;
         applyHighlightColor(specWithId);
+        // p24g: 마지막 적용 spec 을 저장 (미니 팝오버 상단 사각형 아이콘 배경색 및 즉시 적용창 재사용)
+        try {
+          var _cleanSpec = Object.assign({}, preset.spec);
+          delete _cleanSpec.presetId;
+          localStorage.setItem('ddl.lastAppliedHlSpec', JSON.stringify(_cleanSpec));
+        } catch(_){}
       }
     } catch(err){ console.warn('[hl-preset-apply]', err); }
   }
@@ -14521,14 +14528,14 @@
     var filter = 'all'; // 'all' | 'fav' | 'used'
 
     var popup = window.__DDL_EDITOR.createBlockPopup({
-      title: '형광폜 프리셋 모두 보기',
+      title: '형광펜 프리셋 모두 보기',
       width: '760px',
       draggable: true,
-      tabs: [{ key: 'main', label: '' }]
+      tabs: []
     });
-    popup.open();
+    popup.show();
 
-    var body = popup.getBody('main');
+    var body = popup.getBody('__single') || popup.body;
     if (!body) return;
     body.style.padding = '0';
 
@@ -14543,7 +14550,7 @@
     [
       { key:'all',  label:'전체' },
       { key:'fav',  label:'★ 즐겨찾기' },
-      { key:'used', label:'이 글에서' }
+      { key:'used', label:'현재 페이지' }
     ].forEach(function(td){
       var b = document.createElement('button');
       b.type = 'button';
@@ -14596,7 +14603,7 @@
     scroll.style.cssText = 'padding: 14px 18px; max-height: 68vh; overflow-y: auto; background: #F5F5F5;';
     body.appendChild(scroll);
 
-    // "이 글에서" 필터용 — 현재 문서에 사용 중인 preset ID 수집
+    // "현재 페이지" 필터용 — 현재 문서에 사용 중인 preset ID 수집
     function _collectUsedHlPresetIds(){
       var used = {};
       try {
@@ -14692,7 +14699,7 @@
         var em = document.createElement('div');
         em.style.cssText = 'padding: 40px; text-align: center; color: rgba(15,58,58,0.45); font-size: 13px;';
         if (filter === 'fav')       em.textContent = '★ 즐겨찾기한 프리셋이 아직 없어요.';
-        else if (filter === 'used') em.textContent = '이 글에서 사용 중인 프리셋이 없어요. (프리셋 카드를 클릭해서 적용해보세요)';
+        else if (filter === 'used') em.textContent = '현재 페이지 사용 중인 프리셋이 없어요. (프리셋 카드를 클릭해서 적용해보세요)';
         else                        em.textContent = '등록된 형광폜 프리셋이 없어요.';
         scroll.appendChild(em);
       }
@@ -15207,11 +15214,73 @@
   //   속성 탭: 모양 3개(marker/fade/paint) 카드 + 위치(paint만) + 어두운색 흔텔스트 토글
   //   색깔 탭: 헤더 색깔 탭과 구조 동일 — 그룹·카드·투명도 슬라이더 + [-]/[+], 저장소는 분리된 ddl.highlightColorLibrary
   // ============================================================
-  function openHighlighterPresetEditor(preset, onSave){
+  // p24g: options.mode = 'save-preset' (기본) | 'apply-hl' (즉시 적용용)
+  //   apply-hl 모드: 이름 수백 X, [적용]/[취소] 버튼, 선택된 mark 서식 자동 읽기, 프리셋 저장 X, 모드별로 localStorage 마지막 spec 저장
+  function openHighlighterPresetEditor(preset, onSave, options){
+    options = options || {};
+    var editorMode = options.mode || 'save-preset';
     var current = JSON.parse(JSON.stringify(preset || {}));
     if (!current.spec) current.spec = { mode:'marker', c1:'#FFF176', a1:100 };
     if (!current.name) current.name = '';
     var currentTab = 'props';
+
+    // p24g: apply-hl 모드 — 선택된 글자 안 mark.ddl-hl 을 찾아서 그 서식으로 초기값 설정
+    var _savedApplyRange = null;
+    var _initialSpecFromSelection = null;
+    if (editorMode === 'apply-hl'){
+      try {
+        // 선택 범위 기억
+        if (typeof savedRange !== 'undefined' && savedRange){
+          _savedApplyRange = savedRange.cloneRange();
+        } else {
+          var _sel = window.getSelection();
+          if (_sel && _sel.rangeCount > 0) _savedApplyRange = _sel.getRangeAt(0).cloneRange();
+        }
+        // 선택 샜작점에서 mark.ddl-hl 찾기
+        if (_savedApplyRange){
+          var _startNode = _savedApplyRange.startContainer;
+          if (_startNode && _startNode.nodeType === 3) _startNode = _startNode.parentElement;
+          if (_startNode){
+            var _mkFound = _startNode.closest && _startNode.closest('mark.ddl-hl');
+            if (_mkFound){
+              // data-hl-spec (JSON) 이 있으면 우선 사용
+              var _specJson = _mkFound.getAttribute('data-hl-spec');
+              if (_specJson){
+                try {
+                  var _parsedSpec = JSON.parse(_specJson);
+                  if (_parsedSpec && typeof _parsedSpec === 'object'){
+                    current.spec = _parsedSpec;
+                    if (typeof current.spec.a1 !== 'number') current.spec.a1 = 100;
+                  }
+                } catch(_){}
+              } else {
+                // Fallback: data-hl-* 속성 개별 읽기
+                var _mode = _mkFound.getAttribute('data-hl-mode') || 'marker';
+                var _c1   = _mkFound.getAttribute('data-hl-c1')   || '#FFF176';
+                var _a1   = parseInt(_mkFound.getAttribute('data-hl-a1') || '100', 10);
+                var _pos  = _mkFound.getAttribute('data-hl-pos');
+                current.spec = { mode: _mode, c1: _c1, a1: isNaN(_a1) ? 100 : _a1 };
+                if (_pos) current.spec.pos = _pos;
+              }
+              _initialSpecFromSelection = JSON.parse(JSON.stringify(current.spec));
+            }
+          }
+        }
+        // 선택이 mark 안이 아니면 — localStorage 의 마지막 spec 을 초기값으로
+        if (!_initialSpecFromSelection){
+          try {
+            var _lastSpecJson = localStorage.getItem('ddl.lastAppliedHlSpec');
+            if (_lastSpecJson){
+              var _lastSpec = JSON.parse(_lastSpecJson);
+              if (_lastSpec && typeof _lastSpec === 'object'){
+                current.spec = _lastSpec;
+                if (typeof current.spec.a1 !== 'number') current.spec.a1 = 100;
+              }
+            }
+          } catch(_){}
+        }
+      } catch(_){}
+    }
 
     // 열려있는 관리창 잠시 숨김
     var hiddenManagers = [];
@@ -15283,11 +15352,35 @@
       return b;
     }
 
-    dFooter.appendChild(makeBtn('취소', { onClick: function(){ closeDialog(); } }));
-    dFooter.appendChild(makeBtn('저장', { primary: true, onClick: function(){
-      if (typeof onSave === 'function') onSave(current);
-      closeDialog();
-    }}));
+    // p24g: 모드별 다른 제목 + 푸터 버튼
+    if (editorMode === 'apply-hl'){
+      dTitle.textContent = '형광폜 적용';
+      dFooter.appendChild(makeBtn('취소', { onClick: function(){ closeDialog(); } }));
+      dFooter.appendChild(makeBtn('적용', { primary: true, onClick: function(){
+        try {
+          // 선택 복원
+          if (_savedApplyRange){
+            var _sel2 = window.getSelection();
+            _sel2.removeAllRanges();
+            _sel2.addRange(_savedApplyRange);
+            if (typeof saveRange === 'function') saveRange();
+          }
+          // 형광폜 적용 (presetId 는 안 실음 — 즉시 적용용)
+          if (typeof applyHighlightColor === 'function'){
+            applyHighlightColor(current.spec);
+          }
+          // localStorage 에 마지막 spec 저장
+          try { localStorage.setItem('ddl.lastAppliedHlSpec', JSON.stringify(current.spec)); } catch(_){}
+        } catch(err){ console.warn('[apply-hl]', err); }
+        closeDialog();
+      }}));
+    } else {
+      dFooter.appendChild(makeBtn('취소', { onClick: function(){ closeDialog(); } }));
+      dFooter.appendChild(makeBtn('저장', { primary: true, onClick: function(){
+        if (typeof onSave === 'function') onSave(current);
+        closeDialog();
+      }}));
+    }
     dialog.appendChild(dFooter);
 
     overlay.appendChild(dialog);
@@ -15311,10 +15404,10 @@
 
     // 본문 렌더
     var pseudoPP = { body: dBody };
-    _renderHlEditorBody(pseudoPP, current, currentTab, function(nt){ currentTab = nt; });
+    _renderHlEditorBody(pseudoPP, current, currentTab, function(nt){ currentTab = nt; }, editorMode);
   }
 
-  function _renderHlEditorBody(pp, current, activeTab, onTabChange){
+  function _renderHlEditorBody(pp, current, activeTab, onTabChange, editorMode){
     var body = pp.body || pp.getBody('__single');
     if (!body) return;
     body.innerHTML = '';
@@ -15323,6 +15416,8 @@
     // === 1. 이름 입력 ===
     var nameArea = document.createElement('div');
     nameArea.style.cssText = 'padding: 14px 18px 8px; border-bottom: 1px solid rgba(15,58,58,0.06);';
+    // p24g: apply-hl 모드는 이름 입력 숨김 (프리셋 저장이 아니기 때문)
+    if (editorMode === 'apply-hl') nameArea.style.display = 'none';
     var nameLabel = document.createElement('div');
     nameLabel.style.cssText = 'font-size: 10px; opacity: 0.5; letter-spacing: 0.06em; margin-bottom: 4px; text-transform: uppercase;';
     nameLabel.textContent = '이름';
@@ -15851,7 +15946,7 @@
 
   // ============================================================
   // p23v: 형광펜 미니 팝오버 (헤더 미니 팝오버와 동일 구조)
-  //   상단: 필터 탭바 (전체 / ★ / 이 글에서) + ⚙
+  //   상단: 필터 탭바 (전체 / ★ / 현재 페이지) + ⚙
   //   본문: 그룹별 섹션 (각 그룹 최대 3개 대표 카드)
   //   하단: "모든 프리셋 보기 (N) →" (플레이스홀더 — 큰 창은 다음 라운드에서)
   // ============================================================
@@ -15872,10 +15967,59 @@
       + ' font-family: "Pretendard Variable","Pretendard",sans-serif; color: var(--color, #0F3A3A);'
       + ' padding: 0;';
 
-    // 상단 필터 탭바 + ⚙
+    // 상단 필터 탭바 + ⚙ (p24g: 좌측에 최근색 아이콘 추가)
     var topbar = document.createElement('div');
     topbar.style.cssText = 'display: flex; justify-content: space-between; align-items: center;'
       + ' padding: 8px 10px; border-bottom: 1px solid rgba(15,58,58,0.06);';
+
+    // p24g: 좌측 묶음 = 최근색 아이콘 + 탭바
+    var leftGroup = document.createElement('div');
+    leftGroup.style.cssText = 'display: inline-flex; align-items: center; gap: 8px;';
+
+    // p24g: 최근 적용 spec 사각형 아이콘 (클릭 = 형광폜 즉시 적용창 열림)
+    var lastSpecBtn = document.createElement('button');
+    lastSpecBtn.type = 'button';
+    lastSpecBtn.title = '마지막 형광폜로 편집해서 적용';
+    lastSpecBtn.style.cssText = 'width: 24px; height: 24px; border-radius: 5px;'
+      + ' border: 1px solid rgba(15,58,58,0.2); padding: 0; cursor: pointer;'
+      + ' background: #FFF176; transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;'
+      + ' flex-shrink: 0;';
+    (function _initLastSpecBtn(){
+      try {
+        var _lastJson = localStorage.getItem('ddl.lastAppliedHlSpec');
+        if (_lastJson){
+          var _lastSp = JSON.parse(_lastJson);
+          if (_lastSp && typeof _lastSp === 'object'){
+            var _bg = (typeof _hlSpecToPreview === 'function') ? _hlSpecToPreview(_lastSp) : (_lastSp.c1 || '#FFF176');
+            lastSpecBtn.style.background = _bg;
+          }
+        }
+      } catch(_){}
+    })();
+    lastSpecBtn.addEventListener('mouseenter', function(){
+      lastSpecBtn.style.borderColor = 'var(--point, #FF9A76)';
+      lastSpecBtn.style.boxShadow = '0 0 0 2px rgba(255,154,118,0.18)';
+    });
+    lastSpecBtn.addEventListener('mouseleave', function(){
+      lastSpecBtn.style.borderColor = 'rgba(15,58,58,0.2)';
+      lastSpecBtn.style.boxShadow = 'none';
+    });
+    lastSpecBtn.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    lastSpecBtn.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
+      pop.remove();
+      try {
+        if (typeof openHighlighterPresetEditor === 'function'){
+          openHighlighterPresetEditor(
+            { name: '', spec: { mode:'marker', c1:'#FFF176', a1:100 } },
+            null,
+            { mode: 'apply-hl' }
+          );
+        }
+      } catch(err){ console.warn('[hl-apply-open]', err); }
+    });
+    leftGroup.appendChild(lastSpecBtn);
 
     var tabs = document.createElement('div');
     tabs.style.cssText = 'display: inline-flex; gap: 4px;';
@@ -15883,7 +16027,7 @@
     [
       { key:'all',  label:'전체' },
       { key:'fav',  label:'★' },
-      { key:'used', label:'이 글에서' }
+      { key:'used', label:'현재 페이지' }
     ].forEach(function(td){
       var b = document.createElement('button');
       b.type = 'button';
@@ -15912,7 +16056,8 @@
       tabButtons[td.key] = b;
       tabs.appendChild(b);
     });
-    topbar.appendChild(tabs);
+    leftGroup.appendChild(tabs);
+    topbar.appendChild(leftGroup);
 
     var gear = document.createElement('button');
     gear.type = 'button';
@@ -15941,7 +16086,7 @@
     bodyEl.style.cssText = 'padding: 8px 10px; max-height: 360px; overflow-y: auto;';
     pop.appendChild(bodyEl);
 
-    // "이 글에서" 필터용 — 현재 문서에서 사용 중인 프리셋 ID 수집
+    // "현재 페이지" 필터용 — 현재 문서에서 사용 중인 프리셋 ID 수집
     function _collectUsedHlPresetIds(){
       var used = {};
       try {
@@ -16057,7 +16202,7 @@
         var em = document.createElement('div');
         em.style.cssText = 'padding: 18px; text-align: center; color: rgba(15,58,58,0.4); font-size: 11px;';
         if (filter === 'fav')       em.textContent = '즐겨찾기한 프리셋이 없어요.';
-        else if (filter === 'used') em.textContent = '이 글에서 사용 중인 프리셋이 없어요.';
+        else if (filter === 'used') em.textContent = '현재 페이지 사용 중인 프리셋이 없어요.';
         else                        em.textContent = '프리셋이 없어요.';
         bodyEl.appendChild(em);
       }
@@ -19824,7 +19969,7 @@
     var _mode = (spec && spec.mode) || 'marker';
     if (_mode === 'solid') _mode = 'marker';
     m.setAttribute('data-hl-mode', _mode);
-    // p24f: preset.id 가 spec 에 실려오면 mark 에 표시 → "이 글에서" 탭 동작
+    // p24f: preset.id 가 spec 에 실려오면 mark 에 표시 → "현재 페이지" 탭 동작
     if (spec && spec.presetId){
       m.setAttribute('data-hl-preset', spec.presetId);
     }
