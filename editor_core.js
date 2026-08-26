@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22g';
+  var VERSION = 'v2.0-β-p22h';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2255,7 +2255,7 @@
     '  --ep-mini-sw-gap:    8px;',
     '  --ep-mini-sw-radius: 6px;',
     '  --ep-mini-width:     296px;',
-    '  --ep-mini-z:         9500;',
+    '  --ep-mini-z:         10001;',   /* p22h: 모던 툴바(9990)보다 위 — 첨자 팝오버 가려지는 버그 수정 */
     '}',
     /* 팝오버 셸 · p22c: min-width 강제 · p22d: display:block 명시 (낡은 CSS 상속 질달) */
     '.ep-mini-popover {',
@@ -2420,6 +2420,173 @@
     '  text-decoration-color: rgba(255,154,118,0.4);',
     '}',
     '.ep-mini-clear:hover { text-decoration-color: var(--point, #FF9A76); filter: brightness(0.9); }',
+
+    /* ═════════════════════════════════════════════════════════ */
+    /*  p22h: 불릿 팝오버 그리드 CSS                                                     */
+    /* ═════════════════════════════════════════════════════════ */
+    /*  · 5행 × 4열 그리드                                                              */
+    /*  · 연간 데모 샘플 · 클릭 시 리스트 스타일 적용                                        */
+    '.ep-bullet-mini { padding: 8px; }',
+    '.ep-bullet-mini-row {',
+    '  display: grid;',
+    '  grid-template-columns: repeat(4, 1fr);',
+    '  gap: 6px;',
+    '  margin-bottom: 6px;',
+    '}',
+    '.ep-bullet-mini-row:last-child { margin-bottom: 0; }',
+    '.ep-bullet-mini-label {',
+    '  font-size: 10px; opacity: 0.55; letter-spacing: 0.04em;',
+    '  margin: 6px 2px 3px; grid-column: 1 / -1;',
+    '}',
+    '.ep-bullet-mini-btn {',
+    '  display: flex; flex-direction: column; align-items: center; justify-content: center;',
+    '  min-height: 42px; padding: 6px 4px;',
+    '  background: #fff;',
+    '  border: 1px solid rgba(15,58,58,0.15);',
+    '  border-radius: 6px;',
+    '  cursor: pointer;',
+    '  color: #0F3A3A;',
+    '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
+    '  font-size: 12px;',
+    '  transition: all 0.15s ease;',
+    '  position: relative;',
+    '  gap: 2px;',
+    '}',
+    '.ep-bullet-mini-btn:hover {',
+    '  background: rgba(255,154,118,0.06);',
+    '  border-color: rgba(255,154,118,0.4);',
+    '  transform: scale(1.05);',
+    '}',
+    '.ep-bullet-mini-btn.is-active {',
+    '  background: rgba(255,154,118,0.12);',
+    '  border-color: var(--point, #FF9A76);',
+    '  box-shadow: 0 0 0 2px rgba(255,154,118,0.25);',
+    '}',
+    /* 데모 샘플: 마커·텍스트 */
+    '.ep-bullet-mini-btn .demo {',
+    '  font-family: "Pretendard Variable","Pretendard","Cafe24Danjunghae","Gowun Batang",serif;',
+    '  font-size: 15px;',
+    '  line-height: 1;',
+    '  color: #0F3A3A;',
+    '}',
+    '.ep-bullet-mini-btn .demo-sub {',
+    '  font-size: 9px; opacity: 0.5; line-height: 1;',
+    '  margin-top: 2px;',
+    '}',
+    /* 하단 협업 영역: 프레임 토글 · 크기 버튼 */
+    '.ep-bullet-mini-footer {',
+    '  display: flex; align-items: center; justify-content: space-between;',
+    '  gap: 6px; margin-top: 8px; padding-top: 8px;',
+    '  border-top: 1px solid rgba(15,58,58,0.1);',
+    '}',
+    '.ep-bullet-mini-frame-group {',
+    '  display: flex; gap: 4px;',
+    '}',
+    '.ep-bullet-mini-frame-btn {',
+    '  width: 28px; height: 28px;',
+    '  display: flex; align-items: center; justify-content: center;',
+    '  border: 1px solid rgba(15,58,58,0.15);',
+    '  border-radius: 4px; background: #fff;',
+    '  cursor: pointer;',
+    '  font-size: 14px; color: #0F3A3A;',
+    '  transition: all 0.15s ease;',
+    '}',
+    '.ep-bullet-mini-frame-btn:hover { background: rgba(255,154,118,0.06); border-color: rgba(255,154,118,0.4); }',
+    '.ep-bullet-mini-frame-btn.is-active {',
+    '  background: var(--point, #FF9A76); color: #fff; border-color: var(--point, #FF9A76);',
+    '}',
+    '.ep-bullet-mini-size-group { display: flex; gap: 2px; }',
+    '.ep-bullet-mini-size-btn {',
+    '  width: 26px; height: 26px;',
+    '  border: 1px solid rgba(15,58,58,0.15);',
+    '  border-radius: 4px; background: #fff; cursor: pointer;',
+    '  font-size: 12px; color: #0F3A3A;',
+    '  display: flex; align-items: center; justify-content: center;',
+    '}',
+    '.ep-bullet-mini-size-btn:hover { background: rgba(15,58,58,0.05); }',
+    '.ep-bullet-mini-tip {',
+    '  font-size: 10px; opacity: 0.5; text-align: center; margin-top: 4px;',
+    '  font-family: "Pretendard Variable","Pretendard",sans-serif;',
+    '}',
+    /* 실제 본문 리스트 스타일: data-bullet-style, data-frame, data-scale */
+    '.editor-block[data-bullet-style="disc"] > ul, .editor-block[data-bullet-style="disc"] ul { list-style-type: disc; }',
+    '.editor-block[data-bullet-style="circle"] > ul, .editor-block[data-bullet-style="circle"] ul { list-style-type: circle; }',
+    '.editor-block[data-bullet-style="square"] > ul, .editor-block[data-bullet-style="square"] ul { list-style-type: square; }',
+    /* 심볼 마름모 · 별표 · ※ 은 CSS list-style-type 없음 → ::marker 커스텀 */
+    '.editor-block[data-bullet-style="diamond-solid"] ul { list-style: none; padding-left: 1.2em; }',
+    '.editor-block[data-bullet-style="diamond-solid"] ul > li::before { content: "\\25C6\\A0"; color: currentColor; margin-left: -1.2em; }',
+    '.editor-block[data-bullet-style="diamond-hollow"] ul { list-style: none; padding-left: 1.2em; }',
+    '.editor-block[data-bullet-style="diamond-hollow"] ul > li::before { content: "\\25C7\\A0"; color: currentColor; margin-left: -1.2em; }',
+    '.editor-block[data-bullet-style="star"] ul { list-style: none; padding-left: 1.2em; }',
+    '.editor-block[data-bullet-style="star"] ul > li::before { content: "*\\A0"; color: currentColor; margin-left: -1.2em; }',
+    '.editor-block[data-bullet-style="reference"] ul { list-style: none; padding-left: 1.2em; }',
+    '.editor-block[data-bullet-style="reference"] ul > li::before { content: "\\203B\\A0"; color: currentColor; margin-left: -1.2em; }',
+    /* 계층적 축소 (마름모/별표/※): 하위 li 로 갈수록 축소 */
+    '.editor-block[data-bullet-style="star"] ul ul > li::before { font-size: 0.82em; }',
+    '.editor-block[data-bullet-style="star"] ul ul ul > li::before { font-size: 0.7em; }',
+    '.editor-block[data-bullet-style="reference"] ul ul > li::before { font-size: 0.82em; }',
+    '.editor-block[data-bullet-style="reference"] ul ul ul > li::before { font-size: 0.7em; }',
+    '.editor-block[data-bullet-style="diamond-solid"] ul ul > li::before { font-size: 0.85em; }',
+    '.editor-block[data-bullet-style="diamond-solid"] ul ul ul > li::before { font-size: 0.72em; }',
+    /* 숫자 / 기타 (ol 사용) */
+    '.editor-block[data-bullet-style="decimal"] ol { list-style-type: decimal; }',
+    '.editor-block[data-bullet-style="decimal-zero"] ol { list-style-type: decimal-leading-zero; }',
+    '.editor-block[data-bullet-style="lower-roman"] ol { list-style-type: lower-roman; }',
+    '.editor-block[data-bullet-style="upper-roman"] ol { list-style-type: upper-roman; }',
+    '.editor-block[data-bullet-style="lower-alpha"] ol { list-style-type: lower-alpha; }',
+    '.editor-block[data-bullet-style="upper-alpha"] ol { list-style-type: upper-alpha; }',
+    '.editor-block[data-bullet-style="hangul-consonant"] ol { list-style-type: hangul-consonant; }',
+    '.editor-block[data-bullet-style="hangul"] ol { list-style-type: hangul; }',
+    /* 프레임 (원·사각·직사각) — counter-based 커스텀 마커 */
+    /* 이때 ol 기본 마커를 끄고 counter로 직접 그린다 */
+    '.editor-block[data-frame="circle"] ol { list-style: none; counter-reset: bl-frame; padding-left: 2.2em; }',
+    '.editor-block[data-frame="circle"] ol > li { counter-increment: bl-frame; position: relative; }',
+    '.editor-block[data-frame="circle"] ol > li::before {',
+    '  content: counter(bl-frame, var(--bl-marker, decimal));',
+    '  position: absolute; left: -1.9em; top: 0.05em;',
+    '  width: 1.4em; height: 1.4em;',
+    '  display: inline-flex; align-items: center; justify-content: center;',
+    '  border: 1px solid currentColor; border-radius: 50%;',
+    '  font-size: 0.75em; line-height: 1;',
+    '}',
+    '.editor-block[data-frame="square"] ol { list-style: none; counter-reset: bl-frame; padding-left: 2.2em; }',
+    '.editor-block[data-frame="square"] ol > li { counter-increment: bl-frame; position: relative; }',
+    '.editor-block[data-frame="square"] ol > li::before {',
+    '  content: counter(bl-frame, var(--bl-marker, decimal));',
+    '  position: absolute; left: -1.9em; top: 0.05em;',
+    '  width: 1.4em; height: 1.4em;',
+    '  display: inline-flex; align-items: center; justify-content: center;',
+    '  border: 1px solid currentColor; border-radius: 3px;',
+    '  font-size: 0.75em; line-height: 1;',
+    '}',
+    '.editor-block[data-frame="tall"] ol { list-style: none; counter-reset: bl-frame; padding-left: 2.2em; }',
+    '.editor-block[data-frame="tall"] ol > li { counter-increment: bl-frame; position: relative; }',
+    '.editor-block[data-frame="tall"] ol > li::before {',
+    '  content: counter(bl-frame, var(--bl-marker, decimal));',
+    '  position: absolute; left: -1.9em; top: -0.05em;',
+    '  width: 1.1em; height: 1.6em;',
+    '  display: inline-flex; align-items: center; justify-content: center;',
+    '  border: 1px solid currentColor; border-radius: 3px;',
+    '  font-size: 0.72em; line-height: 1;',
+    '}',
+    /* 프레임이 적용된 ol — counter marker 변수를 data-bullet-style 에서 설정 */
+    '.editor-block[data-bullet-style="decimal"] { --bl-marker: decimal; }',
+    '.editor-block[data-bullet-style="decimal-zero"] { --bl-marker: decimal-leading-zero; }',
+    '.editor-block[data-bullet-style="lower-roman"] { --bl-marker: lower-roman; }',
+    '.editor-block[data-bullet-style="upper-roman"] { --bl-marker: upper-roman; }',
+    '.editor-block[data-bullet-style="lower-alpha"] { --bl-marker: lower-alpha; }',
+    '.editor-block[data-bullet-style="upper-alpha"] { --bl-marker: upper-alpha; }',
+    '.editor-block[data-bullet-style="hangul-consonant"] { --bl-marker: hangul-consonant; }',
+    '.editor-block[data-bullet-style="hangul"] { --bl-marker: hangul; }',
+    /* 마커 크기 스케일 (data-marker-scale="70".."140") */
+    '.editor-block[data-marker-scale="70"] li::marker { font-size: 0.7em; }',
+    '.editor-block[data-marker-scale="85"] li::marker { font-size: 0.85em; }',
+    '.editor-block[data-marker-scale="115"] li::marker { font-size: 1.15em; }',
+    '.editor-block[data-marker-scale="130"] li::marker { font-size: 1.3em; }',
+    '.editor-block[data-marker-scale="70"] li::before { font-size: 0.7em; }',
+    '.editor-block[data-marker-scale="85"] li::before { font-size: 0.85em; }',
+    '.editor-block[data-marker-scale="115"] li::before { font-size: 1.15em; }',
+    '.editor-block[data-marker-scale="130"] li::before { font-size: 1.3em; }',
 
     ''
   ].join('\n');
@@ -9792,12 +9959,17 @@
         '<button type="button" data-cmd="inline-code"    title="코드">' + svgCode + '</button>' +
       '</div>' +
       '<div class="ep-modern-toolbar-sep"></div>' +
-      // 4행: 자간▾ · 줄간격▾ · 서식▾ · 서식지우기
+      // 4행 (p22h): 링크 · 자간▾ · 줄간격▾ · 서식지우기
       '<div class="ep-modern-toolbar-icons">' +
+        '<button type="button" data-cmd="createLink"     title="링크">' + svgLink + '</button>' +
         '<button type="button" data-cmd="letter-spacing" data-expand="true" title="자간">' + svgLetterSp + '</button>' +
         '<button type="button" data-cmd="line-height"    data-expand="true" title="줄간격">' + svgLineH + '</button>' +
-        '<button type="button" data-cmd="open-presets"   data-expand="true" title="서식 프리셋" style="font-size:14px;">⭐</button>' +
         '<button type="button" data-cmd="removeFormat"   title="서식 지우기">' + svgClear_m + '</button>' +
+      '</div>' +
+      '<div class="ep-modern-toolbar-sep"></div>' +
+      // 5행 (p22h): 서식 프리셋 (별도 행)
+      '<div class="ep-modern-toolbar-icons" style="grid-template-columns:1fr;">' +
+        '<button type="button" data-cmd="open-presets"   data-expand="true" title="서식 프리셋" style="font-size:14px;">⭐ 서식 프리셋</button>' +
       '</div>' +
       '<div class="ep-modern-toolbar-sep"></div>' +
       // 링크는 이 4x4에 자리 없으므로 하단 텍스트 영역에서 접근하거나 별도 배치 (사용자 스펙 준수)
@@ -9914,7 +10086,13 @@
         return;
       }
       if (cmd === 'list-expand'){
-        try { _showStubToast('불릿/목록 — 다음 배포에서 지원됩니다'); } catch(_){}
+        // p22h: 실제 불릿 팝오버로 연결
+        e.preventDefault(); e.stopPropagation();
+        try { saveRange && saveRange(); } catch(_){}
+        try {
+          if (window.__DDL_EDITOR && window.__DDL_EDITOR.openBulletPopover) window.__DDL_EDITOR.openBulletPopover(btn);
+          else _showStubToast('불릿 — 로드 실패');
+        } catch(err){ console.warn('[BULLET]', err); }
         return;
       }
       // Size 버튼 활성 토글
@@ -17007,6 +17185,7 @@
     var _svg_font_up   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><text x="3" y="17" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="14" fill="#0F3A3A" stroke="none">A</text><path d="M17 6v8"/><polyline points="14,9 17,6 20,9"/></svg>';
     var _svg_font_down = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><text x="3" y="17" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="14" fill="#0F3A3A" stroke="none">A</text><path d="M17 6v8"/><polyline points="14,11 17,14 20,11"/></svg>';
     var _svg_code      = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,7 4,12 9,17"/><polyline points="15,7 20,12 15,17"/></svg>';
+    var _svg_link      = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>';
     // p22c: TOOLBAR_SPEC_v2 순서로 완전 재편 · 15개 순서 준수
     //   1.헤더▾ 2.B 3.I 4.U 5.S 6.정렬▾ 7.글자색▾ 8.형광펜▾
     //   9.불릿▾ 10.첨자▾ 11.A+ 12.A− 13.<> 14.서식▾ 15.⚙
@@ -17039,8 +17218,10 @@
       // 13. <>
       '<button data-cmd="inline-code" title="인라인 코드">' + _svg_code + '</button>' +
       '<span class="ftb-sep"></span>' +
+      // 13.5 링크 (p22h: 사용자 요청 — 코드 다음에 추가)
+      '<button data-cmd="createLink" title="링크">' + _svg_link + '</button>' +
       // 14. 서식▾
-      '<button data-cmd="open-presets" title="서식 프리셋" style="display:inline-flex; align-items:center; gap:0.25em;">' + _svg_star + '<span>서식</span></button>' +
+      '<button data-cmd="open-presets" data-expand="true" title="서식 프리셋" style="display:inline-flex; align-items:center; gap:0.25em;">' + _svg_star + '<span>서식</span></button>' +
       // 15. ⚙ (설정)
       '<button data-cmd="open-settings" class="ftb-gear" title="편집기 설정">' + _gearSvg(14) + '</button>';
 
@@ -17289,9 +17470,14 @@
         e.preventDefault(); e.stopPropagation();
         openHeadingPopoverStub(btn);
       } else if (cmd === 'list-expand') {
-        // p19m: 목록 stub 유지 (다음 라운드)
+        // p22h: 실제 불릿 팝오버 열기
         e.preventDefault(); e.stopPropagation();
-        _showStubToast('목록(불릿/번호) — 다음 배포에서 지원됩니다');
+        saveRange();
+        try {
+          if (typeof openBulletPopover === 'function') openBulletPopover(btn);
+          else if (window.__DDL_EDITOR && window.__DDL_EDITOR.openBulletPopover) window.__DDL_EDITOR.openBulletPopover(btn);
+          else _showStubToast('불릿 — 로드 실패');
+        } catch(err){ console.warn('[BULLET]', err); }
       } else {
         restoreRange();
         document.execCommand(cmd, false, null);
@@ -17343,6 +17529,281 @@
   }
 
   try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.openSupSubMini = openSupSubMini; } catch(_){}
+
+  // p22h. 불릿 팝오버 (사용자 스펙: 4행 × 4열 + 프레임 + 크기)
+  //
+  //   행 1 (도형-기본):  원채움 · 원빈 · 사각채움 · 사각빈
+  //   행 2 (도형-추가): 마름모채움 · 마름모빈 · *별표 · ※참조
+  //   행 3 (숫자):     1. · 01. · i. · I.
+  //   행 4 (기타):     a. · A. · ㄱ. · 가.
+  //   하단: 프레임 (테두리 없음 · 원 · 사각 · 직사각) + 크기 (−·●·+)
+  //
+  var BULLET_STYLES_UL   = ['disc','circle','square','square-hollow','diamond-solid','diamond-hollow','star','reference'];
+  var BULLET_STYLES_OL   = ['decimal','decimal-zero','lower-roman','upper-roman','lower-alpha','upper-alpha','hangul-consonant','hangul'];
+  var BULLET_FRAMES      = ['none','circle','square','tall'];
+  var BULLET_SCALES      = ['70','85','','115','130'];   // '' = 100% (기본)
+
+  function _bulletDemo(style){
+    switch (style){
+      case 'disc':            return { html: '<span class="demo">\u25CF</span>', sub: '' };
+      case 'circle':          return { html: '<span class="demo">\u25CB</span>', sub: '' };
+      case 'square':          return { html: '<span class="demo">\u25A0</span>', sub: '' };
+      case 'square-hollow':   return { html: '<span class="demo">\u25A1</span>', sub: '' };
+      case 'diamond-solid':   return { html: '<span class="demo">\u25C6</span>', sub: '' };
+      case 'diamond-hollow':  return { html: '<span class="demo">\u25C7</span>', sub: '' };
+      case 'star':            return { html: '<span class="demo">*</span>',       sub: '' };
+      case 'reference':       return { html: '<span class="demo">\u203B</span>',  sub: '' };
+      case 'decimal':         return { html: '<span class="demo">1.</span>',      sub: '' };
+      case 'decimal-zero':    return { html: '<span class="demo">01.</span>',     sub: '' };
+      case 'lower-roman':     return { html: '<span class="demo">i.</span>',      sub: '' };
+      case 'upper-roman':     return { html: '<span class="demo">I.</span>',      sub: '' };
+      case 'lower-alpha':     return { html: '<span class="demo">a.</span>',      sub: '' };
+      case 'upper-alpha':     return { html: '<span class="demo">A.</span>',      sub: '' };
+      case 'hangul-consonant':return { html: '<span class="demo">\u3131.</span>', sub: '' };
+      case 'hangul':          return { html: '<span class="demo">\uAC00.</span>', sub: '' };
+      default:                return { html: '<span class="demo">?</span>',       sub: '' };
+    }
+  }
+
+  function _bulletFrameLabel(f){
+    switch (f){
+      case 'circle': return '\u24EA';
+      case 'square': return '\u25A2';
+      case 'tall':   return '\u25AF';
+      default:       return '\u2013';
+    }
+  }
+
+  function applyBulletStyle(style, frame){
+    var isOL = BULLET_STYLES_OL.indexOf(style) !== -1;
+    var applyFrame = isOL ? (frame || 'none') : 'none';
+
+    // 리스트 생성 (execCommand)
+    try { document.execCommand(isOL ? 'insertOrderedList' : 'insertUnorderedList'); } catch(_){}
+
+    // 생성된 list 의 상위 editor-block 에 data-* 설정
+    setTimeout(function(){
+      var sel2 = window.getSelection();
+      if (!sel2 || sel2.rangeCount === 0) return;
+      var node = sel2.getRangeAt(0).startContainer;
+      var el   = node.nodeType === 1 ? node : node.parentElement;
+      if (!el) return;
+      var block = el.closest && el.closest('.editor-block');
+      if (!block) {
+        var li = el.closest && el.closest('li');
+        block = li && li.closest && li.closest('.editor-block');
+      }
+      if (!block) return;
+      block.setAttribute('data-bullet-style', style);
+      if (applyFrame && applyFrame !== 'none') block.setAttribute('data-frame', applyFrame);
+      else block.removeAttribute('data-frame');
+      try { if (window.__DDL_DBG_TB_CMD) console.log('[BULLET] applied', style, 'frame=', applyFrame, block); } catch(_){}
+    }, 30);
+  }
+
+  function setBulletMarkerScale(scale){
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    var node = sel.getRangeAt(0).startContainer;
+    var el   = node.nodeType === 1 ? node : node.parentElement;
+    var block = el && el.closest && el.closest('.editor-block');
+    if (!block) return;
+    if (scale && scale !== '') block.setAttribute('data-marker-scale', scale);
+    else block.removeAttribute('data-marker-scale');
+  }
+
+  var _bulletState = { style: 'disc', frame: 'none', scale: '' };
+
+  function openBulletPopover(anchor){
+    restoreRange();
+
+    if (__activeMiniPopover) { try { __activeMiniPopover.close(); } catch(_){} }
+
+    var root = document.createElement('div');
+    root.className = 'ep-mini-popover ddl-editor-popup';
+    root.setAttribute('data-variant', 'bullet');
+    root.style.width = '260px';
+    root.style.minWidth = '260px';
+
+    var body = document.createElement('div');
+    body.className = 'ep-bullet-mini';
+    root.appendChild(body);
+
+    function makeRow(label, styles){
+      var lbl = document.createElement('div');
+      lbl.className = 'ep-bullet-mini-label';
+      lbl.textContent = label;
+      body.appendChild(lbl);
+
+      var row = document.createElement('div');
+      row.className = 'ep-bullet-mini-row';
+      styles.forEach(function(s){
+        var demo = _bulletDemo(s);
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'ep-bullet-mini-btn';
+        b.setAttribute('data-style', s);
+        b.innerHTML = demo.html + (demo.sub ? '<span class="demo-sub">' + demo.sub + '</span>' : '');
+        if (_bulletState.style === s) b.classList.add('is-active');
+        b.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
+        b.addEventListener('click', function(ev){
+          ev.preventDefault(); ev.stopPropagation();
+          _bulletState.style = s;
+          root.querySelectorAll('.ep-bullet-mini-btn').forEach(function(bb){ bb.classList.remove('is-active'); });
+          b.classList.add('is-active');
+          restoreRange();
+          applyBulletStyle(s, _bulletState.frame);
+        });
+        row.appendChild(b);
+      });
+      body.appendChild(row);
+    }
+
+    makeRow('도형', ['disc','circle','square','square-hollow']);
+    makeRow('도형 추가', ['diamond-solid','diamond-hollow','star','reference']);
+    makeRow('숫자', ['decimal','decimal-zero','lower-roman','upper-roman']);
+    makeRow('기타', ['lower-alpha','upper-alpha','hangul-consonant','hangul']);
+
+    var footer = document.createElement('div');
+    footer.className = 'ep-bullet-mini-footer';
+
+    var frameGroup = document.createElement('div');
+    frameGroup.className = 'ep-bullet-mini-frame-group';
+    var frameLabel = document.createElement('span');
+    frameLabel.style.cssText = 'font-size:10px;opacity:0.55;margin-right:4px;align-self:center;';
+    frameLabel.textContent = '프레임';
+    frameGroup.appendChild(frameLabel);
+    BULLET_FRAMES.forEach(function(f){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ep-bullet-mini-frame-btn';
+      b.title = f === 'none' ? '프레임 없음' : (f === 'circle' ? '원 프레임' : (f === 'square' ? '사각 프레임' : '세로긴 프레임'));
+      b.setAttribute('data-frame', f);
+      b.textContent = _bulletFrameLabel(f);
+      if (_bulletState.frame === f) b.classList.add('is-active');
+      b.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
+      b.addEventListener('click', function(ev){
+        ev.preventDefault(); ev.stopPropagation();
+        _bulletState.frame = f;
+        frameGroup.querySelectorAll('.ep-bullet-mini-frame-btn').forEach(function(bb){ bb.classList.remove('is-active'); });
+        b.classList.add('is-active');
+        restoreRange();
+        applyBulletStyle(_bulletState.style, f);
+      });
+      frameGroup.appendChild(b);
+    });
+    footer.appendChild(frameGroup);
+
+    var sizeGroup = document.createElement('div');
+    sizeGroup.className = 'ep-bullet-mini-size-group';
+    var sizeLabel = document.createElement('span');
+    sizeLabel.style.cssText = 'font-size:10px;opacity:0.55;margin-right:4px;align-self:center;';
+    sizeLabel.textContent = '크기';
+    sizeGroup.appendChild(sizeLabel);
+    var minusBtn = document.createElement('button');
+    minusBtn.type = 'button';
+    minusBtn.className = 'ep-bullet-mini-size-btn';
+    minusBtn.title = '마커 작게';
+    minusBtn.textContent = '\u2212';
+    minusBtn.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
+    minusBtn.addEventListener('click', function(){
+      var i = BULLET_SCALES.indexOf(_bulletState.scale);
+      if (i > 0) { _bulletState.scale = BULLET_SCALES[i-1]; setBulletMarkerScale(_bulletState.scale); }
+    });
+    var resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'ep-bullet-mini-size-btn';
+    resetBtn.title = '보통';
+    resetBtn.textContent = '\u25CF';
+    resetBtn.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
+    resetBtn.addEventListener('click', function(){
+      _bulletState.scale = '';
+      setBulletMarkerScale('');
+    });
+    var plusBtn = document.createElement('button');
+    plusBtn.type = 'button';
+    plusBtn.className = 'ep-bullet-mini-size-btn';
+    plusBtn.title = '마커 크게';
+    plusBtn.textContent = '+';
+    plusBtn.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
+    plusBtn.addEventListener('click', function(){
+      var i = BULLET_SCALES.indexOf(_bulletState.scale);
+      if (i < BULLET_SCALES.length - 1) { _bulletState.scale = BULLET_SCALES[i+1]; setBulletMarkerScale(_bulletState.scale); }
+    });
+    sizeGroup.appendChild(minusBtn);
+    sizeGroup.appendChild(resetBtn);
+    sizeGroup.appendChild(plusBtn);
+    footer.appendChild(sizeGroup);
+
+    body.appendChild(footer);
+
+    var tip = document.createElement('div');
+    tip.className = 'ep-bullet-mini-tip';
+    tip.textContent = 'Tab / Shift+Tab 으로 하위 계층';
+    body.appendChild(tip);
+
+    document.body.appendChild(root);
+    __activeMiniPopover = {
+      root: root,
+      close: function(){
+        try { root.remove(); } catch(_){}
+        __activeMiniPopover = null;
+      }
+    };
+
+    var ar = anchor.getBoundingClientRect();
+    var pw = 260;
+    var ph = root.offsetHeight || 380;
+    var left = Math.max(6, Math.min(ar.left, window.innerWidth - pw - 6));
+    var top  = ar.bottom + 6;
+    if (top + ph + 6 > window.innerHeight) top = Math.max(6, ar.top - ph - 6);
+    root.style.top  = top + 'px';
+    root.style.left = left + 'px';
+
+    setTimeout(function(){
+      function onOutside(ev){
+        if (root.contains(ev.target)) return;
+        if (anchor && anchor.contains(ev.target)) return;
+        __activeMiniPopover && __activeMiniPopover.close();
+        document.removeEventListener('mousedown', onOutside, true);
+      }
+      document.addEventListener('mousedown', onOutside, true);
+    }, 20);
+
+    function onKey(e){
+      if (e.key === 'Escape') {
+        __activeMiniPopover && __activeMiniPopover.close();
+        document.removeEventListener('keydown', onKey);
+      }
+    }
+    document.addEventListener('keydown', onKey);
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.openBulletPopover = openBulletPopover; } catch(_){}
+
+  // p22h. Tab / Shift+Tab 들여쓰기 (li 안에서만 작동)
+  function _setupBulletTabHandler(){
+    document.addEventListener('keydown', function(e){
+      if (e.key !== 'Tab') return;
+      var sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      var node = sel.getRangeAt(0).startContainer;
+      var el   = node.nodeType === 1 ? node : node.parentElement;
+      var li   = el && el.closest && el.closest('li');
+      if (!li) return;
+      e.preventDefault();
+      if (e.shiftKey) {
+        try { document.execCommand('outdent'); } catch(_){}
+      } else {
+        try { document.execCommand('indent'); } catch(_){}
+      }
+    }, true);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _setupBulletTabHandler);
+  } else {
+    _setupBulletTabHandler();
+  }
+
 
   // ════════════════════════════════════════════════════════
   // p22g. 링크 호버 미리보기 툴팁
