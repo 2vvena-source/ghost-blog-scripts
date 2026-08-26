@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22y';
+  var VERSION = 'v2.0-β-p22z';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -3099,6 +3099,9 @@
 
       if (e.key === 'Enter' && !e.shiftKey) {
         var t = target.tagName;
+        // p22z: e.target 이 li 안에 있으면 무조건 리스트 기본 동작 (LI 는 대개 CE 속성 없어서
+        //       closest('[contenteditable=true]') 로 target 잡을 때 UL/DIV 로 잡혀 이 조건을 놓침)
+        if (e.target && e.target.closest && e.target.closest('li')) return;
         if (t === 'LI' || t === 'UL' || t === 'OL') return; // 리스트는 기본 동작
 
         // p20r: 접은글 제목(.ddl-fold-title)에서 Enter → 본문 첫 위치로 이동 (span 밖 튀는 버그 방지)
@@ -16258,6 +16261,43 @@
       + '<button type="button" data-rcmd="clearFormat" class="pop-btn" title="서식 지우기" style="margin-left:auto;">✕서식</button>';
     wrap.appendChild(toolbar);
 
+    // p22z: 크기·위치 슬라이더 - 확실히 발화하도록 modal 안에 배치, 값은 전역 __DDL_RUBY_PENDING 에 저장
+    var _initOffset = 55;
+    try { var _s = localStorage.getItem('ddl.rubyOffset'); if (_s != null && !isNaN(parseFloat(_s))) _initOffset = parseFloat(_s); } catch(_){}
+    var _initSize = 50;
+    try { window.__DDL_RUBY_PENDING = { size: _initSize, offset: _initOffset }; } catch(_){}
+
+    var slidersBox = document.createElement('div');
+    slidersBox.style.cssText = 'margin-top:12px; padding:10px 12px; background:rgba(15,58,58,0.03); border-radius:6px; display:flex; flex-direction:column; gap:10px;';
+    slidersBox.innerHTML = ''
+      + '<div>'
+      +   '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">'
+      +     '<span style="font-size:11.5px; font-weight:600; color:#0F3A3A;">루비 크기</span>'
+      +     '<span data-rlbl="size" style="font-size:11px; color:rgba(15,58,58,0.6);">' + _initSize + '%</span>'
+      +   '</div>'
+      +   '<input data-rslider="size" type="range" min="30" max="90" step="5" value="' + _initSize + '" style="width:100%; accent-color:#FF9A76;" />'
+      + '</div>'
+      + '<div>'
+      +   '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">'
+      +     '<span style="font-size:11.5px; font-weight:600; color:#0F3A3A;">루비 위치 (위↔아래)</span>'
+      +     '<span data-rlbl="offset" style="font-size:11px; color:rgba(15,58,58,0.6);">' + _initOffset + '%</span>'
+      +   '</div>'
+      +   '<input data-rslider="offset" type="range" min="0" max="100" step="5" value="' + _initOffset + '" style="width:100%; accent-color:#FF9A76;" />'
+      + '</div>';
+    wrap.appendChild(slidersBox);
+
+    slidersBox.addEventListener('input', function(e){
+      var s = e.target.getAttribute && e.target.getAttribute('data-rslider');
+      if (!s) return;
+      var v = parseFloat(e.target.value);
+      var lbl = slidersBox.querySelector('[data-rlbl="' + s + '"]');
+      if (lbl) lbl.textContent = v + '%';
+      try {
+        if (!window.__DDL_RUBY_PENDING) window.__DDL_RUBY_PENDING = {};
+        window.__DDL_RUBY_PENDING[s] = v;
+      } catch(_){}
+    });
+
     // p22t: 크기 + 위치 슬라이더 (개별 루비마다 다른 값 가능)
     // 초기값: 전역 설정에서 읽어옴 (편집기 설정 팝오버의 값)
     var _rubyInitOffset = 55;
@@ -16384,12 +16424,21 @@
       el.setAttribute('title', rubyHtml.replace(/<[^>]+>/g,''));
       el.style.background = 'transparent';
       el.style.color = 'inherit';
-      // p22y: 전역 위치 값을 mark 인라인 style 로 세팅 (편집기 설정 팝오버의 슬라이더 값)
+      // p22z: 편집창 슬라이더 값 (window.__DDL_RUBY_PENDING) 을 mark 인라인 style 로 세팅
+      //   슬라이더가 없거나 값 없으면 전역 기본값 사용
       try {
-        var _globalOffset = 55;
-        var _lg = localStorage.getItem('ddl.rubyOffset');
-        if (_lg != null && !isNaN(parseFloat(_lg))) _globalOffset = parseFloat(_lg);
-        el.style.setProperty('--ddl-ruby-offset', _globalOffset + '%');
+        var _pend = window.__DDL_RUBY_PENDING || {};
+        var _sz = _pend.size;
+        var _of = _pend.offset;
+        // 위치 값 없으면 편집기 설정의 전역 값에서 fallback
+        if (_of == null || isNaN(_of)) {
+          var _lg = localStorage.getItem('ddl.rubyOffset');
+          _of = (_lg != null && !isNaN(parseFloat(_lg))) ? parseFloat(_lg) : 55;
+        }
+        if (_sz != null && !isNaN(_sz)) el.style.setProperty('--ddl-ruby-size', (_sz / 100) + 'em');
+        el.style.setProperty('--ddl-ruby-offset', _of + '%');
+        // 다음 루비 대비 초기화
+        try { window.__DDL_RUBY_PENDING = null; } catch(_){}
       } catch(_){}
       // HTML 이면 편집 중 시각화용 rt-span
       if (rubyHtml.indexOf('<') >= 0) {
@@ -18089,8 +18138,8 @@
 
     // p22x: contentEl 에 우선 리스너 등록, contentEl 아직 없으면 document 로 fallback
     var _bulletKeyHandler = function(e){
-      // p22w: 진단용 - 어떤 키가 실제로 들어오는지 log
-      if (e.key === 'Tab' || e.key === 'Enter' || e.key === 'Backspace') {
+      // p22w: 진단용 - window.__DDL_DBG_BULLET = true 일 때만 로그 (콘솔 지저분함 완화)
+      if ((e.key === 'Tab' || e.key === 'Enter' || e.key === 'Backspace') && window.__DDL_DBG_BULLET) {
         try { log('[BULLET-KD]', e.key, 'shift=', e.shiftKey, 'target=', e.target && e.target.tagName); } catch(_){}
       }
       // Tab / Shift+Tab
@@ -19673,7 +19722,7 @@
           if (m.type === 'childList' && m.removedNodes && m.removedNodes.length){
             m.removedNodes.forEach(function(n){
               if (n.nodeType === 1 && n.classList && n.classList.contains && n.classList.contains('editor-block')){
-                try { log('[BLOCK-REMOVED] editor-block 제거됨 · innerHTML=', (n.innerHTML||'').slice(0,80)); } catch(_){}
+                if (window.__DDL_DBG_BLOCK) { try { log('[BLOCK-REMOVED] editor-block 제거됨 · innerHTML=', (n.innerHTML||'').slice(0,80)); } catch(_){} }
               }
             });
           }
