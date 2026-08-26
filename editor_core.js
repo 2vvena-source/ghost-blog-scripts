@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22r';
+  var VERSION = 'v2.0-β-p22s';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2551,35 +2551,45 @@
     /* p22j: 프레임 마커 수직 중앙 정렬 v3 — transform 제거 · top 값 직접 보정 */
     /* li 첫줄 텍스트는 baseline 이 약 line-height/2 + em/2 ≈ 0.85em 지점.                      */
     /* 마커 높이 1.4em (변환 안 함) → 상단이 약 li 상단에서 0.15em~0.2em 서로 닉은 것이 관적으로 적합. */
-    '.editor-block[data-frame="circle"] ol { list-style: none; counter-reset: bl-frame; padding-left: 2.2em; }',
-    '.editor-block[data-frame="circle"] ol > li { counter-increment: bl-frame; position: relative; min-height: 1.6em; }',
+    /* p22s: 옵션 B - Flexbox 재설계 · 마커가 첫줄 텍스트와 baseline 정렬 */
+    '.editor-block[data-frame="circle"] ol { list-style: none; counter-reset: bl-frame; padding-left: 0; }',
+    '.editor-block[data-frame="circle"] ol > li {',
+    '  counter-increment: bl-frame; display: flex; align-items: flex-start;',
+    '  gap: 0.5em; padding-left: 0; position: static; min-height: 0;',
+    '}',
     '.editor-block[data-frame="circle"] ol > li::before {',
     '  content: counter(bl-frame, var(--bl-marker, decimal));',
-    '  position: absolute; left: -1.9em; top: 0.2em;',
-    '  width: 1.4em; height: 1.4em; box-sizing: border-box;',
+    '  flex: 0 0 auto; width: 1.4em; height: 1.4em; box-sizing: border-box;',
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  border: 1px solid currentColor; border-radius: 50%;',
     '  font-size: 0.75em; line-height: 1; padding: 0;',
+    '  margin-top: 0.28em; position: static;',
     '}',
-    '.editor-block[data-frame="square"] ol { list-style: none; counter-reset: bl-frame; padding-left: 2.2em; }',
-    '.editor-block[data-frame="square"] ol > li { counter-increment: bl-frame; position: relative; min-height: 1.6em; }',
+    '.editor-block[data-frame="square"] ol { list-style: none; counter-reset: bl-frame; padding-left: 0; }',
+    '.editor-block[data-frame="square"] ol > li {',
+    '  counter-increment: bl-frame; display: flex; align-items: flex-start;',
+    '  gap: 0.5em; padding-left: 0; position: static; min-height: 0;',
+    '}',
     '.editor-block[data-frame="square"] ol > li::before {',
     '  content: counter(bl-frame, var(--bl-marker, decimal));',
-    '  position: absolute; left: -1.9em; top: 0.2em;',
-    '  width: 1.4em; height: 1.4em; box-sizing: border-box;',
+    '  flex: 0 0 auto; width: 1.4em; height: 1.4em; box-sizing: border-box;',
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  border: 1px solid currentColor; border-radius: 3px;',
     '  font-size: 0.75em; line-height: 1; padding: 0;',
+    '  margin-top: 0.28em; position: static;',
     '}',
-    '.editor-block[data-frame="tall"] ol { list-style: none; counter-reset: bl-frame; padding-left: 2.2em; }',
-    '.editor-block[data-frame="tall"] ol > li { counter-increment: bl-frame; position: relative; min-height: 1.8em; }',
+    '.editor-block[data-frame="tall"] ol { list-style: none; counter-reset: bl-frame; padding-left: 0; }',
+    '.editor-block[data-frame="tall"] ol > li {',
+    '  counter-increment: bl-frame; display: flex; align-items: flex-start;',
+    '  gap: 0.5em; padding-left: 0; position: static; min-height: 0;',
+    '}',
     '.editor-block[data-frame="tall"] ol > li::before {',
     '  content: counter(bl-frame, var(--bl-marker, decimal));',
-    '  position: absolute; left: -1.9em; top: 0.1em;',
-    '  width: 1.1em; height: 1.6em; box-sizing: border-box;',
+    '  flex: 0 0 auto; width: 1.1em; height: 1.6em; box-sizing: border-box;',
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  border: 1px solid currentColor; border-radius: 3px;',
     '  font-size: 0.72em; line-height: 1; padding: 0;',
+    '  margin-top: 0.15em; position: static;',
     '}',
     /* 프레임이 적용된 ol — counter marker 변수를 data-bullet-style 에서 설정 */
     '.editor-block[data-bullet-style="decimal"] { --bl-marker: decimal; }',
@@ -16329,9 +16339,17 @@
       try {
         el.appendChild(range.extractContents());
         range.insertNode(el);
+        // p22s: mark 뒤에 zero-width space 텍스트 노드 삽입하고 커서를 그 뒤로.
+        //   → mark 안 편집으로 폭이 늘어나 루비 위치가 흔들리는 문제 방지
+        var _zwsp = document.createTextNode('\u200B');
+        if (el.parentNode){
+          if (el.nextSibling) el.parentNode.insertBefore(_zwsp, el.nextSibling);
+          else                el.parentNode.appendChild(_zwsp);
+        }
         sel2.removeAllRanges();
         var nr = document.createRange();
-        nr.selectNodeContents(el);
+        nr.setStartAfter(_zwsp);
+        nr.collapse(true);
         sel2.addRange(nr);
         saveRange();
       } catch(err){ console.warn('[p19i] ruby error', err); }
