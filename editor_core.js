@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p23u';
+  var VERSION = 'v2.0-β-p23v';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -10565,12 +10565,17 @@
         return;
       }
       if (cmd === 'highlight-expand'){
-        // p22f: openPalette 를 전역에서 참조 (setupFloatingToolbar 클로저에 갇혀 있으므로 전역 경유 필수)
+        // p23v: 새 형광펜 미니 팝오버 우선 사용 (헤더 미니와 동일 구조).
+        //   사용자가 사이트 설정에서 돌리고 싶으면 legacy openPalette 로 대체 가능하도록 openPalette 는 그대로 유지.
         e.preventDefault(); e.stopPropagation();
         try {
-          var _op = (window.__DDL_EDITOR && window.__DDL_EDITOR.openPalette) || (typeof openPalette === 'function' ? openPalette : null);
-          if (_op) _op(btn);
-          else _showStubToast('형광펜 — 팔레트 로드 실패');
+          if (typeof openHighlighterMiniPopover === 'function'){
+            openHighlighterMiniPopover(btn);
+          } else {
+            var _op = (window.__DDL_EDITOR && window.__DDL_EDITOR.openPalette) || (typeof openPalette === 'function' ? openPalette : null);
+            if (_op) _op(btn);
+            else _showStubToast('형광펜 — 팔레트 로드 실패');
+          }
         } catch(err){ console.warn(err); }
         return;
       }
@@ -14012,6 +14017,447 @@
     _saveHeaderColorLibrary(lib);
   }
 
+  // ============================================================
+  // p23v: 형광펜 프리셋 라이브러리 (헤더와 같은 구조 · 별도 저장소)
+  //   키: ddl.highlightPresetLibrary
+  //   구조: { version, groups: [{ id, name, isBuiltin, presets:[{ id, name, spec, isBuiltin, isFavorite }] }] }
+  //   spec: { mode:'marker'|'fade'|'paint', c1, a1, pos?, ratio? } — applyHighlightColor 가 이해하는 형식
+  //
+  //   ★ 원칙 (헤더와 동일):
+  //     1. 시드는 localStorage 값이 완전히 없을 때만
+  //     2. 모든 변경은 helper 함수를 통해서만
+  //     3. ID 중복 검사 내장
+  // ============================================================
+  var HL_LIB_KEY = 'ddl.highlightPresetLibrary';
+
+  function _highlightInitialSeed(){
+    // 기존 HL_PALETTE_BASIC 기반으로 기본 그룹 구성
+    var basicPresets = [
+      { id: 'hl-basic-yellow',   name: '노랑',   spec: { mode:'marker', c1:'#FFF176',                 a1:100 }, isBuiltin: true, isFavorite: true  },
+      { id: 'hl-basic-pink',     name: '분홍',   spec: { mode:'marker', c1:'#F8BBD0',                 a1:100 }, isBuiltin: true, isFavorite: false },
+      { id: 'hl-basic-sky',      name: '하늘',   spec: { mode:'marker', c1:'#B3E5FC',                 a1:100 }, isBuiltin: true, isFavorite: false },
+      { id: 'hl-basic-green',    name: '연두',   spec: { mode:'marker', c1:'#DCEDC8',                 a1:100 }, isBuiltin: true, isFavorite: false },
+      { id: 'hl-basic-orange',   name: '주황',   spec: { mode:'marker', c1:'#FFCCBC',                 a1:100 }, isBuiltin: true, isFavorite: false },
+      { id: 'hl-basic-lavender', name: '라벤더', spec: { mode:'marker', c1:'#D1C4E9',                 a1:100 }, isBuiltin: true, isFavorite: false },
+      { id: 'hl-basic-gray',     name: '회색',   spec: { mode:'marker', c1:'#EEEEEE',                 a1:100 }, isBuiltin: true, isFavorite: false },
+      { id: 'hl-basic-peach',    name: '복숨아', spec: { mode:'marker', c1:'#FFE0B2',                 a1:100 }, isBuiltin: true, isFavorite: false },
+      { id: 'hl-basic-apricot',  name: '살구',   spec: { mode:'marker', c1:'rgba(255,154,118,0.4)',   a1:100 }, isBuiltin: true, isFavorite: true  }
+    ];
+    return {
+      version: 1,
+      groups: [{
+        id: 'hl-grp-basic',
+        name: '기본',
+        isBuiltin: true,
+        presets: basicPresets
+      }]
+    };
+  }
+
+  function _uidHl(prefix){ return (prefix || 'hlp') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6); }
+
+  function _loadHighlightLibrary(){
+    try {
+      var raw = localStorage.getItem(HL_LIB_KEY);
+      if (raw === null || raw === undefined){
+        var seeded = _highlightInitialSeed();
+        _saveHighlightLibrary(seeded);
+        return seeded;
+      }
+      var data = JSON.parse(raw);
+      if (!data || typeof data !== 'object' || !Array.isArray(data.groups)){
+        var reseeded = _highlightInitialSeed();
+        _saveHighlightLibrary(reseeded);
+        return reseeded;
+      }
+      // 각 그룹의 presets 배열 보장
+      data.groups.forEach(function(g){
+        if (!Array.isArray(g.presets)) g.presets = [];
+      });
+      return data;
+    } catch(err){
+      console.warn('[hl-lib] load fail, reseeding', err);
+      var fb = _highlightInitialSeed();
+      _saveHighlightLibrary(fb);
+      return fb;
+    }
+  }
+
+  function _saveHighlightLibrary(data){
+    try { localStorage.setItem(HL_LIB_KEY, JSON.stringify(data)); }
+    catch(err){ console.warn('[hl-lib] save fail', err); }
+  }
+
+  function _addHighlightPresetToGroup(groupId, payload){
+    var lib = _loadHighlightLibrary();
+    var g = lib.groups.filter(function(x){ return x.id === groupId; })[0];
+    if (!g) return null;
+    var newId = _uidHl();
+    if (g.presets.some(function(p){ return p.id === newId; })) return null;
+    var newP = {
+      id: newId,
+      name: (payload && payload.name) || '새 프리셋',
+      spec: (payload && payload.spec) || { mode:'marker', c1:'#FFF176', a1:100 },
+      isBuiltin: false,
+      isFavorite: false
+    };
+    g.presets.push(newP);
+    _saveHighlightLibrary(lib);
+    return newP;
+  }
+
+  function _addHighlightGroup(name){
+    var lib = _loadHighlightLibrary();
+    var newId = _uidHl('hlgrp');
+    if (lib.groups.some(function(g){ return g.id === newId; })) return null;
+    var g = { id: newId, name: (name || '새 그룹').trim() || '새 그룹', isBuiltin: false, presets: [] };
+    lib.groups.push(g);
+    _saveHighlightLibrary(lib);
+    return g;
+  }
+
+  function _updateHighlightPreset(groupId, presetId, patch){
+    var lib = _loadHighlightLibrary();
+    var g = lib.groups.filter(function(x){ return x.id === groupId; })[0];
+    if (!g) return;
+    var p = g.presets.filter(function(x){ return x.id === presetId; })[0];
+    if (!p) return;
+    if (typeof patch.name === 'string')      p.name = patch.name;
+    if (patch.spec && typeof patch.spec === 'object') p.spec = patch.spec;
+    if (typeof patch.isFavorite === 'boolean') p.isFavorite = patch.isFavorite;
+    _saveHighlightLibrary(lib);
+  }
+
+  function _deleteHighlightPreset(groupId, presetId){
+    var lib = _loadHighlightLibrary();
+    var g = lib.groups.filter(function(x){ return x.id === groupId; })[0];
+    if (!g) return;
+    g.presets = g.presets.filter(function(p){ return p.id !== presetId || p.isBuiltin; });
+    _saveHighlightLibrary(lib);
+  }
+
+  function _renameHighlightGroup(groupId, newName){
+    var lib = _loadHighlightLibrary();
+    var g = lib.groups.filter(function(x){ return x.id === groupId; })[0];
+    if (!g || g.isBuiltin) return;
+    g.name = (newName || '').trim() || g.name;
+    _saveHighlightLibrary(lib);
+  }
+
+  function _deleteHighlightGroup(groupId){
+    var lib = _loadHighlightLibrary();
+    var g = lib.groups.filter(function(x){ return x.id === groupId; })[0];
+    if (!g || g.isBuiltin) return;
+    lib.groups = lib.groups.filter(function(x){ return x.id !== groupId; });
+    _saveHighlightLibrary(lib);
+  }
+
+  // spec 을 CSS background 문자열로 변환 (직접 사용 · 미리보기 용)
+  function _hlSpecToPreview(spec){
+    if (!spec) return 'transparent';
+    var c1 = spec.c1 || '#FFF176';
+    // alpha 적용
+    var a1 = (typeof spec.a1 === 'number' ? spec.a1 : 100) / 100;
+    function _withAlpha(color, a){
+      var m = String(color).match(/^#([0-9a-f]{6})$/i);
+      if (m){
+        var r = parseInt(m[1].slice(0,2),16);
+        var g = parseInt(m[1].slice(2,4),16);
+        var b = parseInt(m[1].slice(4,6),16);
+        return 'rgba('+r+','+g+','+b+','+a+')';
+      }
+      var rgb = String(color).match(/rgba?\s*\(\s*([0-9.]+)\s*,\s*([0-9.]+)\s*,\s*([0-9.]+)/i);
+      if (rgb) return 'rgba('+rgb[1]+','+rgb[2]+','+rgb[3]+','+a+')';
+      return color;
+    }
+    var c = a1 < 1 ? _withAlpha(c1, a1) : c1;
+    var mode = spec.mode || 'marker';
+    if (mode === 'marker'){
+      return c;
+    }
+    if (mode === 'fade'){
+      return 'linear-gradient(90deg, transparent 0%, ' + c + ' 15%, ' + c + ' 85%, transparent 100%)';
+    }
+    if (mode === 'paint'){
+      var pos = spec.pos || 'bottom';
+      if (pos === 'top')    return 'linear-gradient(180deg, ' + c + ' 0%, ' + c + ' 50%, transparent 50%, transparent 100%)';
+      if (pos === 'middle') return 'linear-gradient(180deg, transparent 0%, transparent 35%, ' + c + ' 35%, ' + c + ' 65%, transparent 65%, transparent 100%)';
+      return 'linear-gradient(180deg, transparent 0%, transparent 50%, ' + c + ' 50%, ' + c + ' 100%)';
+    }
+    return c;
+  }
+
+  // 프리셋 적용 → 기존 applyHighlightColor 사용
+  function _applyHighlightPreset(preset){
+    try {
+      if (typeof applyHighlightColor === 'function' && preset && preset.spec){
+        applyHighlightColor(preset.spec);
+      }
+    } catch(err){ console.warn('[hl-preset-apply]', err); }
+  }
+
+  // ============================================================
+  // p23v: 형광펜 미니 팝오버 (헤더 미니 팝오버와 동일 구조)
+  //   상단: 필터 탭바 (전체 / ★ / 이 글에서) + ⚙
+  //   본문: 그룹별 섹션 (각 그룹 최대 3개 대표 카드)
+  //   하단: "모든 프리셋 보기 (N) →" (플레이스홀더 — 큰 창은 다음 라운드에서)
+  // ============================================================
+  function openHighlighterMiniPopover(anchorBtn){
+    var old = document.getElementById('ep-highlight-popover');
+    if (old){ old.remove(); return; }
+
+    var lib = _loadHighlightLibrary();
+    var filter = 'all'; // 'all' | 'fav' | 'used'
+
+    var pop = document.createElement('div');
+    pop.id = 'ep-highlight-popover';
+    pop.className = 'ep-highlight-mini ddl-editor-popup';
+    pop.style.cssText = 'position: fixed; z-index: 99900;'
+      + ' width: 380px; background: #fff;'
+      + ' border: 1px solid rgba(15,58,58,0.15); border-radius: 6px;'
+      + ' box-shadow: 0 6px 20px rgba(0,0,0,0.12);'
+      + ' font-family: "Pretendard Variable","Pretendard",sans-serif; color: var(--color, #0F3A3A);'
+      + ' padding: 0;';
+
+    // 상단 필터 탭바 + ⚙
+    var topbar = document.createElement('div');
+    topbar.style.cssText = 'display: flex; justify-content: space-between; align-items: center;'
+      + ' padding: 8px 10px; border-bottom: 1px solid rgba(15,58,58,0.06);';
+
+    var tabs = document.createElement('div');
+    tabs.style.cssText = 'display: inline-flex; gap: 4px;';
+    var tabButtons = {};
+    [
+      { key:'all',  label:'전체' },
+      { key:'fav',  label:'★' },
+      { key:'used', label:'이 글에서' }
+    ].forEach(function(td){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = td.label;
+      b.style.cssText = 'padding: 4px 12px; font-size: 12px; cursor: pointer;'
+        + ' background: transparent; border: none; border-radius: 4px;'
+        + ' color: rgba(15,58,58,0.55); font-family: inherit;';
+      if (filter === td.key){
+        b.style.background = 'rgba(255,154,118,0.15)';
+        b.style.color = 'var(--point, #FF9A76)';
+        b.style.fontWeight = '600';
+      }
+      b.addEventListener('mousedown', function(e){ e.preventDefault(); });
+      b.addEventListener('click', function(e){
+        e.preventDefault(); e.stopPropagation();
+        filter = td.key;
+        Object.keys(tabButtons).forEach(function(k){
+          var tb = tabButtons[k];
+          var active = k === filter;
+          tb.style.background = active ? 'rgba(255,154,118,0.15)' : 'transparent';
+          tb.style.color      = active ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.55)';
+          tb.style.fontWeight = active ? '600' : '400';
+        });
+        _renderBody();
+      });
+      tabButtons[td.key] = b;
+      tabs.appendChild(b);
+    });
+    topbar.appendChild(tabs);
+
+    var gear = document.createElement('button');
+    gear.type = 'button';
+    gear.title = '형광펜 프리셋 관리 열기';
+    gear.style.cssText = 'background: transparent; border: none; cursor: pointer; padding: 4px;'
+      + ' color: rgba(15,58,58,0.55); border-radius: 4px;';
+    gear.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+    gear.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    gear.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      pop.remove();
+      // p23w 예정: 형광펜 프리셋 관리창. 지금은 안내 토스트.
+      try {
+        if (typeof openHighlighterPresetManager === 'function'){
+          openHighlighterPresetManager();
+        } else {
+          _showStubToast('형광펜 관리창 — 다음 라운드에서 지원됩니다');
+        }
+      } catch(_){}
+    });
+    topbar.appendChild(gear);
+    pop.appendChild(topbar);
+
+    // 본문
+    var bodyEl = document.createElement('div');
+    bodyEl.style.cssText = 'padding: 8px 10px; max-height: 360px; overflow-y: auto;';
+    pop.appendChild(bodyEl);
+
+    // "이 글에서" 필터용 — 현재 문서에서 사용 중인 프리셋 ID 수집
+    function _collectUsedHlPresetIds(){
+      var used = {};
+      try {
+        if (typeof contentEl !== 'undefined' && contentEl){
+          contentEl.querySelectorAll('mark.ddl-hl[data-hl-preset]').forEach(function(el){
+            var pid = el.getAttribute('data-hl-preset');
+            if (pid) used[pid] = true;
+          });
+        }
+      } catch(_){}
+      return used;
+    }
+
+    function _makeCard(group, preset){
+      var card = document.createElement('div');
+      card.style.cssText = 'position: relative; display: flex; flex-direction: column; gap: 4px;'
+        + ' padding: 6px; border-radius: 5px; cursor: pointer;'
+        + ' background: #fff; border: 1px solid rgba(15,58,58,0.12);';
+
+      // 미리보기: 가나다 글자에 형광펜이 적용된 모습
+      var prev = document.createElement('div');
+      prev.style.cssText = 'text-align: center; font-size: 14px; line-height: 1.4; padding: 4px 2px;'
+        + ' font-family: "Pretendard Variable","Pretendard",sans-serif;';
+      var mkSpan = document.createElement('mark');
+      mkSpan.textContent = '가나다 ABC';
+      mkSpan.style.cssText = 'background: ' + _hlSpecToPreview(preset.spec) + ';'
+        + ' padding: 1px 4px; color: inherit;';
+      prev.appendChild(mkSpan);
+      card.appendChild(prev);
+
+      // 이름
+      var lbl = document.createElement('div');
+      lbl.textContent = preset.name || '';
+      lbl.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.55); text-align: center;'
+        + ' overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+      card.appendChild(lbl);
+
+      // 즐겨찾기 별 (우상단)
+      var fav = document.createElement('button');
+      fav.type = 'button';
+      fav.textContent = preset.isFavorite ? '★' : '☆';
+      fav.title = '즐겨찾기';
+      fav.style.cssText = 'position: absolute; top: 2px; right: 4px; background: transparent; border: none; cursor: pointer;'
+        + ' font-size: 11px; padding: 0; line-height: 1;'
+        + ' color: ' + (preset.isFavorite ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.3)') + ';';
+      (function(gId, pId, curFav){
+        fav.addEventListener('mousedown', function(e){ e.preventDefault(); });
+        fav.addEventListener('click', function(e){
+          e.stopPropagation();
+          _updateHighlightPreset(gId, pId, { isFavorite: !curFav });
+          _renderBody();
+        });
+      })(group.id, preset.id, !!preset.isFavorite);
+      card.appendChild(fav);
+
+      card.addEventListener('mouseenter', function(){
+        card.style.borderColor = 'var(--point, #FF9A76)';
+      });
+      card.addEventListener('mouseleave', function(){
+        card.style.borderColor = 'rgba(15,58,58,0.12)';
+      });
+
+      (function(sp){
+        card.addEventListener('mousedown', function(e){ e.preventDefault(); });
+        card.addEventListener('click', function(e){
+          e.stopPropagation();
+          _applyHighlightPreset(sp);
+          pop.remove();
+        });
+      })(preset);
+
+      return card;
+    }
+
+    function _renderBody(){
+      bodyEl.innerHTML = '';
+
+      var usedSet = filter === 'used' ? _collectUsedHlPresetIds() : null;
+
+      function _passView(p){
+        if (filter === 'fav') return !!p.isFavorite;
+        if (filter === 'used'){
+          if (!usedSet) return true;
+          return !!usedSet[p.id];
+        }
+        return true;
+      }
+
+      var anyRendered = false;
+      lib.groups.forEach(function(group){
+        var visible = (group.presets || []).filter(_passView);
+        if (visible.length === 0) return;
+        // 헤더 미니와 동일: 각 그룹 최대 3개만 대표 노출
+        var picked = visible.slice(0, 3);
+
+        var section = document.createElement('div');
+        section.style.cssText = 'margin-bottom: 10px;';
+
+        var head = document.createElement('div');
+        head.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.55); letter-spacing: 0.04em; margin-bottom: 4px; padding: 0 2px;';
+        head.textContent = group.name + (group.isBuiltin ? '' : '') + '  ·  ' + visible.length + '개';
+        section.appendChild(head);
+
+        var grid = document.createElement('div');
+        grid.style.cssText = 'display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;';
+        picked.forEach(function(p){ grid.appendChild(_makeCard(group, p)); });
+        section.appendChild(grid);
+        bodyEl.appendChild(section);
+        anyRendered = true;
+      });
+
+      if (!anyRendered){
+        var em = document.createElement('div');
+        em.style.cssText = 'padding: 18px; text-align: center; color: rgba(15,58,58,0.4); font-size: 11px;';
+        if (filter === 'fav')       em.textContent = '즐겨찾기한 프리셋이 없어요.';
+        else if (filter === 'used') em.textContent = '이 글에서 사용 중인 프리셋이 없어요.';
+        else                        em.textContent = '프리셋이 없어요.';
+        bodyEl.appendChild(em);
+      }
+    }
+
+    _renderBody();
+
+    // 하단 "모든 프리셋 보기"
+    var footer = document.createElement('div');
+    footer.style.cssText = 'border-top: 1px solid rgba(15,58,58,0.06); padding: 8px 10px;';
+    var totalCount = 0;
+    lib.groups.forEach(function(g){ totalCount += (g.presets || []).length; });
+    var moreBtn = document.createElement('button');
+    moreBtn.type = 'button';
+    moreBtn.innerHTML = '모든 프리셋 보기 <span style="opacity:0.6;">(' + totalCount + ')</span> →';
+    moreBtn.style.cssText = 'background: transparent; border: none; cursor: pointer;'
+      + ' font-size: 11px; color: var(--color, #0F3A3A); padding: 4px 6px; border-radius: 4px; font-family: inherit;';
+    moreBtn.addEventListener('mouseenter', function(){ moreBtn.style.background = 'rgba(15,58,58,0.04)'; });
+    moreBtn.addEventListener('mouseleave', function(){ moreBtn.style.background = 'transparent'; });
+    moreBtn.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    moreBtn.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      pop.remove();
+      // p23w 예정: 형광펜 큰 창 (openHighlighterPresetGallery)
+      try {
+        if (typeof openHighlighterPresetGallery === 'function'){
+          openHighlighterPresetGallery();
+        } else {
+          _showStubToast('형광펜 큰 창 — 다음 라운드에서 지원됩니다');
+        }
+      } catch(_){}
+    });
+    footer.appendChild(moreBtn);
+    pop.appendChild(footer);
+
+    document.body.appendChild(pop);
+
+    // 위치: anchor 아래
+    var r = anchorBtn.getBoundingClientRect();
+    pop.style.top  = (r.bottom + 6) + 'px';
+    pop.style.left = Math.max(8, Math.min(window.innerWidth - 380 - 8, r.left)) + 'px';
+
+    // 밖 클릭 = 닫기
+    setTimeout(function(){
+      var closer = function(ev){
+        if (pop.contains(ev.target) || anchorBtn.contains(ev.target)) return;
+        pop.remove();
+        document.removeEventListener('mousedown', closer, true);
+      };
+      document.addEventListener('mousedown', closer, true);
+    }, 100);
+  }
+
   // 색깔 편집 미니 다이얼로그 (이름 + 색)
   //   ★ 중복 콜백 완전 차단: onDone 은 딱 한 번만 호출된다.
   function _openHeaderColorEditMini(existing, onDone){
@@ -14143,6 +14589,9 @@
     window.__DDL_EDITOR.openFontPicker         = openFontPicker;             // p20b
     window.__DDL_EDITOR.loadHeaderColorLibrary  = _loadHeaderColorLibrary;   // p23t
     window.__DDL_EDITOR.saveHeaderColorLibrary  = _saveHeaderColorLibrary;   // p23t
+    window.__DDL_EDITOR.loadHighlightLibrary    = _loadHighlightLibrary;    // p23v
+    window.__DDL_EDITOR.saveHighlightLibrary    = _saveHighlightLibrary;    // p23v
+    window.__DDL_EDITOR.openHighlighterMiniPopover = openHighlighterMiniPopover; // p23v
   } catch(_){}
 
   // 부팅 시 자동 로드 (편집기 페이지)
@@ -20188,10 +20637,11 @@
         saveRange();
         openTextColorMini(btn);
       } else if (cmd === 'highlight-expand') {
-        // p22c: 형광펜 유지 (기존 highlight-palette 재사용)
+        // p23v: 새 형광펜 미니 팝오버 (헤더와 동일 구조). openPalette 는 유지.
         e.preventDefault(); e.stopPropagation();
         saveRange();
-        if (typeof openPalette === 'function') openPalette(btn);
+        if (typeof openHighlighterMiniPopover === 'function') openHighlighterMiniPopover(btn);
+        else if (typeof openPalette === 'function') openPalette(btn);
         else _showStubToast('형광펜 — 준비 중');
       } else if (cmd === 'supsub-expand') {
         // p22c: 첨자·강조점 통합 미니 (p22l: 루비 분리)
