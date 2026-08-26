@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p22n';
+  var VERSION = 'v2.0-β-p22o';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1655,6 +1655,9 @@
     '}',
     '.ep-modern-toolbar-icons button svg * { stroke: var(--color, #0F3A3A); }',
     '.ep-modern-toolbar-icons button:hover svg * { stroke: var(--point, #FF9A76); }',
+    /* p22o: row 구조 버튼 안 SVG 도 동일하게 색 부여 (4행 코드/링크 아이콘 안 보이던 문제 방어) */
+    '.ep-modern-toolbar-row button svg * { stroke: var(--color, #0F3A3A); }',
+    '.ep-modern-toolbar-row button:hover svg * { stroke: var(--point, #FF9A76); }',
     // hairline 구분선 · p22f: 마진 즐임
     '.ep-modern-toolbar-sep { border-top: 1px solid rgba(15,58,58,0.1); margin: 4px -2px 6px; }',
     /* p22f: 1행 전용 · 헤더 + 세로 구분선 + BIUS 4개 (flex row) */
@@ -9906,13 +9909,13 @@
     var svgAlignL = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg>';
     var svgAlignC = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="5" y1="18" x2="19" y2="18"/></svg>';
     var svgAlignR = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="6" y1="18" x2="20" y2="18"/></svg>';
-    var svgLink   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>';
+    var svgLink   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>';
     var svgList   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg>';
     var svgLineH  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/><polyline points="18,4 20,6 18,8"/><polyline points="18,16 20,18 18,20"/></svg>';
     // p19m: 새 3종
     var svgFontUp   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><text x="3" y="17" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="14" fill="#0F3A3A" stroke="none">A</text><path d="M17 6v8"/><polyline points="14,9 17,6 20,9"/></svg>';
     var svgFontDown = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><text x="3" y="17" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="14" fill="#0F3A3A" stroke="none">A</text><path d="M17 6v8"/><polyline points="14,11 17,14 20,11"/></svg>';
-    var svgCode     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,7 4,12 9,17"/><polyline points="15,7 20,12 15,17"/></svg>';
+    var svgCode     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,7 4,12 9,17"/><polyline points="15,7 20,12 15,17"/></svg>';
     var svgHeadingT = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><path d="M6 4v16M14 4v16M6 12h8"/><text x="18" y="20" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="9" fill="#0F3A3A" stroke="none">▸</text></svg>';
 
     // p22f: TOOLBAR_SPEC_v2 §3-2 + 사용자 스펙 4x4 준수 · flex-wrap 사용
@@ -9961,7 +9964,7 @@
       // 3행 (p22m): 첨자 · 루비 · A+ · A− (코드 제거)
       '<div class="ep-modern-toolbar-icons">' +
         '<button type="button" data-cmd="supsub-expand"  data-expand="true" title="첨자·강조점">' + svgSupSub_m + '</button>' +
-        '<button type="button" data-cmd="ruby-open"      title="윗글씨 (루비)" style="font-family:Cafe24Danjunghae, Gowun Batang, serif; line-height:1.2;"><span style="display:inline-flex; flex-direction:column; align-items:center; justify-content:center; line-height:1;"><span style="font-size:0.55em; opacity:0.75; margin-bottom:1px;">가나</span><span style="font-size:0.95em;">Ru</span></span></button>' +
+        '<button type="button" data-cmd="ruby-open"      title="윗글씨 (루비)" style="font-family:Cafe24Danjunghae, Gowun Batang, serif; line-height:1; padding-top:10px; padding-bottom:6px;"><span style="display:inline-flex; flex-direction:column; align-items:center; justify-content:center; line-height:0.95;"><span style="font-size:0.5em; opacity:0.7;">가나</span><span style="font-size:0.85em; margin-top:1px;">Ru</span></span></button>' +
         '<button type="button" data-cmd="font-size-up"   title="글자 크게">' + svgFontUp   + '</button>' +
         '<button type="button" data-cmd="font-size-down" title="글자 작게">' + svgFontDown + '</button>' +
       '</div>' +
@@ -17232,7 +17235,7 @@
       // 10. 첨자▾ (위·아래·강조점 3개 통합 · p22l: 루비 분리)
       '<button data-cmd="supsub-expand" data-expand="true" title="첨자·강조점" style="font-size:0.85em;">X<sup style="font-size:0.7em;">²</sup></button>' +
       // 10.5 루비 (p22l: 옛날 원본 큰 다이얼로그 복원 · 팝오버 selection 소실 회피)
-      '<button data-cmd="ruby-open" title="윗글씨 (루비)" style="font-family:Cafe24Danjunghae, Gowun Batang, serif; line-height:1.2;"><span style="display:inline-flex; flex-direction:column; align-items:center; justify-content:center; line-height:1;"><span style="font-size:0.5em; opacity:0.75; margin-bottom:1px;">가나</span><span style="font-size:0.8em;">Ru</span></span></button>' +
+      '<button data-cmd="ruby-open" title="윗글씨 (루비)" style="font-family:Cafe24Danjunghae, Gowun Batang, serif; line-height:1; padding-top:6px; padding-bottom:3px;"><span style="display:inline-flex; flex-direction:column; align-items:center; justify-content:center; line-height:0.95;"><span style="font-size:0.45em; opacity:0.7;">가나</span><span style="font-size:0.75em; margin-top:1px;">Ru</span></span></button>' +
       '<span class="ftb-sep"></span>' +
       // 11-12. A+ / A−
       '<button data-cmd="font-size-up"   title="글자 크게">' + _svg_font_up   + '</button>' +
