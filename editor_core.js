@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26t';
+  var VERSION = 'v2.0-β-p26u';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -306,6 +306,26 @@
     '.editor-block[data-align="center"] > *:not(.block-handle) { margin-left: auto !important; margin-right: auto !important; }',
     '.editor-block[data-align="right"] > *:not(.block-handle) { margin-left: auto !important; margin-right: 0 !important; }',
     '.editor-block[data-align="left"] > *:not(.block-handle) { margin-left: 0 !important; margin-right: auto !important; }',
+    /* p26u: text-align 을 블록 자체와 모든 자손에 강제 적용 (텍스트/리스트/버튼등 자동 정렬) */
+    '.editor-block[data-align="left"]   { text-align: left   !important; }',
+    '.editor-block[data-align="center"] { text-align: center !important; }',
+    '.editor-block[data-align="right"]  { text-align: right  !important; }',
+    '.editor-block[data-align="left"]   > * { text-align: left   !important; }',
+    '.editor-block[data-align="center"] > * { text-align: center !important; }',
+    '.editor-block[data-align="right"]  > * { text-align: right  !important; }',
+    /* p26u: 이미지/임베드등 inline-block 자손에도 flex 방식으로 정렬 (block: figure, .ep-callout-block, .ep-slider-block, .ddl-fold-block 등) */
+    '.editor-block[data-align="center"] > figure,',
+    '.editor-block[data-align="center"] > .ep-callout-block,',
+    '.editor-block[data-align="center"] > .ep-slider-block,',
+    '.editor-block[data-align="center"] > .ddl-fold-block { margin-left: auto !important; margin-right: auto !important; }',
+    '.editor-block[data-align="right"] > figure,',
+    '.editor-block[data-align="right"] > .ep-callout-block,',
+    '.editor-block[data-align="right"] > .ep-slider-block,',
+    '.editor-block[data-align="right"] > .ddl-fold-block { margin-left: auto !important; margin-right: 0 !important; }',
+    '.editor-block[data-align="left"] > figure,',
+    '.editor-block[data-align="left"] > .ep-callout-block,',
+    '.editor-block[data-align="left"] > .ep-slider-block,',
+    '.editor-block[data-align="left"] > .ddl-fold-block { margin-left: 0 !important; margin-right: auto !important; }',
     /* p14d: hover 툴바 CSS 제거 - 사용자님 지시로 미사용 */
 
     // ─── 우측 사이드바 토글 탭 ───
@@ -2793,27 +2813,34 @@
     '  font-size: 0.9em;',
     '}',
     /* 페이드 애니메이션 (data-anim=fade) */
-    '.ep-slider-block[data-anim="fade"] .ddl-slider-track {',
-    '  display: block;',
-    '  transition: none;',
+    /* p26u: fade/zoom 모두 적상위치로 겹치게 → 넘김 자체는 opacity 로 대체 */
+    '.ep-slider-block[data-anim="fade"] .ddl-slider-track,',
+    '.ep-slider-block[data-anim="zoom"] .ddl-slider-track {',
+    '  display: block !important;',
+    '  transition: none !important;',
+    '  transform: none !important;',
     '}',
-    '.ep-slider-block[data-anim="fade"] .ddl-slider-item {',
-    '  position: absolute;',
-    '  top: 0; left: 0; right: 0; bottom: 0;',
-    '  width: 100%;',
+    '.ep-slider-block[data-anim="fade"] .ddl-slider-item,',
+    '.ep-slider-block[data-anim="zoom"] .ddl-slider-item {',
+    '  position: absolute !important;',
+    '  top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;',
+    '  width: 100% !important;',
+    '  height: 100% !important;',
     '  opacity: 0;',
     '  transition: opacity 500ms ease;',
     '  pointer-events: none;',
+    '  z-index: 0;',
     '}',
-    '.ep-slider-block[data-anim="fade"] .ddl-slider-item.is-current {',
+    '.ep-slider-block[data-anim="fade"] .ddl-slider-item.is-current,',
+    '.ep-slider-block[data-anim="zoom"] .ddl-slider-item.is-current {',
     '  opacity: 1;',
     '  pointer-events: auto;',
     '  z-index: 1;',
     '}',
-    /* 줌 애니메이션 (data-anim=zoom) - 슬라이드 유지 + 현재 슬라이드 살짝 확대 */
+    /* p26u: 줌 애니메이션 — fade 위에 추가로 마이마이 확대 */
     '.ep-slider-block[data-anim="zoom"] .ddl-slider-item img {',
     '  transition: transform 700ms ease;',
-    '  transform: scale(1.05);',
+    '  transform: scale(1.06);',
     '}',
     '.ep-slider-block[data-anim="zoom"] .ddl-slider-item.is-current img {',
     '  transform: scale(1.0);',
@@ -19511,11 +19538,21 @@
             if (err) { alert('업로드 실패: ' + err.message); return; }
             var url = res && res.url;
             if (!url) { alert('업로드는 됐으나 URL 을 못 받았습니다.'); return; }
-            var opts2 = readDividerOpts(selectedDivider);
-            opts2.source = 'image';
-            opts2.imageUrl = url;
-            applyDividerOpts(selectedDivider, opts2);
-            renderDividerPopupBody('preset');
+            // p26u: 공용 크롭 대화창 자동 호출
+            var _applyDivImg = function(finalUrl){
+              var opts2 = readDividerOpts(selectedDivider);
+              opts2.source = 'image';
+              opts2.imageUrl = finalUrl;
+              applyDividerOpts(selectedDivider, opts2);
+              renderDividerPopupBody('preset');
+            };
+            if (window.__DDL_EDITOR && window.__DDL_EDITOR.openImageCropDialog) {
+              window.__DDL_EDITOR.openImageCropDialog(url, { aspect: null }, function(cropped){
+                _applyDivImg(cropped || url);
+              });
+            } else {
+              _applyDivImg(url);
+            }
           });
         });
         fileInput.click();
@@ -20766,11 +20803,21 @@
             if (err) { alert('업로드 실패: ' + err.message); return; }
             var url = res && res.url;
             if (!url) { alert('URL 못 받음'); return; }
-            var opts2 = readButtonOpts(selectedButton);
-            opts2.bgMode = 'image';
-            opts2.bgImage = url;
-            writeButtonOpts(selectedButton, opts2);
-            renderButtonPopupBody('bg');
+            // p26u: 공용 크롭 대화창 자동 호출
+            var _applyBtnImg = function(finalUrl){
+              var opts2 = readButtonOpts(selectedButton);
+              opts2.bgMode = 'image';
+              opts2.bgImage = finalUrl;
+              writeButtonOpts(selectedButton, opts2);
+              renderButtonPopupBody('bg');
+            };
+            if (window.__DDL_EDITOR && window.__DDL_EDITOR.openImageCropDialog) {
+              window.__DDL_EDITOR.openImageCropDialog(url, { aspect: null }, function(cropped){
+                _applyBtnImg(cropped || url);
+              });
+            } else {
+              _applyBtnImg(url);
+            }
           });
         });
         fi.click();
@@ -33094,10 +33141,20 @@
         var act = bgAction.getAttribute('data-fold-bg-action');
         if (act === 'upload-head-image' || act === 'upload-body-image') {
           _foldPickImage(function(dataUrl){
-            var attr = act === 'upload-head-image' ? 'data-fold-head-bg-image' : 'data-fold-body-bg-image';
-            block.setAttribute(attr, dataUrl);
-            _applyFoldStyles(block);
-            renderFoldPopupBody();
+            // p26u: 공용 크롭 대화창 자동 호출 - 사용자님 요청("모든 이미지 삽입 지점에 크롭")
+            var _applyImg = function(finalUrl){
+              var attr = act === 'upload-head-image' ? 'data-fold-head-bg-image' : 'data-fold-body-bg-image';
+              block.setAttribute(attr, finalUrl);
+              _applyFoldStyles(block);
+              renderFoldPopupBody();
+            };
+            if (window.__DDL_EDITOR && window.__DDL_EDITOR.openImageCropDialog) {
+              window.__DDL_EDITOR.openImageCropDialog(dataUrl, { aspect: null }, function(cropped){
+                _applyImg(cropped || dataUrl);
+              });
+            } else {
+              _applyImg(dataUrl);
+            }
           });
         } else if (act === 'remove-head-image') {
           block.removeAttribute('data-fold-head-bg-image');
