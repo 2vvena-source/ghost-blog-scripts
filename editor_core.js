@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p25s
+ * 2vvena Editor Core - v2.0-β-p25t
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25s';
+  var VERSION = 'v2.0-β-p25t';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -29647,7 +29647,12 @@
     // 헤더 색 1
     html += '<div class="row" style="margin-top:0.4em;"><div class="row-label">헤더 색 1</div>'
       + '<div class="ep-color-row" style="display:flex; align-items:center; gap:8px;">'
-      + '<input type="color" data-fold-set="headBg" value="' + escapeAttr(headBg) + '">'
+      // p25t: native <input type="color"> → 커스텀 스와치 버튼 (콜아웃 p25l 패턴 미러링)
+      + '<button type="button" class="ep-color-swatch" data-fold-swatch="headBg" data-cur="' + escapeAttr(headBg) + '"'
+      + '        style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2);'
+      + '               border-radius:4px; padding:0; cursor:pointer;'
+      + '               background:' + escapeAttr(headBg) + '; flex-shrink:0;"'
+      + '        title="클릭해서 색 선택"></button>'
       + '<span style="font-size:0.75em; opacity:0.7; white-space:nowrap;">투명도 ' + headOp + '%</span>'
       + '<input type="range" id="pop-fold-head-bg-opacity" min="0" max="100" step="5" value="' + headOp + '" style="flex:1; min-width:60px;">'
       + '</div></div>';
@@ -29702,9 +29707,14 @@
     } else {
       // 개별 지정 모드: 본문도 완전 독립
       html += bgModeButtons('body', bodyBgMode);
+      // p25t: native <input type="color"> → 커스텀 스와치 버튼 (콜아웃 p25l 패턴 미러링)
       html += '<div class="row" style="margin-top:0.4em;"><div class="row-label">본문 색 1</div>'
         + '<div class="ep-color-row" style="display:flex; align-items:center; gap:8px;">'
-        + '<input type="color" data-fold-set="bodyBg" value="' + escapeAttr(bodyBg) + '">'
+        + '<button type="button" class="ep-color-swatch" data-fold-swatch="bodyBg" data-cur="' + escapeAttr(bodyBg) + '"'
+        + '        style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2);'
+        + '               border-radius:4px; padding:0; cursor:pointer;'
+        + '               background:' + escapeAttr(bodyBg) + '; flex-shrink:0;"'
+        + '        title="클릭해서 색 선택"></button>'
         + '<span style="font-size:0.75em; opacity:0.7; white-space:nowrap;">투명도 ' + bodyOp + '%</span>'
         + '<input type="range" id="pop-fold-body-bg-opacity" min="0" max="100" step="5" value="' + bodyOp + '" style="flex:1; min-width:60px;">'
         + '</div></div>';
@@ -29958,6 +29968,38 @@
       if (_fwPreset) {
         e.preventDefault(); e.stopPropagation();
         _applyFoldWidthPct(block, _fwPreset.getAttribute('data-fold-width-preset'));
+        return;
+      }
+
+      // p25t: 접은글 색 스와치 (headBg / bodyBg) → 커스텀 픽커 · 실시간 반영 · 취소 시 원본 복원
+      //       콜아웃 p25l~p25o 패턴 미러링
+      var _fSwatch = e.target.closest && e.target.closest('[data-fold-swatch]');
+      if (_fSwatch) {
+        e.preventDefault(); e.stopPropagation();
+        var _fsKind = _fSwatch.getAttribute('data-fold-swatch'); // 'headBg' | 'bodyBg'
+        // 현재 색: data-cur 우선, 그 다음 실제 접은글 속성
+        var _fsAttrMap = { 'headBg':'data-fold-head-bg', 'bodyBg':'data-fold-body-bg' };
+        var _fsAttr = _fsAttrMap[_fsKind];
+        var _fsCur = _fSwatch.getAttribute('data-cur') || (block.getAttribute(_fsAttr) || '#0F3A3A');
+        var _fsOrig = _fsCur;
+        var _applyFoldSwatch = function(colorValue){
+          if (!colorValue) return;
+          // 기존 data-fold-set 경로 재사용 (data-fold-{head|body}-bg 세팅 → _applyFoldStyles 재적용)
+          _applyFoldAttrSet(block, _fsKind, colorValue);
+          // 스와치 UI 자체도 새 색으로 갱신
+          _fSwatch.style.background = colorValue;
+          _fSwatch.setAttribute('data-cur', colorValue);
+        };
+        if (typeof openCustomColorPicker === 'function') {
+          openCustomColorPicker({
+            initial: _fsCur,
+            context: 'bg',
+            detectFromSelection: false,
+            onChange: _applyFoldSwatch,
+            onDone: _applyFoldSwatch,
+            onCancel: function(){ _applyFoldSwatch(_fsOrig); }
+          });
+        }
         return;
       }
 
