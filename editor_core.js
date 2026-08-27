@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26x';
+  var VERSION = 'v2.0-β-p26y';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2813,16 +2813,20 @@
     '  font-style: italic;',
     '  font-size: 0.9em;',
     '}',
-    /* 페이드 애니메이션 (data-anim=fade) */
+    /* 페이드 애니메이션 (data-anim=fade) · p26y: data-ddl-anim 병행 (Ghost sanitizer 대비) */
     /* p26u: fade/zoom 모두 적상위치로 겹치게 → 넘김 자체는 opacity 로 대체 */
     '.ep-slider-block[data-anim="fade"] .ddl-slider-track,',
-    '.ep-slider-block[data-anim="zoom"] .ddl-slider-track {',
+    '.ep-slider-block[data-anim="zoom"] .ddl-slider-track,',
+    '.ep-slider-block[data-ddl-anim="fade"] .ddl-slider-track,',
+    '.ep-slider-block[data-ddl-anim="zoom"] .ddl-slider-track {',
     '  display: block !important;',
     '  transition: none !important;',
     '  transform: none !important;',
     '}',
     '.ep-slider-block[data-anim="fade"] .ddl-slider-item,',
-    '.ep-slider-block[data-anim="zoom"] .ddl-slider-item {',
+    '.ep-slider-block[data-anim="zoom"] .ddl-slider-item,',
+    '.ep-slider-block[data-ddl-anim="fade"] .ddl-slider-item,',
+    '.ep-slider-block[data-ddl-anim="zoom"] .ddl-slider-item {',
     '  position: absolute !important;',
     '  top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;',
     '  width: 100% !important;',
@@ -2834,18 +2838,22 @@
     '  z-index: 0;',
     '}',
     '.ep-slider-block[data-anim="fade"] .ddl-slider-item.is-current,',
-    '.ep-slider-block[data-anim="zoom"] .ddl-slider-item.is-current {',
+    '.ep-slider-block[data-anim="zoom"] .ddl-slider-item.is-current,',
+    '.ep-slider-block[data-ddl-anim="fade"] .ddl-slider-item.is-current,',
+    '.ep-slider-block[data-ddl-anim="zoom"] .ddl-slider-item.is-current {',
     '  opacity: 1;',
     '  pointer-events: auto;',
     '  z-index: 1;',
     '}',
     /* p26u: 줌 애니메이션 — fade 위에 추가로 마이마이 확대 */
-    '.ep-slider-block[data-anim="zoom"] .ddl-slider-item img {',
+    '.ep-slider-block[data-anim="zoom"] .ddl-slider-item img,',
+    '.ep-slider-block[data-ddl-anim="zoom"] .ddl-slider-item img {',
     /* p26v: zoom duration 도 변수화 (기본 700ms) */
     '  transition: transform var(--ddl-slider-duration, 700ms) ease;',
     '  transform: scale(1.06);',
     '}',
-    '.ep-slider-block[data-anim="zoom"] .ddl-slider-item.is-current img {',
+    '.ep-slider-block[data-anim="zoom"] .ddl-slider-item.is-current img,',
+    '.ep-slider-block[data-ddl-anim="zoom"] .ddl-slider-item.is-current img {',
     '  transform: scale(1.0);',
     '}',
     /* 좌우 화살표 버튼 */
@@ -31614,6 +31622,7 @@
     slider.className = 'ep-slider-block';
     slider.setAttribute('data-ddl-slider', '1');
     slider.setAttribute('data-anim', 'slide');
+    slider.setAttribute('data-ddl-anim', 'slide'); // p26y: sanitizer 대비 병행
     slider.setAttribute('data-ddl-autoplay', '0');
     slider.setAttribute('data-ddl-interval', '3500');
     slider.setAttribute('data-ddl-duration', '400'); // p26v: 넘김 속도 (밀리초)
@@ -32061,6 +32070,7 @@
     if (act === 'anim-slide' || act === 'anim-fade' || act === 'anim-zoom') {
       var mode = act.replace('anim-', '');
       s.setAttribute('data-anim', mode);
+      s.setAttribute('data-ddl-anim', mode); // p26y: sanitizer 대비 병행
       if (s._sliderUpdate) s._sliderUpdate();
       renderSlidePopupBody();
       return;
@@ -32271,9 +32281,11 @@
     slider.style.setProperty('--ddl-slider-duration', _dur + 'ms');
 
     // p26v: 애니메이션 모드 변수로 저장
-    var _anim = slider.getAttribute('data-anim') || 'slide';
+    var _anim = slider.getAttribute('data-anim') || slider.getAttribute('data-ddl-anim') || 'slide';
     // p26x: data-anim 명시적 재설정 (sanitizer나 재하이드러이션으로 속성 잎을 수 있음)
     slider.setAttribute('data-anim', _anim);
+    // p26y: Ghost sanitizer 가 data-anim 을 쟼는 경우 대비 — data-ddl-anim 병행 저장
+    slider.setAttribute('data-ddl-anim', _anim);
     // p26x: fade/zoom 모드에서 첫 아이템에 is-current 강제 보장 (사이트 런타임 이전에도 보이도록)
     if (_anim === 'fade' || _anim === 'zoom') {
       var _anyCurrent = slider.querySelector('.ddl-slider-item.is-current');
