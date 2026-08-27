@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p25q
+ * 2vvena Editor Core - v2.0-β-p25r
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25q';
+  var VERSION = 'v2.0-β-p25r';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -5652,18 +5652,107 @@
         + '<button class="pop-btn' + (iconSize==='150'?' is-active':'') + '" data-icon-size="150">크게</button>'
         + '<button class="pop-btn' + (iconSize==='200'?' is-active':'') + '" data-icon-size="200">아주 크게</button>'
         + '</div>';
-      html += renderColorSection('icon', iconColor);
+      // p25r: 도형색 확장 — 콜아웃 [배경] 탭 수준으로 격상
+      //       단색/그라데이션/패턴 3모드 + 스와치 + 미리보기 바 + 각도/투명도
+      //       기존 data-icon-color 는 색 1 로 재사용 (호환성)
+      //       data-icon-bg-mode 가 없으면 자동 'solid' 로 fallback (구 콜아웃 그대로 동작)
+      var iconBgMode = box.getAttribute('data-icon-bg-mode') || 'solid';
+      var iconBg2 = box.getAttribute('data-icon-bg2') || '#FF9A76';
+      var iconBgAngle = box.getAttribute('data-icon-bg-angle') || '45';
+      var iconPattern = box.getAttribute('data-icon-pattern') || 'dot';
+      var iconPatternSize = box.getAttribute('data-icon-pattern-size') || '10';
+      var iconPatternAngle = box.getAttribute('data-icon-pattern-angle') || '45';
+      var iconBgAlpha1 = box.getAttribute('data-icon-bg-alpha1') || '100';
+      var iconBgAlpha2 = box.getAttribute('data-icon-bg-alpha2') || '100';
+      var iconColorHex = toHex(iconColor);
+      var iconBg2Hex = toHex(iconBg2);
 
-      // p18i: 아이콘 색상 자체 알파 (rgba 알파)
-      var iconColorAlpha = box.getAttribute('data-icon-color-alpha') || '100';
-      html += '<div class="row"><div class="row-label">색상 투명도 (' + iconColorAlpha + '%) <span style="font-size:0.7em; opacity:0.55;">— 도형 색만 반투명</span></div>'
-        + '<input type="range" id="pop-icon-color-alpha" min="0" max="100" step="5" value="' + iconColorAlpha + '" style="width:100%;">'
+      // 색 모드 선택 3버튼
+      html += '<div class="row"><div class="row-label">색 모드</div>'
+        + '<button type="button" class="pop-btn' + (iconBgMode==='solid'?' is-active':'') + '" data-icon-bg-set="mode" data-value="solid">단색</button>'
+        + '<button type="button" class="pop-btn' + (iconBgMode==='gradient'?' is-active':'') + '" data-icon-bg-set="mode" data-value="gradient">그라데이션</button>'
+        + '<button type="button" class="pop-btn' + (iconBgMode==='pattern'?' is-active':'') + '" data-icon-bg-set="mode" data-value="pattern">패턴</button>'
         + '</div>';
+
+      // 미리보기 바 (그라데이션/패턴 모드에서만 · display 는 리스너에서 토글)
+      var _iconPreviewShow = (iconBgMode === 'gradient' || iconBgMode === 'pattern');
+      html += '<div class="row" data-icon-gradient-preview-row style="margin-bottom:0.6em;' + (_iconPreviewShow ? '' : ' display:none;') + '">'
+        + '<div class="row-label">미리보기</div>'
+        + '<div class="ep-gradient-preview-bar" data-icon-preview'
+        + '     style="width:100%; height:44px; border-radius:6px;'
+        + '            border:1px solid rgba(15,58,58,0.2);'
+        + '            background-color:' + iconColorHex + ';'
+        + '            background-image:none;'
+        + '            background-size:auto; background-position:0 0; background-repeat:repeat;">'
+        + '</div></div>';
+
+      // 색 1 스와치
+      html += '<div class="row"><div class="row-label">' + (iconBgMode==='solid' ? '도형 색' : '색 1') + '</div>'
+        + '<div style="display:flex; align-items:center; gap:0.5em;">'
+        + '<button type="button" class="ep-color-swatch" data-icon-swatch="bg" data-cur="' + escapeAttr(iconColorHex) + '"'
+        + '        style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2);'
+        + '               border-radius:4px; padding:0; cursor:pointer;'
+        + '               background:' + iconColorHex + '; flex-shrink:0;"'
+        + '        title="클릭해서 색 선택"></button>'
+        + '<span style="opacity:0.55; font-size:0.78em;">' + escapeHtml(iconColorHex.toUpperCase()) + '</span>'
+        + '</div></div>';
+
+      // p18i: 색 1 투명도 (기존 pop-icon-color-alpha 재사용)
+      html += '<div class="row"><div class="row-label">' + (iconBgMode==='solid' ? '색 투명도' : '색 1 투명도') + ' (' + iconBgAlpha1 + '%)</div>'
+        + '<input type="range" id="pop-icon-color-alpha" min="0" max="100" step="5" value="' + iconBgAlpha1 + '" style="width:100%;">'
+        + '</div>';
+
+      // 그라데이션/패턴 모드 · 색 2 스와치 + 색 2 투명도
+      if (iconBgMode === 'gradient' || iconBgMode === 'pattern') {
+        html += '<div class="row"><div class="row-label">색 2</div>'
+          + '<div style="display:flex; align-items:center; gap:0.5em;">'
+          + '<button type="button" class="ep-color-swatch" data-icon-swatch="bg2" data-cur="' + escapeAttr(iconBg2Hex) + '"'
+          + '        style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2);'
+          + '               border-radius:4px; padding:0; cursor:pointer;'
+          + '               background:' + iconBg2Hex + '; flex-shrink:0;"'
+          + '        title="클릭해서 색 선택"></button>'
+          + '<span style="opacity:0.55; font-size:0.78em;">' + escapeHtml(iconBg2Hex.toUpperCase()) + '</span>'
+          + '</div></div>';
+
+        html += '<div class="row"><div class="row-label">색 2 투명도 (' + iconBgAlpha2 + '%)</div>'
+          + '<input type="range" id="pop-icon-bg-alpha2" min="0" max="100" step="5" value="' + iconBgAlpha2 + '" style="width:100%;">'
+          + '</div>';
+      }
+
+      // 그라데이션 모드 · 각도 슬라이더 + 각도 프리셋 5방향
+      if (iconBgMode === 'gradient') {
+        html += '<div class="row"><div class="row-label">방향 (' + iconBgAngle + '°)</div>'
+          + '<input type="range" id="pop-icon-bg-angle" min="0" max="360" step="15" value="' + iconBgAngle + '" style="width:100%;">'
+          + '</div>';
+        html += '<div class="row"><div class="row-label">각도 프리셋</div>'
+          + '<button type="button" class="pop-btn" data-icon-bg-set="angle" data-value="0">↑</button>'
+          + '<button type="button" class="pop-btn" data-icon-bg-set="angle" data-value="45">↗</button>'
+          + '<button type="button" class="pop-btn" data-icon-bg-set="angle" data-value="90">→</button>'
+          + '<button type="button" class="pop-btn" data-icon-bg-set="angle" data-value="135">↘</button>'
+          + '<button type="button" class="pop-btn" data-icon-bg-set="angle" data-value="180">↓</button>'
+          + '</div>';
+      }
+
+      // 패턴 모드 · 종류 + 크기 + 각도
+      if (iconBgMode === 'pattern') {
+        html += '<div class="row"><div class="row-label">패턴 종류</div>'
+          + '<button type="button" class="pop-btn' + (iconPattern==='dot'?' is-active':'') + '" data-icon-bg-set="pattern" data-value="dot">도트</button>'
+          + '<button type="button" class="pop-btn' + (iconPattern==='stripe'?' is-active':'') + '" data-icon-bg-set="pattern" data-value="stripe">줄무늬</button>'
+          + '<button type="button" class="pop-btn' + (iconPattern==='check'?' is-active':'') + '" data-icon-bg-set="pattern" data-value="check">체크</button>'
+          + '<button type="button" class="pop-btn' + (iconPattern==='zigzag'?' is-active':'') + '" data-icon-bg-set="pattern" data-value="zigzag">지그재그</button>'
+          + '</div>';
+        html += '<div class="row"><div class="row-label">패턴 크기 (' + iconPatternSize + 'px)</div>'
+          + '<input type="range" id="pop-icon-pattern-size" min="4" max="40" step="1" value="' + iconPatternSize + '" style="width:100%;">'
+          + '</div>';
+        html += '<div class="row"><div class="row-label">패턴 각도 (' + iconPatternAngle + '°)</div>'
+          + '<input type="range" id="pop-icon-pattern-angle" min="0" max="360" step="15" value="' + iconPatternAngle + '" style="width:100%;">'
+          + '</div>';
+      }
 
       // p13b: 아이콘 요소 투명도 (아이콘 전체 opacity — 색+테두리 다 포함)
       var iconOpacity = box.getAttribute('data-icon-opacity') || '100';
       var iconCutout = box.getAttribute('data-icon-cutout') === '1';
-      html += '<div class="row"><div class="row-label">전체 투명도 (' + iconOpacity + '%) <span style="font-size:0.7em; opacity:0.55;">— 아이콘 요소 전체</span></div>'
+      html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;"><div class="row-label">전체 투명도 (' + iconOpacity + '%) <span style="font-size:0.7em; opacity:0.55;">— 아이콘 요소 전체</span></div>'
         + '<input type="range" id="pop-icon-opacity" min="0" max="100" step="5" value="' + iconOpacity + '" style="width:100%;">'
         + '</div>';
       html += '<div class="row"><div class="row-label">컷아웃 (뒤가 뚫림)</div>'
@@ -6107,6 +6196,8 @@
     if (_box) {
       var _icons = _box.querySelectorAll('.callout-icon.is-shape');
       _icons.forEach(function(ic){ updateShapeSpanStyle(ic); });
+      // p25r: 도형 미리보기 바 초기 갱신
+      try { _updateIconPreviewBar(_box); } catch(_){}
     }
     if (body._listenersAttached) return;
     body._listenersAttached = true;
@@ -6277,6 +6368,81 @@
         body.querySelectorAll('[data-icon-size]').forEach(function(b){
           b.classList.toggle('is-active', b === sizeBtn);
         });
+        return;
+      }
+
+      // p25r: 도형색 모드 버튼 (단색/그라데이션/패턴)
+      var iBgSetBtn = e.target.closest('[data-icon-bg-set][data-value]');
+      if (iBgSetBtn) {
+        var _iKey = iBgSetBtn.getAttribute('data-icon-bg-set');
+        var _iVal = iBgSetBtn.getAttribute('data-value');
+        if (_iKey === 'mode') {
+          box.setAttribute('data-icon-bg-mode', _iVal);
+        } else if (_iKey === 'pattern') {
+          box.setAttribute('data-icon-pattern', _iVal);
+        } else if (_iKey === 'angle') {
+          box.setAttribute('data-icon-bg-angle', _iVal);
+        }
+        // 도형 span 재그리기
+        var _iIcon = box.querySelector('.callout-icon.is-shape');
+        if (_iIcon && typeof updateShapeSpanStyle === 'function') updateShapeSpanStyle(_iIcon);
+        // 미리보기 바 갱신
+        try { _updateIconPreviewBar(box); } catch(_){}
+        // 모드 변경과 각도 프리셋/패턴 종류는 UI 재렉더 필요 (하위 옵션 토글 · 버튼 active 상태)
+        if (_iKey === 'mode' || _iKey === 'pattern') {
+          renderCalloutPopupBody();
+        } else if (_iKey === 'angle') {
+          // 각도 프리셋은 슬라이더 값과 라벨만 동기화 (전체 재렉더 불필요)
+          var _iAngleSlider = body.querySelector('#pop-icon-bg-angle');
+          if (_iAngleSlider) _iAngleSlider.value = _iVal;
+          var _iAngleLabel = _iAngleSlider && _iAngleSlider.parentNode.querySelector('.row-label');
+          if (_iAngleLabel) _iAngleLabel.textContent = '방향 (' + _iVal + '°)';
+        }
+        return;
+      }
+
+      // p25r: 도형색 스와치 (색 1 / 색 2) → 커스텀 픽커 호출 · 실시간 반영
+      var iSwatch = e.target.closest('[data-icon-swatch]');
+      if (iSwatch) {
+        e.preventDefault(); e.stopPropagation();
+        var _swKind = iSwatch.getAttribute('data-icon-swatch'); // 'bg' | 'bg2'
+        var _curVal = iSwatch.getAttribute('data-cur') ||
+                      (_swKind === 'bg' ? (box.getAttribute('data-icon-color') || '#0F3A3A')
+                                        : (box.getAttribute('data-icon-bg2') || '#FF9A76'));
+        // rgba(...) 로 될 수 있으므로 hex 로 맞춤 (픽커는 hex/rgba 모두 받음)
+        _curVal = toHex(_curVal);
+        var _origVal = _curVal;
+        var _applyIconColor = function(colorValue){
+          if (!colorValue) return;
+          var _iconEl = box.querySelector('.callout-icon.is-shape');
+          if (_swKind === 'bg') {
+            // 색 1 — 기존 data-icon-color 경로 재사용 (알파 반영은 상단에서 슬라이더로 별도 적용)
+            box.setAttribute('data-icon-color', colorValue);
+            if (_iconEl) _iconEl.style.setProperty('--icon-color', colorValue);
+          } else if (_swKind === 'bg2') {
+            box.setAttribute('data-icon-bg2', colorValue);
+          }
+          if (_iconEl && typeof updateShapeSpanStyle === 'function') updateShapeSpanStyle(_iconEl);
+          try { _updateIconPreviewBar(box); } catch(_){}
+          // 스와치 UI 자체 색도 갱신
+          iSwatch.style.background = colorValue;
+          iSwatch.setAttribute('data-cur', colorValue);
+          // 오른쪽 hex 라벨 갱신
+          try {
+            var _sib = iSwatch.parentNode && iSwatch.parentNode.querySelector('span');
+            if (_sib) _sib.textContent = String(colorValue).toUpperCase();
+          } catch(_){}
+        };
+        if (typeof openCustomColorPicker === 'function') {
+          openCustomColorPicker({
+            initial: _curVal,
+            context: (_swKind === 'bg' ? 'icon' : 'bg'),
+            detectFromSelection: false,
+            onChange: _applyIconColor,
+            onDone: _applyIconColor,
+            onCancel: function(){ _applyIconColor(_origVal); }
+          });
+        }
         return;
       }
       // p18d: 색상 그룹 전체 삭제 (콜아웃 팝업 · 모든 target)
@@ -6623,26 +6789,98 @@
         return;
       }
       // p18i: 아이콘 색상 자체 알파 → data-icon-color 를 rgba 로 재조립
+      // p25r: data-icon-bg-alpha1 에도 동시 저장 (도형색 확장이 이 값을 그대로 사용)
+      //       그라데이션/패턴 모드에서는 span 생성 시 다시 재조립되므로 data-icon-color 자체는 hex 유지
       if (t.id === 'pop-icon-color-alpha') {
         var iAlpha = parseInt(t.value, 10);
         box.setAttribute('data-icon-color-alpha', String(iAlpha));
+        box.setAttribute('data-icon-bg-alpha1', String(iAlpha));
+        var _iCurMode = box.getAttribute('data-icon-bg-mode') || 'solid';
         var iCur = box.getAttribute('data-icon-color') || '#0F3A3A';
         var iRgb = parseRgb(iCur) || parseRgb(toHex(iCur));
-        if (iRgb) {
-          var iRgba = 'rgba(' + iRgb.r + ',' + iRgb.g + ',' + iRgb.b + ',' + (iAlpha/100) + ')';
-          box.setAttribute('data-icon-color', iRgba);
-          var iconElA = box.querySelector('.callout-icon');
-          if (iconElA) {
-            if (iconElA.classList.contains('is-shape')) {
-              iconElA.style.setProperty('--icon-color', iRgba);
-              if (typeof updateShapeSpanStyle === 'function') updateShapeSpanStyle(iconElA);
-            } else {
-              iconElA.style.color = iRgba;
+        var iconElA = box.querySelector('.callout-icon');
+        if (_iCurMode === 'solid') {
+          // 기존 동작: data-icon-color 를 rgba 로 재조립 · --icon-color 에 적용
+          if (iRgb) {
+            var iRgba = 'rgba(' + iRgb.r + ',' + iRgb.g + ',' + iRgb.b + ',' + (iAlpha/100) + ')';
+            box.setAttribute('data-icon-color', iRgba);
+            if (iconElA) {
+              if (iconElA.classList.contains('is-shape')) {
+                iconElA.style.setProperty('--icon-color', iRgba);
+                if (typeof updateShapeSpanStyle === 'function') updateShapeSpanStyle(iconElA);
+              } else {
+                iconElA.style.color = iRgba;
+              }
             }
           }
+        } else {
+          // 그라데이션/패턴: data-icon-color 는 hex 유지 (updateShapeSpanStyle 이 alpha1 읽어서 rgba 재조립)
+          if (iconElA && iconElA.classList.contains('is-shape')) {
+            var _iHex = box.getAttribute('data-icon-color') || '#0F3A3A';
+            // rgba 형태면 hex 로 되돌리기 (가능하면)
+            if (String(_iHex).indexOf('rgba') === 0) _iHex = toHex(_iHex);
+            box.setAttribute('data-icon-color', _iHex);
+            iconElA.style.setProperty('--icon-color', _iHex);
+            if (typeof updateShapeSpanStyle === 'function') updateShapeSpanStyle(iconElA);
+          }
+          try { _updateIconPreviewBar(box); } catch(_){}
         }
         var lblIA = t.parentNode.querySelector('.row-label');
-        if (lblIA) lblIA.innerHTML = '색상 투명도 (' + iAlpha + '%) <span style="font-size:0.7em; opacity:0.55;">— 도형 색만 반투명</span>';
+        if (lblIA) {
+          if (_iCurMode === 'solid') {
+            lblIA.textContent = '색 투명도 (' + iAlpha + '%)';
+          } else {
+            lblIA.textContent = '색 1 투명도 (' + iAlpha + '%)';
+          }
+        }
+        return;
+      }
+
+      // p25r: 도형색 색 2 투명도
+      if (t.id === 'pop-icon-bg-alpha2') {
+        var iA2 = parseInt(t.value, 10);
+        box.setAttribute('data-icon-bg-alpha2', String(iA2));
+        var _iIcon2 = box.querySelector('.callout-icon.is-shape');
+        if (_iIcon2 && typeof updateShapeSpanStyle === 'function') updateShapeSpanStyle(_iIcon2);
+        try { _updateIconPreviewBar(box); } catch(_){}
+        var lblIA2 = t.parentNode.querySelector('.row-label');
+        if (lblIA2) lblIA2.textContent = '색 2 투명도 (' + iA2 + '%)';
+        return;
+      }
+
+      // p25r: 도형색 그라데이션 각도
+      if (t.id === 'pop-icon-bg-angle') {
+        var iAng = parseInt(t.value, 10);
+        box.setAttribute('data-icon-bg-angle', String(iAng));
+        var _iIcon3 = box.querySelector('.callout-icon.is-shape');
+        if (_iIcon3 && typeof updateShapeSpanStyle === 'function') updateShapeSpanStyle(_iIcon3);
+        try { _updateIconPreviewBar(box); } catch(_){}
+        var lblIAng = t.parentNode.querySelector('.row-label');
+        if (lblIAng) lblIAng.textContent = '방향 (' + iAng + '°)';
+        return;
+      }
+
+      // p25r: 도형색 패턴 크기
+      if (t.id === 'pop-icon-pattern-size') {
+        var iPS = parseInt(t.value, 10);
+        box.setAttribute('data-icon-pattern-size', String(iPS));
+        var _iIcon4 = box.querySelector('.callout-icon.is-shape');
+        if (_iIcon4 && typeof updateShapeSpanStyle === 'function') updateShapeSpanStyle(_iIcon4);
+        try { _updateIconPreviewBar(box); } catch(_){}
+        var lblIPS = t.parentNode.querySelector('.row-label');
+        if (lblIPS) lblIPS.textContent = '패턴 크기 (' + iPS + 'px)';
+        return;
+      }
+
+      // p25r: 도형색 패턴 각도
+      if (t.id === 'pop-icon-pattern-angle') {
+        var iPA = parseInt(t.value, 10);
+        box.setAttribute('data-icon-pattern-angle', String(iPA));
+        var _iIcon5 = box.querySelector('.callout-icon.is-shape');
+        if (_iIcon5 && typeof updateShapeSpanStyle === 'function') updateShapeSpanStyle(_iIcon5);
+        try { _updateIconPreviewBar(box); } catch(_){}
+        var lblIPA = t.parentNode.querySelector('.row-label');
+        if (lblIPA) lblIPA.textContent = '패턴 각도 (' + iPA + '°)';
         return;
       }
       // p25p: 글자색 투명도 슬라이더 제거됨 · 이 분기는 이제 실행되지 않지만 안전 대시 유지
@@ -7701,20 +7939,102 @@
     return span;
   }
 
+  // p25r: 도형 색 렉더링 확장 — 단색/그라데이션/패턴 3모드 지원
+  //           기존 --icon-color 는 그대로 재사용 (색 1 역할) · 모드가 solid 면 예전 동작과 동일
   function updateShapeSpanStyle(iconEl){
     var span = ensureShapeSpan(iconEl);
     if (!span) return;
-    var color = iconEl.style.getPropertyValue('--icon-color') || '#0F3A3A';
+    // 도형 크기
     var size = '1em';
     if (iconEl.classList.contains('size-50')) size = '0.5em';
     else if (iconEl.classList.contains('size-75')) size = '0.75em';
     else if (iconEl.classList.contains('size-150')) size = '1.5em';
     else if (iconEl.classList.contains('size-200')) size = '2em';
-    var shapeStyle = 'display:block; width:' + size + '; height:' + size + '; background:' + color + ';';
+
+    // 기본 구조 스타일 (display/크기/모양 공통)
+    var shapeStyle = 'display:block; width:' + size + '; height:' + size + ';';
     if (iconEl.classList.contains('shape-circle')) shapeStyle += ' border-radius:50%;';
     else if (iconEl.classList.contains('shape-square')) shapeStyle += ' border-radius:0;';
     else if (iconEl.classList.contains('shape-diamond')) shapeStyle += ' border-radius:2px; transform:rotate(45deg);';
+
+    // 색 모드 · solid 기본 · 법원 면 iconEl 상위의 .callout-box 에서 속성 읽기
+    var box = iconEl.closest && iconEl.closest('.callout-box');
+    var mode = box ? (box.getAttribute('data-icon-bg-mode') || 'solid') : 'solid';
+    var c1Raw = iconEl.style.getPropertyValue('--icon-color') || (box && box.getAttribute('data-icon-color')) || '#0F3A3A';
+    // c1Raw 가 이미 rgba(...) 로 되어있을 수 있는데 (색 1 투명도 적용된 상태) 그대로 사용 안전
+    var c1 = c1Raw;
+    // 모드가 solid 면 기존 동작 (background 하나만)
+    if (mode === 'solid' || !box) {
+      // 잔존 그라데이션/패턴 이미지를 반드시 리셋 (모드 전환 시 잔상 방지)
+      shapeStyle += ' background-image:none; background-color:' + c1 + ';';
+      span.setAttribute('style', shapeStyle);
+      return;
+    }
+    // 그라데이션/패턴 공용 · 색 2 및 각도를 박스에서 읽기
+    var c2Hex = box.getAttribute('data-icon-bg2') || '#FF9A76';
+    var a1 = parseInt(box.getAttribute('data-icon-bg-alpha1') || '100', 10);
+    var a2 = parseInt(box.getAttribute('data-icon-bg-alpha2') || '100', 10);
+    // c1 에 이미 알파가 반영되어 있으면(=rgba) 새로 재입력 불필요, 아니면 재만들기
+    var c1Str = c1;
+    if (String(c1).charAt(0) === '#') {
+      var _r1 = parseRgb(toHex(c1));
+      if (_r1) c1Str = 'rgba(' + _r1.r + ',' + _r1.g + ',' + _r1.b + ',' + (a1/100) + ')';
+    }
+    var _r2 = parseRgb(toHex(c2Hex));
+    var c2Str = _r2 ? 'rgba(' + _r2.r + ',' + _r2.g + ',' + _r2.b + ',' + (a2/100) + ')' : c2Hex;
+
+    if (mode === 'gradient') {
+      var angle = parseInt(box.getAttribute('data-icon-bg-angle') || '45', 10);
+      shapeStyle += ' background-color:transparent;';
+      shapeStyle += ' background-image:linear-gradient(' + angle + 'deg, ' + c1Str + ', ' + c2Str + ');';
+    } else if (mode === 'pattern') {
+      var p = box.getAttribute('data-icon-pattern') || 'dot';
+      var s = parseInt(box.getAttribute('data-icon-pattern-size') || '10', 10);
+      var pang = parseInt(box.getAttribute('data-icon-pattern-angle') || '45', 10);
+      var patObj = (typeof _calloutMakePatternBg === 'function') ? _calloutMakePatternBg(p, c1Str, c2Str, s, pang) : null;
+      shapeStyle += ' background-color:transparent;';
+      if (patObj) {
+        // 패턴은 여러 background-* 프로퍼티 필요 · style 문자열에 모두 합치기
+        shapeStyle += ' background-image:' + patObj.image + ';';
+        shapeStyle += ' background-size:' + patObj.size + ';';
+        shapeStyle += ' background-position:' + patObj.position + ';';
+        shapeStyle += ' background-repeat:' + patObj.repeat + ';';
+      } else {
+        shapeStyle += ' background-image:none; background-color:' + c1Str + ';';
+      }
+    }
     span.setAttribute('style', shapeStyle);
+    // p25r: span 스타일 갱신 마다 미리보기 바도 함께 (팝업 열려있을 때만 반영)
+    try {
+      var _pbBox = iconEl.closest && iconEl.closest('.callout-box');
+      if (_pbBox) _updateIconPreviewBar(_pbBox);
+    } catch(_){}
+  }
+
+  // p25r: 도형 미리보기 바 갱신 (콜아웃 미리보기 바 _updateGradientPreviewBar 와 동일 원리)
+  //           도형 span 자체의 background-* 를 그대로 미러링
+  function _updateIconPreviewBar(box){
+    if (!box) return;
+    try {
+      var previews = document.querySelectorAll('[data-icon-preview]');
+      if (!previews || !previews.length) return;
+      var mode = box.getAttribute('data-icon-bg-mode') || 'solid';
+      var show = (mode === 'gradient' || mode === 'pattern');
+      var iconEl = box.querySelector('.callout-icon.is-shape');
+      var span = iconEl ? iconEl.querySelector('.callout-shape-render') : null;
+      for (var i = 0; i < previews.length; i++){
+        var pv = previews[i];
+        var row = pv.closest('[data-icon-gradient-preview-row]');
+        if (row) row.style.display = show ? '' : 'none';
+        if (!show || !span) continue;
+        // 도형 span 이 이미 확정된 스타일을 갖고 있으므로 그거를 미러링
+        pv.style.backgroundColor = span.style.backgroundColor || 'transparent';
+        pv.style.backgroundImage = span.style.backgroundImage || 'none';
+        pv.style.backgroundSize = span.style.backgroundSize || 'auto';
+        pv.style.backgroundPosition = span.style.backgroundPosition || '0 0';
+        pv.style.backgroundRepeat = span.style.backgroundRepeat || 'repeat';
+      }
+    } catch(_){}
   }
 
   function toHex(color){
@@ -19445,6 +19765,8 @@
       icon.style.userSelect = 'none';
 
       // 도형(is-shape)이면 ::before가 사이트에 없음 → 실제 <span> 자식으로 그리기
+      // p25r: 도형색 확장 — 단색/그라데이션/패턴 3모드 지원
+      //       모드가 없으면 solid 로 fallback → 구 콜아웃 호환성 유지
       if (icon.classList.contains('is-shape')) {
         // 기존 ::before 대체용 자식이 없으면 만들기
         var shapeSpan = icon.querySelector('.callout-shape-render');
@@ -19454,18 +19776,57 @@
           icon.textContent = ''; // 기존 텍스트 노드 제거
           icon.appendChild(shapeSpan);
         }
-        var color = icon.style.getPropertyValue('--icon-color') || '#0F3A3A';
+        var color = icon.style.getPropertyValue('--icon-color') || box.getAttribute('data-icon-color') || '#0F3A3A';
         // 크기 (size-* 클래스)
         var size = '1em';
         if (icon.classList.contains('size-50')) size = '0.5em';
         else if (icon.classList.contains('size-75')) size = '0.75em';
         else if (icon.classList.contains('size-150')) size = '1.5em';
         else if (icon.classList.contains('size-200')) size = '2em';
-        // 모양
-        var shapeStyle = 'display:block; width:' + size + '; height:' + size + '; background:' + color + ';';
+        // 모양 (공통)
+        var shapeStyle = 'display:block; width:' + size + '; height:' + size + ';';
         if (icon.classList.contains('shape-circle')) shapeStyle += ' border-radius:50%;';
         else if (icon.classList.contains('shape-square')) shapeStyle += ' border-radius:0;';
         else if (icon.classList.contains('shape-diamond')) shapeStyle += ' border-radius:2px; transform:rotate(45deg);';
+
+        // p25r: 색 모드 분기 · 저장 HTML 에 인라인 심기
+        var _iBgMode = box.getAttribute('data-icon-bg-mode') || 'solid';
+        if (_iBgMode === 'gradient') {
+          var _ic1Hex = toHex(color);
+          var _ic2Hex = toHex(box.getAttribute('data-icon-bg2') || '#FF9A76');
+          var _ia1 = parseInt(box.getAttribute('data-icon-bg-alpha1') || '100', 10);
+          var _ia2 = parseInt(box.getAttribute('data-icon-bg-alpha2') || '100', 10);
+          var _iAng = parseInt(box.getAttribute('data-icon-bg-angle') || '45', 10);
+          var _ir1 = parseRgb(_ic1Hex), _ir2 = parseRgb(_ic2Hex);
+          var _ic1s = _ir1 ? ('rgba(' + _ir1.r + ',' + _ir1.g + ',' + _ir1.b + ',' + (_ia1/100) + ')') : _ic1Hex;
+          var _ic2s = _ir2 ? ('rgba(' + _ir2.r + ',' + _ir2.g + ',' + _ir2.b + ',' + (_ia2/100) + ')') : _ic2Hex;
+          shapeStyle += ' background-color:transparent;';
+          shapeStyle += ' background-image:linear-gradient(' + _iAng + 'deg, ' + _ic1s + ', ' + _ic2s + ');';
+        } else if (_iBgMode === 'pattern') {
+          var _ipc1Hex = toHex(color);
+          var _ipc2Hex = toHex(box.getAttribute('data-icon-bg2') || '#FF9A76');
+          var _ipa1 = parseInt(box.getAttribute('data-icon-bg-alpha1') || '100', 10);
+          var _ipa2 = parseInt(box.getAttribute('data-icon-bg-alpha2') || '100', 10);
+          var _ipr1 = parseRgb(_ipc1Hex), _ipr2 = parseRgb(_ipc2Hex);
+          var _ipc1s = _ipr1 ? ('rgba(' + _ipr1.r + ',' + _ipr1.g + ',' + _ipr1.b + ',' + (_ipa1/100) + ')') : _ipc1Hex;
+          var _ipc2s = _ipr2 ? ('rgba(' + _ipr2.r + ',' + _ipr2.g + ',' + _ipr2.b + ',' + (_ipa2/100) + ')') : _ipc2Hex;
+          var _ipT = box.getAttribute('data-icon-pattern') || 'dot';
+          var _ipS = parseInt(box.getAttribute('data-icon-pattern-size') || '10', 10);
+          var _ipAng = parseInt(box.getAttribute('data-icon-pattern-angle') || '45', 10);
+          var _ipObj = (typeof _calloutMakePatternBg === 'function') ? _calloutMakePatternBg(_ipT, _ipc1s, _ipc2s, _ipS, _ipAng) : null;
+          shapeStyle += ' background-color:transparent;';
+          if (_ipObj) {
+            shapeStyle += ' background-image:' + _ipObj.image + ';';
+            shapeStyle += ' background-size:' + _ipObj.size + ';';
+            shapeStyle += ' background-position:' + _ipObj.position + ';';
+            shapeStyle += ' background-repeat:' + _ipObj.repeat + ';';
+          } else {
+            shapeStyle += ' background:' + _ipc1s + ';';
+          }
+        } else {
+          // solid — 기존 동작 (color 가 이미 rgba 일 수 있음)
+          shapeStyle += ' background:' + color + ';';
+        }
         shapeSpan.setAttribute('style', shapeStyle);
         // 아이콘 컨테이너를 정사각형으로 유지
         icon.style.width = '2em';
