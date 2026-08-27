@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26k
+ * 2vvena Editor Core - v2.0-β-p26l
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26k';
+  var VERSION = 'v2.0-β-p26l';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2666,9 +2666,14 @@
     '  position: relative;',
     '  box-sizing: border-box;',
     '}',
+    /* p26l: flex 기반 → width% 기반으로 전환. */
+    /*        이유: flex-grow 로 두 컴럼만 높이면 3단·4단 상황에서 */
+    /*        다른 컴럼이 grow=1 이라 극단적으로 눈려서 세로 기둥 붕괴. */
+    /*        width% 로 관리하면 각 컴럼 폭이 독립적으로 자기 몫 마큼만 차지. */
     '.ddl-column {',
-    '  flex: 1 1 0;',
-    '  min-width: 40px;',
+    '  flex: 0 0 auto;',
+    '  width: 33.3333%;', /* 이건 fallback — 실제로는 insertColumnsBlock 에서 정확한 % 개별 부여 */
+    '  min-width: 60px;', /* 노션도 사실상 이 정도 하한 보장 */
     '  min-height: 40px;',
     '  padding: 2px 4px;',
     '  box-sizing: border-box;',
@@ -2716,8 +2721,18 @@
     /* 모바일 대응 - 사용자 선택: 다단 유지 (좁아짐). 극한 좁을 때만 세로. */
     '@media (max-width: 480px) {',
     '  .ddl-columns-block { flex-wrap: wrap; gap: 4px; }',
-    '  .ddl-columns-block > .ddl-column { flex-basis: 100% !important; }',
+    '  .ddl-columns-block > .ddl-column { width: 100% !important; }',
     '  .ddl-columns-block > .ddl-column-resizer { display: none; }',
+    '}',
+    /* p26l: 노션식 회색 가이드 오버레이 (드래그 중에만 뜼다) */
+    '.ddl-col-guide {',
+    '  position: fixed;',
+    '  top: 0;',
+    '  width: 2px;',
+    '  background: rgba(15,58,58,0.55);',
+    '  pointer-events: none;',
+    '  z-index: 100002;',
+    '  border-radius: 1px;',
     '}',
 
 
@@ -3347,6 +3362,33 @@
         var wrap2 = cb.querySelector(':scope > .ddl-columns-block');
         if (wrap2) {
           var cols2 = wrap2.querySelectorAll(':scope > .ddl-column');
+          // p26l: 자식 컴럼을 편집용으로 복구 — 폭 복원(width%) 및 contenteditable / data-block-container
+          //       저장 파이프라인 enhance 는 flex/width 를 이미 각인해둔, sanitize 가 지우는 경우 자동 복구.
+          //       자식간 포긅은 data-column-pct → data-column-flex(구버전 퍼센트) 순서로 파싱.
+          var storedPcts = (cb.getAttribute('data-column-pct') || cb.getAttribute('data-column-flex') || '').split(',').map(function(v){ return parseFloat(v); });
+          for (var _ci = 0; _ci < cols2.length; _ci++) {
+            var _c = cols2[_ci];
+            if (!_c.hasAttribute('data-block-container')) _c.setAttribute('data-block-container', 'true');
+            if (_c.getAttribute('contenteditable') !== 'true') _c.setAttribute('contenteditable', 'true');
+            _c.setAttribute('data-column-idx', String(_ci));
+            // width % 복원 (해당 배열이 유효하면)
+            var pv = storedPcts[_ci];
+            if (isNaN(pv) || pv <= 0) {
+              // fallback: 기존 data-column-pct 속성이 각 컴럼에 있어도 받음
+              pv = parseFloat(_c.getAttribute('data-column-pct') || '');
+            }
+            if (!isNaN(pv) && pv > 0) {
+              _c.style.setProperty('flex', '0 0 auto', 'important');
+              _c.style.setProperty('width', pv.toFixed(4) + '%', 'important');
+              _c.setAttribute('data-column-pct', pv.toFixed(4));
+            } else if (!_c.style.width) {
+              // 아예 정보 없으면 균등분배
+              var _initPct = (100 / cols2.length).toFixed(4);
+              _c.style.setProperty('flex', '0 0 auto', 'important');
+              _c.style.setProperty('width', _initPct + '%', 'important');
+              _c.setAttribute('data-column-pct', _initPct);
+            }
+          }
           for (var ci2 = 0; ci2 < cols2.length - 1; ci2++) {
             var next2 = cols2[ci2].nextElementSibling;
             if (!next2 || !next2.classList.contains('ddl-column-resizer')) {
@@ -5431,6 +5473,57 @@
     });
 
     // 기존 input 리스너 (남겨두되 위 forEach와 중복이지만 안전용)
+    // p26l: 슬래시 감지 로직 개선
+    //   기존: editable.textContent 에서 마지막 '/' 위치를 찾고 앞 글자가 스페이스인지 확인
+    //   문제: Shift+Enter 로 넣은 <br> 은 textContent 에서 무시되어 "이전 줄 마지막 글자"
+    //           바로 뒤에 '/'가 있는 것처럼 보이게 됨 → 슬래시 메뉴 안 뜨는 버그.
+    //   개선: 커서 위치를 DOM 에서 바로 보고, 직전이 줄시작/공백/줄바꿈(<br>) 이면 허용.
+    function _isSlashContextOK(range, editable){
+      var node = range.startContainer;
+      var off = range.startOffset;
+      // 슬래시 문자 바로 앞 위치 문자 가져오기 — '/'가 방금 입력된 상황이므로
+      //   지금 커서 앞에 '/' 있고, 그 앞이 스페이스/줄시작/<br>이면 OK.
+      if (node.nodeType === 3) {
+        var s = node.nodeValue || '';
+        if (off >= 2) {
+          var ch = s.charAt(off - 2);
+          if (ch === ' ' || ch === '\u00A0' || ch === '\t') return true;
+          return false;
+        }
+        // off === 1 (텍스트 노드 시작에 '/' 만 있음) → 그 노드의 이전 형제 확인
+        var prev = node.previousSibling;
+        if (!prev) {
+          if (node.parentNode === editable) return true;
+          var pp = node.parentNode;
+          if (pp && pp.nodeType === 1 && /^(P|DIV|LI|BLOCKQUOTE|H1|H2|H3|H4|H5|H6|SECTION|ARTICLE)$/.test(pp.tagName)) return true;
+          return false;
+        }
+        if (prev.nodeType === 1) {
+          if (prev.tagName === 'BR') return true;
+          return false;
+        }
+        if (prev.nodeType === 3) {
+          var pv = prev.nodeValue || '';
+          if (pv.length === 0) return true;
+          var lc = pv.charAt(pv.length - 1);
+          if (lc === ' ' || lc === '\u00A0' || lc === '\t') return true;
+          return false;
+        }
+        return false;
+      }
+      if (node.nodeType === 1 && off > 0) {
+        var childBefore = node.childNodes[off - 1];
+        if (childBefore && childBefore.nodeType === 1 && childBefore.tagName === 'BR') return true;
+        if (childBefore && childBefore.nodeType === 3) {
+          var s2 = childBefore.nodeValue || '';
+          var lc2 = s2.charAt(s2.length - 1);
+          if (lc2 === ' ' || lc2 === '\u00A0' || lc2 === '\t') return true;
+        }
+      }
+      if (node.nodeType === 1 && off === 0) return true;
+      return false;
+    }
+
     contentEl.addEventListener('input', function(e){
       var sel = window.getSelection();
       if (!sel.rangeCount) return;
@@ -5441,31 +5534,38 @@
       var el = node.nodeType === 3 ? node.parentElement : node;
       editable = el.closest ? el.closest('[contenteditable="true"]') : null;
       if (!editable || !contentEl.contains(editable)) return;
-      // p20d: block 은 editor-block 이 있으면 그것, 없으면 editable 자체 (콜아웃 body 지원)
       var block = editable.closest('.editor-block') || editable;
 
-      var text = editable.textContent || '';
-      // 마지막 '/' 이후 문자열 = 슬래시 필터
-      var slashIdx = text.lastIndexOf('/');
-      if (slashIdx < 0) {
-        if (slashMenuEl) closeSlashMenu();
+      // 커서 바로 앞 문자가 '/' 인지 먼저 확인 (input 시점에 방금 입력된 글자)
+      var justTypedSlash = false;
+      try {
+        if (node.nodeType === 3 && range.startOffset >= 1) {
+          var chBefore = (node.nodeValue || '').charAt(range.startOffset - 1);
+          if (chBefore === '/') justTypedSlash = true;
+        }
+      } catch(_){}
+
+      if (justTypedSlash) {
+        // 새로 '/' 가 입력된 상황 → 이전 문맥이 적절한지 DOM 기준으로 검사
+        if (!_isSlashContextOK(range, editable)) {
+          if (slashMenuEl) closeSlashMenu();
+          return;
+        }
+        if (!slashMenuEl) {
+          openSlashMenu(block, range, editable);
+        } else {
+          renderSlashMenu('/');
+        }
         return;
       }
-      // '/'가 줄 시작이나 스페이스 뒤에 있어야 함
-      var before = slashIdx === 0 ? '' : text.charAt(slashIdx - 1);
-      if (slashIdx !== 0 && before !== ' ' && before !== ' ') {
-        if (slashMenuEl) closeSlashMenu();
-        return;
-      }
-      var filter = text.substring(slashIdx);
-      // 필터에 공백 있으면 종료
-      if (/\s/.test(filter.substring(1))) {
-        if (slashMenuEl) closeSlashMenu();
-        return;
-      }
-      if (!slashMenuEl) {
-        openSlashMenu(block, range, editable);
-      } else {
+
+      // 슬래시가 방금 입력된 게 아니면 → 이미 열린 메뉴의 필터 갱신 시나리오
+      if (slashMenuEl) {
+        var text = editable.textContent || '';
+        var slashIdx = text.lastIndexOf('/');
+        if (slashIdx < 0) { closeSlashMenu(); return; }
+        var filter = text.substring(slashIdx);
+        if (/\s/.test(filter.substring(1))) { closeSlashMenu(); return; }
         renderSlashMenu(filter);
       }
     });
@@ -30295,6 +30395,8 @@
     wrap.className = 'ddl-columns-block';
     wrap.setAttribute('contenteditable', 'false');
 
+    // p26l: 컬럼 개수만큼 균등 % 계산
+    var initPct = (100 / n).toFixed(4);
     for (var j = 0; j < n; j++) {
       // p26g: 컬럼 자체가 contenteditable=true (콜아웃 body 와 동일 구조)
       //   → 콜아웃 body 의 Enter/Backspace 커스텀 로직이 그대로 재사용됨
@@ -30303,7 +30405,11 @@
       col.setAttribute('data-block-container', 'true');
       col.setAttribute('data-column-idx', String(j));
       col.setAttribute('contenteditable', 'true');
-      col.style.flex = '1 1 0';
+      // p26l: flex 기반 폐기, width% 로 통일 — 3·4단에서 다른 컬럼 눌림 문제 근절.
+      //       flex:0 0 auto + width:% 로 각 컬럼이 독립적으로 자기 % 만 차지.
+      col.style.setProperty('flex', '0 0 auto', 'important');
+      col.style.setProperty('width', initPct + '%', 'important');
+      col.setAttribute('data-column-pct', initPct);
       // 컬럼 안 초기 콘텐츠: 빈 <p> 하나 (콜아웃 body 와 동일)
       var innerP = document.createElement('p');
       innerP.innerHTML = '<br>';
@@ -30376,19 +30482,45 @@
     return block;
   }
 
-  // ─── 컬럼 리사이저 핸들러 (한 번만 body 위임 등록) ────────────────
+  // ─── 컬럼 리사이저 핸들러 (노션식 회색 가이드 오버레이) ────────────────
+  // p26l: 완전 재설계.
+  //   이전(p26j·p26k): flex-grow 값을 직접 조작 → 3·4단에서 다른 컬럼(flex:1)이
+  //     압도적으로 눌려 세로 기둥 붕괴 (큰 버그).
+  //   재설계:
+  //     1) 각 컬럼은 이제 width:X% 로 관리 (flex 아님) → 각자 독립적 폭.
+  //     2) 드래그 중에는 실제 컬럼 폭을 건드리지 않고 회색 세로 가이드만 마우스를 따라 이동
+  //        (노션과 동일) → 모든 실제 변화는 mouseup 에서 확정.
+  //     3) 스냅 제거 (노션엔 없음). 자연스럽게 동작.
+  //     4) 최소 폭은 60px (노션처럼 상식적 마지노).
+  //     5) 저장은 data-column-flex(하위호환) + data-column-pct 병기, 실제 컬럼 style.width 에도 각인.
   (function(){
     var _colResizeState = null;
+    var _guideEl = null;
+
+    var MIN_COL_PX = 60; // 노션과 유사한 최소 폭 보장
+
+    function _makeGuide(rectRefWrap){
+      if (_guideEl && _guideEl.parentNode) _guideEl.parentNode.removeChild(_guideEl);
+      _guideEl = document.createElement('div');
+      _guideEl.className = 'ddl-col-guide';
+      var wr = rectRefWrap.getBoundingClientRect();
+      _guideEl.style.top = wr.top + 'px';
+      _guideEl.style.height = wr.height + 'px';
+      document.body.appendChild(_guideEl);
+      return _guideEl;
+    }
+
+    function _removeGuide(){
+      if (_guideEl && _guideEl.parentNode) _guideEl.parentNode.removeChild(_guideEl);
+      _guideEl = null;
+    }
 
     function _colStart(e){
       var handle = e.target && e.target.closest && e.target.closest('.ddl-column-resizer');
       if (!handle) return;
       var wrap = handle.parentNode;
       if (!wrap || !wrap.classList.contains('ddl-columns-block')) return;
-      // p26k: 안전벨트 — 혹시 문서 레벨 mousedown 리스너가 먼저 잡아서
-      //       _blockDragState 를 세팅해두었다면 여기서 즉시 취소해 고스트가
-      //       뜨지 못하게 함. (capture 순서상 이 함수는 body 등록이라 document
-      //       리스너보다 늦게 실행되므로 반드시 필요한 리셋.)
+      // 안전벨트 (p26k 유지)
       try {
         if (typeof _blockDragState !== 'undefined' && _blockDragState) {
           _blockDragState = null;
@@ -30396,86 +30528,98 @@
       } catch(_){}
       var block = wrap.parentNode;
       var idx = parseInt(handle.getAttribute('data-column-resizer'), 10);
-      // 인접 두 컬럼 찾기
       var cols = Array.prototype.filter.call(wrap.children, function(c){ return c.classList.contains('ddl-column'); });
       if (idx < 0 || idx >= cols.length - 1) return;
       var left = cols[idx], right = cols[idx + 1];
+      var wrapRect = wrap.getBoundingClientRect();
       var lw = left.getBoundingClientRect().width;
       var rw = right.getBoundingClientRect().width;
+      var lpct0 = (lw / wrapRect.width) * 100;
+      var rpct0 = (rw / wrapRect.width) * 100;
       _colResizeState = {
         handle: handle,
         block: block,
         wrap: wrap,
         left: left,
         right: right,
+        cols: cols,
+        leftIdx: idx,
         startX: e.clientX,
-        startLW: lw,
-        startRW: rw,
-        totalW: lw + rw
+        startLpct: lpct0,
+        startRpct: rpct0,
+        pairSum: lpct0 + rpct0,
+        wrapW: wrapRect.width,
+        _lastX: e.clientX
       };
       handle.classList.add('is-dragging');
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
+      // 노션식 회색 세로 가이드 생성 (처음엔 리사이저 위치)
+      var g = _makeGuide(wrap);
+      var rect = handle.getBoundingClientRect();
+      g.style.left = (rect.left + rect.width / 2 - 1) + 'px';
       e.preventDefault();
       e.stopPropagation();
-    }
-
-    // p26j: 노션식 미니멈 리사저 — 툴팁/플래시/오버슈 전부 제거
-    // 유지: 10% 자기장 스냅만 (조용하게)
-    var SNAP_STEP = 10;
-    var SNAP_MAGNET_PCT = 2.5;
-
-    function _snapPct(pct){
-      var nearest = Math.round(pct / SNAP_STEP) * SNAP_STEP;
-      if (Math.abs(pct - nearest) <= SNAP_MAGNET_PCT) return nearest;
-      return pct;
     }
 
     function _colMove(e){
       if (!_colResizeState) return;
       var s = _colResizeState;
-      var dx = e.clientX - s.startX;
-      var newLW = s.startLW + dx;
-      var newRW = s.startRW - dx;
-      // 최소 폭 40px
-      if (newLW < 40) { newLW = 40; newRW = s.totalW - 40; }
-      if (newRW < 40) { newRW = 40; newLW = s.totalW - 40; }
-      var rawLpct = (newLW / s.totalW) * 100;
-      // 자기장 스냅만 적용 (시각 피드백 없음)
-      var lpct = _snapPct(rawLpct);
-      var rpct = 100 - lpct;
-      // 드래그 중에는 transition 없이 직접 적용 (손가락 밀착 추종)
-      s.left.style.transition = 'none';
-      s.right.style.transition = 'none';
-      s.left.style.flex  = lpct.toFixed(2) + ' 0 0';
-      s.right.style.flex = rpct.toFixed(2) + ' 0 0';
+      // 회색 가이드만 이동 — 실제 컬럼은 안 건드림 (노션식)
+      var leftRect = s.left.getBoundingClientRect();
+      var rightRect = s.right.getBoundingClientRect();
+      var minX = leftRect.left + MIN_COL_PX;
+      var maxX = rightRect.right - MIN_COL_PX;
+      var x = e.clientX;
+      if (x < minX) x = minX;
+      if (x > maxX) x = maxX;
+      if (_guideEl) _guideEl.style.left = (x - 1) + 'px';
+      s._lastX = x;
     }
 
     function _colEnd(e){
       if (!_colResizeState) return;
       var s = _colResizeState;
-      // 놓는 순간 마지막 스냅 (애니메이션 없이 좁은히)
-      var curLW = s.left.getBoundingClientRect().width;
-      var curLpct = (curLW / s.totalW) * 100;
-      var finalLpct = _snapPct(curLpct);
-      var finalRpct = 100 - finalLpct;
-      s.left.style.flex  = finalLpct.toFixed(2) + ' 0 0';
-      s.right.style.flex = finalRpct.toFixed(2) + ' 0 0';
+      _removeGuide();
       s.handle.classList.remove('is-dragging');
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
-      // 최종 flex 값을 block 의 data-column-flex 에 저장
-      var cols = Array.prototype.filter.call(s.wrap.children, function(c){ return c.classList.contains('ddl-column'); });
-      var flexVals = cols.map(function(c){
-        var v = (c.style.flex || '').split(' ')[0];
-        var fv = parseFloat(v);
-        return isNaN(fv) ? 1 : fv;
+      // mouseup 시점에 가이드 위치 기준으로 실제 컬럼 폭 확정
+      var wrapRect = s.wrap.getBoundingClientRect();
+      var leftRect = s.left.getBoundingClientRect();
+      var x = (s._lastX != null) ? s._lastX : e.clientX;
+      var newLW = x - leftRect.left;
+      var pairLwPct = (newLW / wrapRect.width) * 100;
+      var minPct = (MIN_COL_PX / wrapRect.width) * 100;
+      if (pairLwPct < minPct) pairLwPct = minPct;
+      if (pairLwPct > s.pairSum - minPct) pairLwPct = s.pairSum - minPct;
+      var pairRwPct = s.pairSum - pairLwPct;
+      // 실제 width 적용 (인접 두 컬럼만; 다른 컬럼은 건드리지 않음)
+      s.left.style.setProperty('width', pairLwPct.toFixed(4) + '%', 'important');
+      s.right.style.setProperty('width', pairRwPct.toFixed(4) + '%', 'important');
+      s.left.setAttribute('data-column-pct', pairLwPct.toFixed(4));
+      s.right.setAttribute('data-column-pct', pairRwPct.toFixed(4));
+      // 전체 pct 저장
+      var pcts = s.cols.map(function(c){
+        var v = parseFloat(c.getAttribute('data-column-pct') || '');
+        if (isNaN(v)) {
+          v = (c.getBoundingClientRect().width / wrapRect.width) * 100;
+        }
+        return v;
       });
-      var leftIdx = cols.indexOf(s.left);
-      var rightIdx = cols.indexOf(s.right);
-      if (leftIdx >= 0) flexVals[leftIdx] = finalLpct;
-      if (rightIdx >= 0) flexVals[rightIdx] = finalRpct;
-      s.block.setAttribute('data-column-flex', flexVals.map(function(v){ return v.toFixed(2); }).join(','));
+      s.block.setAttribute('data-column-pct', pcts.map(function(v){ return v.toFixed(4); }).join(','));
+      // 하위호환: data-column-flex 도 같은 값으로 병기 (모두 퍼센트)
+      s.block.setAttribute('data-column-flex', pcts.map(function(v){ return v.toFixed(4); }).join(','));
+      _colResizeState = null;
+    }
+
+    function _colKey(e){
+      if (e.key !== 'Escape') return;
+      if (!_colResizeState) return;
+      _removeGuide();
+      _colResizeState.handle.classList.remove('is-dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
       _colResizeState = null;
     }
 
@@ -30486,6 +30630,7 @@
       document.body.addEventListener('mousedown', _colStart, true);
       document.body.addEventListener('mousemove', _colMove, true);
       document.body.addEventListener('mouseup', _colEnd, true);
+      document.addEventListener('keydown', _colKey, true);
     }
     _install();
   })();
@@ -30517,14 +30662,23 @@
       wrap.style.setProperty('box-sizing', 'border-box', 'important');
     }
 
-    // 각 컬럼: 편집 마커 제거 + 인라인 flex 유지 (이미 style.flex 로 저장됨)
+    // 각 컬럼: 편집 마커 제거 + 인라인 width%/flex 유지
+    // p26l: flex-grow 대신 width% 로 저장하도록 변경. 이미 style.width 에 겁이있으면 그대로 유지.
     block.querySelectorAll('.ddl-column').forEach(function(col){
       col.removeAttribute('data-block-container');
       col.removeAttribute('data-column-idx');
       col.removeAttribute('contenteditable');
-      // p26h: min-width, min-height, padding, box-sizing 인라인으로 강제 (사이트 CSS 없어도 동작)
-      if (!col.style.flex) col.style.setProperty('flex', '1 1 0', 'important');
-      col.style.setProperty('min-width', '40px', 'important');
+      // p26l: flex 도식에서 width% 도식으로 이전.
+      //       만약 width 개별 미설정이면 data-column-pct 에서 복원, 그것도 없으면 균등으로.
+      if (!col.style.width) {
+        var pct = parseFloat(col.getAttribute('data-column-pct') || '');
+        if (!isNaN(pct) && pct > 0) {
+          col.style.setProperty('width', pct.toFixed(4) + '%', 'important');
+        }
+      }
+      // flex 란은 강제 (이전 버전이 남긴 flex 값 제거)
+      col.style.setProperty('flex', '0 0 auto', 'important');
+      col.style.setProperty('min-width', '60px', 'important');
       col.style.setProperty('min-height', '40px', 'important');
       col.style.setProperty('padding', '2px 4px', 'important');
       col.style.setProperty('box-sizing', 'border-box', 'important');
