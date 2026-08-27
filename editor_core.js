@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p25w
+ * 2vvena Editor Core - v2.0-β-p25x
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25w';
+  var VERSION = 'v2.0-β-p25x';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -11121,6 +11121,22 @@
         } catch(err){ console.warn('[open-format-apply]', err); }
         return;
       }
+      if (cmd === 'size-more'){
+        // p25x: 사이즈 › 버튼 → 서식 즉시 적용창 (open-format-apply 와 동일 진입점)
+        //       사용자 요청: 사이즈 버튼 옆 › 클릭 시 서식창 등장
+        e.preventDefault(); e.stopPropagation();
+        try { saveRange(); } catch(_){}
+        try {
+          if (typeof openHeaderPresetEditor === 'function'){
+            openHeaderPresetEditor(
+              { name: '', style: (typeof _headerDefaults === 'function' ? _headerDefaults('p') : {}) },
+              null,
+              { mode: 'apply-format', initialTab: 'props' }
+            );
+          }
+        } catch(err){ console.warn('[size-more]', err); }
+        return;
+      }
       // p22e: 모던 툴바 새 명령
       if (cmd === 'align-expand'){
         e.preventDefault(); e.stopPropagation();
@@ -17976,6 +17992,17 @@
       }
     }
     else if (tab === 'color') {
+      // p25x: 큰 스와치 버튼 추가 (native input 위쪽 · 사용자 요청)
+      html += '<div class="row" style="padding-bottom:0.8em; border-bottom:1px solid rgba(15,58,58,0.1); margin-bottom:0.8em;">'
+        + '<div class="row-label" style="font-weight:600;">현재 색상</div>'
+        + '<div style="display:flex; align-items:center; gap:0.6em;">'
+        + '<button type="button" class="ep-color-swatch" data-div-color-swatch="1" data-cur="' + toHex(opts.color) + '"'
+        + '        style="width:44px; height:44px; border:1px solid rgba(15,58,58,0.2);'
+        + '               border-radius:4px; padding:0; cursor:pointer;'
+        + '               background:' + toHex(opts.color) + '; flex-shrink:0;"'
+        + '        title="클릭해서 색 선택"></button>'
+        + '<span style="opacity:0.7; font-size:0.85em;">' + toHex(opts.color).toUpperCase() + '</span>'
+        + '</div></div>';
       html += renderColorSection('divider', opts.color);
     }
     else if (tab === 'size') {
@@ -18325,6 +18352,36 @@
         return;
       }
       // 정렬 / 도형 모드 / 채움 버튼 (data-value 있는 pop-btn)
+      // p25x: 구분선 [색상] 탭 스와치 → 커스텀 픽커 · opts.color 변경 · 실시간 · 취소 복원
+      var _dcSw = t.closest && t.closest('[data-div-color-swatch]');
+      if (_dcSw && selectedDivider) {
+        e.preventDefault(); e.stopPropagation();
+        var _dcOptsOrig = (typeof readDividerOpts === 'function') ? readDividerOpts(selectedDivider) : {};
+        var _dcOrig = _dcOptsOrig.color || '#0F3A3A';
+        var _dcApply = function(colorValue){
+          if (!colorValue) return;
+          var _o = (typeof readDividerOpts === 'function') ? readDividerOpts(selectedDivider) : {};
+          _o.color = colorValue;
+          if (_o.shapeMode === 'unified') _o.shapeStroke = colorValue;
+          if (typeof applyDividerOpts === 'function') applyDividerOpts(selectedDivider, _o);
+          _dcSw.style.background = colorValue;
+          _dcSw.setAttribute('data-cur', colorValue);
+          // 옆의 hex 라벨도 갱신
+          try { var _sib = _dcSw.parentNode && _dcSw.parentNode.querySelector('span'); if (_sib) _sib.textContent = String(colorValue).toUpperCase(); } catch(_){}
+        };
+        if (typeof openCustomColorPicker === 'function') {
+          openCustomColorPicker({
+            initial: _dcOrig,
+            context: 'divider',
+            detectFromSelection: false,
+            onChange: _dcApply,
+            onDone: _dcApply,
+            onCancel: function(){ _dcApply(_dcOrig); }
+          });
+        }
+        return;
+      }
+
       // p25v: 구분선 색 스와치 (shapeStroke / shapeFillColor) → 커스텀 픽커 · 실시간 · 취소 복원
       var _dvSw = t.closest && t.closest('[data-div-swatch]');
       if (_dvSw && selectedDivider) {
