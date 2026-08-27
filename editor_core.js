@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26f
+ * 2vvena Editor Core - v2.0-β-p26g
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26f';
+  var VERSION = 'v2.0-β-p26g';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2681,7 +2681,7 @@
     '.ddl-column > *:last-child  { margin-bottom: 0; }',
     /* 컬럼 리사이저 (컬럼 사이 세로 손잡이) */
     '.ddl-column-resizer {',
-    '  flex: 0 0 6px;',
+    '  flex: 0 0 12px;',
     '  align-self: stretch;',
     '  cursor: col-resize;',
     '  position: relative;',
@@ -2699,7 +2699,8 @@
     '  transition: background 120ms ease;',
     '  border-radius: 1px;',
     '}',
-    '.ep-columns-block:hover > .ddl-column-resizer::before { background: rgba(15,58,58,0.12); }',
+    '.ep-columns-block > .ddl-column-resizer::before { background: rgba(15,58,58,0.08); }',
+    '.ep-columns-block:hover > .ddl-column-resizer::before { background: rgba(15,58,58,0.22); }',
     '.ddl-column-resizer:hover::before { background: var(--point, #FF9A76) !important; }',
     '.ddl-column-resizer.is-dragging::before { background: var(--point, #FF9A76) !important; }',
     /* 편집기 안 표시 마커 (저장 시 ep- 접두사 제거) */
@@ -3759,8 +3760,14 @@
           return;
         }
 
-        // p20m: 콜아웃/접은글 body Enter - 진짜 노션식 (엔터 1번=새 문단, 엔터 2번=탈출)
-        if (target.classList && (target.classList.contains('callout-body') || target.classList.contains('ddl-fold-body'))) {
+        // p26g: 다단 컬럼도 콜아웃/접은글 body 와 동일하게 Enter 처리
+        //   target 이 컬럼 안의 <p> 이면 target 을 컬럼(.ddl-column) 으로 승격
+        if (target && target.tagName === 'P' && target.closest && target.closest('.ddl-column')) {
+          // target 을 컬럼으로 리매핑 - 콜아웃 body Enter 로직 재사용
+          target = target.closest('.ddl-column');
+        }
+        // p20m: 콜아웃/접은글/다단 컬럼 body Enter - 진짜 노션식 (엔터 1번=새 문단, 엔터 2번=탈출)
+        if (target.classList && (target.classList.contains('callout-body') || target.classList.contains('ddl-fold-body') || target.classList.contains('ddl-column'))) {
           var s = window.getSelection();
           if (!s.rangeCount) return;
           var r = s.getRangeAt(0);
@@ -5134,19 +5141,19 @@
         }
       },
       // p26f: 다단 블록 (Notion-style columns) - 2/3/4단
-      { id:'columns2', label:'2단', desc:'컬럼 2개 · 노션 스타일. 각 컬럼 안에 모든 블록 삽입 가능 · 드래그로 폭 조절', icon:'▮▮',
+      { id:'columns2', label:'2단', desc:'컬럼 2개 · 노션 스타일. 각 컬럼 안에 모든 블록 삽입 가능 · 드래그로 폭 조절', icon:'<svg width="18" height="14" viewBox="0 0 18 14" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="7" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="10" y="1" width="7" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
         keywords:['2단','2컬럼','columns','컬럼','multi','다단','2col','two column'],
         exec:function(originBlock){
           _insertColumnsFromSlash(originBlock, 2);
         }
       },
-      { id:'columns3', label:'3단', desc:'컬럼 3개 · 노션 스타일. 각 컬럼 안에 모든 블록 삽입 가능 · 드래그로 폭 조절', icon:'▮▮▮',
+      { id:'columns3', label:'3단', desc:'컬럼 3개 · 노션 스타일. 각 컬럼 안에 모든 블록 삽입 가능 · 드래그로 폭 조절', icon:'<svg width="20" height="14" viewBox="0 0 20 14" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="5" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="7.5" y="1" width="5" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="14" y="1" width="5" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
         keywords:['3단','3컬럼','columns','컬럼','다단','3col','three column'],
         exec:function(originBlock){
           _insertColumnsFromSlash(originBlock, 3);
         }
       },
-      { id:'columns4', label:'4단', desc:'컬럼 4개 · 노션 스타일. 각 컬럼 안에 모든 블록 삽입 가능 · 드래그로 폭 조절', icon:'▮▮▮▮',
+      { id:'columns4', label:'4단', desc:'컬럼 4개 · 노션 스타일. 각 컬럼 안에 모든 블록 삽입 가능 · 드래그로 폭 조절', icon:'<svg width="22" height="14" viewBox="0 0 22 14" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="4" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="6.5" y="1" width="4" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="12" y="1" width="4" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="17.5" y="1" width="4" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
         keywords:['4단','4컬럼','columns','컬럼','다단','4col','four column'],
         exec:function(originBlock){
           _insertColumnsFromSlash(originBlock, 4);
@@ -5156,37 +5163,66 @@
     ];
   }
 
-  // p26f: 다단 삽입 공용 (콜아웃 body 안 · 접은글 body 안 · 그 외 모든 컨테이너 지원)
+  // p26g: 다단 삽입 공용 (콜아웃/접은글/컬럼 안 · 최상위 · 노션식 컨테이너 모두 지원)
+  //   컬럼(.ddl-column) 안에서 슬래시 → editable=컬럼, block=.ep-columns-block(다단자체) 이 됨.
+  //   → 컨테이너 브랜치에서 anchor === body(=컬럼) 로 잡히면 컬럼 안에 새 다단 중첩 삽입.
   function _insertColumnsFromSlash(originBlock, nCols){
+    var newColBlk = null;
     if (slashInCalloutBody) {
-      // 컨테이너 안이면 그 컨테이너 안에 삽입
       var body = _prepareCalloutBodyForInsert();
       var anchor = _slashAnchorForCalloutBody(originBlock);
       if (anchor === body) {
-        var tmp = document.createElement('div');
-        tmp.className = 'editor-block';
-        tmp.setAttribute('data-block-type', 'p');
-        var tp = document.createElement('p');
-        tp.setAttribute('contenteditable', 'true');
-        tp.innerHTML = '<br>';
-        tmp.appendChild(makeBlockHandle());
-        tmp.appendChild(tp);
-        body.appendChild(tmp);
-        insertColumnsBlock(tmp, nCols);
-        if ((tp.textContent || '').trim() === '') { try { tmp.remove(); } catch(_){} }
+        // 컨테이너(콜아웃 body / 접은글 body / 컬럼) 안에 직접 삽입
+        //   컬럼의 경우 body 자체가 컨테이너 → 안의 마지막 자식 뒤에 삽입
+        // 임시 anchor 필요 없이 body 안 마지막 자식을 사용
+        var lastChild = body.lastElementChild;
+        if (lastChild) {
+          newColBlk = insertColumnsBlock(lastChild, nCols);
+        } else {
+          // body 완전 비어있으면 임시 p 만들고 그 뒤에 삽입
+          var tmpP = document.createElement('p');
+          tmpP.innerHTML = '<br>';
+          body.appendChild(tmpP);
+          newColBlk = insertColumnsBlock(tmpP, nCols);
+          try { tmpP.remove(); } catch(_){}
+        }
       } else {
         var wasEmpty = anchor && (anchor.textContent || '').trim() === '' && anchor.getAttribute && anchor.getAttribute('data-block-type') === 'p';
-        insertColumnsBlock(anchor, nCols);
+        newColBlk = insertColumnsBlock(anchor, nCols);
         if (wasEmpty && anchor.parentNode) { try { anchor.remove(); } catch(_){} }
       }
-      return;
-    }
-    var b = originBlock;
-    if (b && (b.textContent || '').trim() === '' && b.getAttribute && b.getAttribute('data-block-type') === 'p') {
-      insertColumnsBlock(b, nCols);
-      try { b.remove(); } catch(_){}
     } else {
-      insertColumnsBlock(b, nCols);
+      // 최상위 삽입 (contentEl 직속)
+      var b = originBlock;
+      var isEmpty = b && (b.textContent || '').trim() === '' && b.getAttribute && b.getAttribute('data-block-type') === 'p';
+      newColBlk = insertColumnsBlock(b, nCols);
+      if (isEmpty && b && b.parentNode) { try { b.remove(); } catch(_){} }
+    }
+    // 삽입 후 커서를 첫 컬럼 첫 P 로 강제 (여러 번, 원본 블록 삭제 후에도)
+    if (newColBlk) {
+      var _refocus = function(){
+        try {
+          var firstCol = newColBlk.querySelector('.ddl-column');
+          if (!firstCol) return;
+          var firstP = firstCol.querySelector(':scope > p') || firstCol;
+          try { firstCol.focus({ preventScroll: false }); } catch(_){}
+          var range = document.createRange();
+          if (firstP && firstP.tagName === 'P') {
+            range.selectNodeContents(firstP);
+            range.collapse(true);
+          } else {
+            range.setStart(firstCol, 0);
+            range.collapse(true);
+          }
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } catch(_){}
+      };
+      _refocus();
+      setTimeout(_refocus, 0);
+      setTimeout(_refocus, 30);
+      setTimeout(_refocus, 100);
     }
   }
 
@@ -30220,33 +30256,27 @@
     block.className = 'editor-block ep-columns-block';
     block.setAttribute('data-block-type', 'columns');
     block.setAttribute('data-columns-n', String(n));
+    // p26g: 다단 wrapper 는 contenteditable=false (컬럼만 편집)
     block.setAttribute('contenteditable', 'false');
     block.appendChild(makeBlockHandle());
 
     var wrap = document.createElement('div');
     wrap.className = 'ddl-columns-block';
-    // 초기 flex-basis: 모두 동일
-    var initFlex = [];
-    for (var i = 0; i < n; i++) initFlex.push(1);
-    block.setAttribute('data-column-flex', initFlex.join(','));
+    wrap.setAttribute('contenteditable', 'false');
 
     for (var j = 0; j < n; j++) {
-      // 컬럼
+      // p26g: 컬럼 자체가 contenteditable=true (콜아웃 body 와 동일 구조)
+      //   → 콜아웃 body 의 Enter/Backspace 커스텀 로직이 그대로 재사용됨
       var col = document.createElement('div');
       col.className = 'ddl-column';
       col.setAttribute('data-block-container', 'true');
       col.setAttribute('data-column-idx', String(j));
+      col.setAttribute('contenteditable', 'true');
       col.style.flex = '1 1 0';
-      // 컬럼 안에 빈 문단 블록 하나
-      var innerBlock = document.createElement('div');
-      innerBlock.className = 'editor-block';
-      innerBlock.setAttribute('data-block-type', 'p');
-      innerBlock.appendChild(makeBlockHandle());
+      // 컬럼 안 초기 콘텐츠: 빈 <p> 하나 (콜아웃 body 와 동일)
       var innerP = document.createElement('p');
-      innerP.setAttribute('contenteditable', 'true');
       innerP.innerHTML = '<br>';
-      innerBlock.appendChild(innerP);
-      col.appendChild(innerBlock);
+      col.appendChild(innerP);
       wrap.appendChild(col);
 
       // 리사이저 (마지막 컬럼 뒤에는 안 넣음)
@@ -30255,7 +30285,7 @@
         rs.className = 'ddl-column-resizer';
         rs.setAttribute('contenteditable', 'false');
         rs.setAttribute('title', '드래그해서 컬럼 폭 조절');
-        rs.setAttribute('data-column-resizer', String(j));  // 왼쪽 컬럼 idx
+        rs.setAttribute('data-column-resizer', String(j));
         wrap.appendChild(rs);
       }
     }
@@ -30268,18 +30298,48 @@
       contentEl.appendChild(block);
     }
 
-    // 커서 첫 컬럼으로
-    try {
-      var firstEditable = block.querySelector('.ddl-column p[contenteditable="true"]');
-      if (firstEditable) {
+    // p26g: 다단 뒤에 자동으로 빈 문단 하나 삽입 (탈출 대비 · 편집기 마지막 요소가 아닌 상태 확보)
+    //   → 이후 사용자가 다단 뒤에 텍스트 입력하기 쉬움, 편집기 자동 clean-up 방지
+    if (block.parentNode) {
+      var next = block.nextSibling;
+      var needTrailing = !next || (next.tagName === 'DIV' && next.classList && next.classList.contains('ep-columns-block'));
+      if (needTrailing) {
+        var trailingP = document.createElement('div');
+        trailingP.className = 'editor-block';
+        trailingP.setAttribute('data-block-type', 'p');
+        trailingP.appendChild(makeBlockHandle());
+        var tpEl = document.createElement('p');
+        tpEl.setAttribute('contenteditable', 'true');
+        tpEl.innerHTML = '<br>';
+        trailingP.appendChild(tpEl);
+        block.parentNode.insertBefore(trailingP, block.nextSibling);
+      }
+    }
+
+    // 커서 첫 컬럼 첫 P 안으로 — 즉시 + setTimeout 2단계 (slash exec 이후에도 유지)
+    function _focusFirstColumn(){
+      try {
+        var firstCol = block.querySelector('.ddl-column');
+        if (!firstCol) return;
+        var firstP = firstCol.querySelector(':scope > p') || firstCol;
+        // 페이지 상자적 focus (컬럼 자체가 contenteditable=true)
+        try { firstCol.focus({ preventScroll: false }); } catch(_){}
         var range = document.createRange();
-        range.selectNodeContents(firstEditable);
-        range.collapse(true);
+        if (firstP && firstP.tagName === 'P') {
+          range.selectNodeContents(firstP);
+          range.collapse(true);
+        } else {
+          range.setStart(firstCol, 0);
+          range.collapse(true);
+        }
         var sel = window.getSelection();
         sel.removeAllRanges();
         sel.addRange(range);
-      }
-    } catch(_){}
+      } catch(_){}
+    }
+    _focusFirstColumn();
+    setTimeout(_focusFirstColumn, 0);
+    setTimeout(_focusFirstColumn, 30);
 
     return block;
   }
