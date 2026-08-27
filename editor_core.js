@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p25t
+ * 2vvena Editor Core - v2.0-β-p25u
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25t';
+  var VERSION = 'v2.0-β-p25u';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -29659,7 +29659,11 @@
     if (headBgMode === 'gradient' || headBgMode === 'pattern') {
       var headBg2 = _hexOrDefault(block.getAttribute('data-fold-head-bg2'), headBgMode==='gradient'?'#FF9A76':'#ffffff');
       html += '<div class="row"><div class="row-label">' + (headBgMode==='gradient'?'헤더 색 2 (그라디언트 끝)':'헤더 패턴 색') + '</div>'
-        + '<div class="ep-color-row"><input type="color" data-fold-set="headBg2" value="' + escapeAttr(headBg2) + '"></div></div>';
+        + '<div class="ep-color-row"><button type="button" class="ep-color-swatch" data-fold-swatch="headBg2" data-cur="' + escapeAttr(headBg2) + '"'
+          + '        style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2);'
+          + '               border-radius:4px; padding:0; cursor:pointer;'
+          + '               background:' + escapeAttr(headBg2) + '; flex-shrink:0;"'
+          + '        title="클릭해서 색 선택"></button></div></div>';
     }
     if (headBgMode === 'gradient') {
       var hAngle = block.getAttribute('data-fold-head-gradient-angle') || block.getAttribute('data-fold-gradient-angle') || '90';
@@ -29721,7 +29725,11 @@
       if (bodyBgMode === 'gradient' || bodyBgMode === 'pattern') {
         var bBg2 = _hexOrDefault(block.getAttribute('data-fold-body-bg2'), bodyBgMode==='gradient'?'#F5F5F5':'#0F3A3A');
         html += '<div class="row"><div class="row-label">' + (bodyBgMode==='gradient'?'본문 색 2 (그라디언트 끝)':'본문 패턴 색') + '</div>'
-          + '<div class="ep-color-row"><input type="color" data-fold-set="bodyBg2" value="' + escapeAttr(bBg2) + '"></div></div>';
+          + '<div class="ep-color-row"><button type="button" class="ep-color-swatch" data-fold-swatch="bodyBg2" data-cur="' + escapeAttr(bBg2) + '"'
+          + '        style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2);'
+          + '               border-radius:4px; padding:0; cursor:pointer;'
+          + '               background:' + escapeAttr(bBg2) + '; flex-shrink:0;"'
+          + '        title="클릭해서 색 선택"></button></div></div>';
       }
       if (bodyBgMode === 'gradient') {
         var bAngle = block.getAttribute('data-fold-body-gradient-angle') || '90';
@@ -29820,7 +29828,11 @@
         + '</div>';
       if (bColorMode === 'custom') {
         html += '<div class="row"><div class="row-label">색상</div>'
-          + '<div class="ep-color-row"><input type="color" data-fold-set="borderColor" value="' + escapeAttr(_hexOrDefault(bColor, '#0F3A3A')) + '"></div></div>';
+          + '<div class="ep-color-row"><button type="button" class="ep-color-swatch" data-fold-swatch="borderColor" data-cur="' + escapeAttr(_hexOrDefault(bColor, '#0F3A3A')) + '"'
+          + '        style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2);'
+          + '               border-radius:4px; padding:0; cursor:pointer;'
+          + '               background:' + escapeAttr(_hexOrDefault(bColor, '#0F3A3A')) + '; flex-shrink:0;"'
+          + '        title="클릭해서 색 선택"></button></div></div>';
       }
     }
     // ─── 내부 구분선 섹션 ───
@@ -29907,7 +29919,11 @@
       html += '<div class="row"><div class="row-label">프리셋 팔레트</div>' + presetSwatches('head', headFg) + '</div>';
     } else {
       html += '<div class="row"><div class="row-label">글자색</div>'
-        + '<div class="ep-color-row"><input type="color" data-fold-set="headFg" value="' + escapeAttr(headFg) + '"></div></div>';
+        + '<div class="ep-color-row"><button type="button" class="ep-color-swatch" data-fold-swatch="headFg" data-cur="' + escapeAttr(headFg) + '"'
+          + '        style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2);'
+          + '               border-radius:4px; padding:0; cursor:pointer;'
+          + '               background:' + escapeAttr(headFg) + '; flex-shrink:0;"'
+          + '        title="클릭해서 색 선택"></button></div></div>';
     }
     html += '<div class="row"><div class="row-label" style="display:flex; justify-content:space-between; align-items:center;">'
       + '<span>폰트</span>'
@@ -29931,7 +29947,11 @@
       html += '<div class="row"><div class="row-label">프리셋 팔레트</div>' + presetSwatches('body', bodyFg) + '</div>';
     } else {
       html += '<div class="row"><div class="row-label">글자색</div>'
-        + '<div class="ep-color-row"><input type="color" data-fold-set="bodyFg" value="' + escapeAttr(bodyFg) + '"></div></div>';
+        + '<div class="ep-color-row"><button type="button" class="ep-color-swatch" data-fold-swatch="bodyFg" data-cur="' + escapeAttr(bodyFg) + '"'
+          + '        style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2);'
+          + '               border-radius:4px; padding:0; cursor:pointer;'
+          + '               background:' + escapeAttr(bodyFg) + '; flex-shrink:0;"'
+          + '        title="클릭해서 색 선택"></button></div></div>';
     }
     html += '<div class="row"><div class="row-label" style="display:flex; justify-content:space-between; align-items:center;">'
       + '<span>폰트</span>'
@@ -29976,11 +29996,24 @@
       var _fSwatch = e.target.closest && e.target.closest('[data-fold-swatch]');
       if (_fSwatch) {
         e.preventDefault(); e.stopPropagation();
-        var _fsKind = _fSwatch.getAttribute('data-fold-swatch'); // 'headBg' | 'bodyBg'
-        // 현재 색: data-cur 우선, 그 다음 실제 접은글 속성
-        var _fsAttrMap = { 'headBg':'data-fold-head-bg', 'bodyBg':'data-fold-body-bg' };
+        var _fsKind = _fSwatch.getAttribute('data-fold-swatch');
+        // p25u: 7개 kind 전부 매핑
+        //       'headBg' | 'bodyBg' | 'headBg2' | 'bodyBg2' | 'borderColor' | 'headFg' | 'bodyFg'
+        var _fsAttrMap = {
+          'headBg':'data-fold-head-bg',   'bodyBg':'data-fold-body-bg',
+          'headBg2':'data-fold-head-bg2', 'bodyBg2':'data-fold-body-bg2',
+          'borderColor':'data-fold-border-color',
+          'headFg':'data-fold-head-fg',   'bodyFg':'data-fold-body-fg'
+        };
+        // 픽커 context (텍스트 색은 'text', 테두리는 'border', 배경류는 'bg')
+        var _fsCtxMap = {
+          'headBg':'bg','bodyBg':'bg','headBg2':'bg','bodyBg2':'bg',
+          'borderColor':'border','headFg':'text','bodyFg':'text'
+        };
         var _fsAttr = _fsAttrMap[_fsKind];
-        var _fsCur = _fSwatch.getAttribute('data-cur') || (block.getAttribute(_fsAttr) || '#0F3A3A');
+        // kind별 기본 색 (배경류는 base 회색, 테두리는 어두운색, 글자류는 어두운색)
+        var _fsDefault = (_fsKind === 'headBg2' || _fsKind === 'bodyBg2') ? '#FFFFFF' : '#0F3A3A';
+        var _fsCur = _fSwatch.getAttribute('data-cur') || (block.getAttribute(_fsAttr) || _fsDefault);
         var _fsOrig = _fsCur;
         var _applyFoldSwatch = function(colorValue){
           if (!colorValue) return;
@@ -29993,7 +30026,7 @@
         if (typeof openCustomColorPicker === 'function') {
           openCustomColorPicker({
             initial: _fsCur,
-            context: 'bg',
+            context: (_fsCtxMap[_fsKind] || 'bg'),
             detectFromSelection: false,
             onChange: _applyFoldSwatch,
             onDone: _applyFoldSwatch,
