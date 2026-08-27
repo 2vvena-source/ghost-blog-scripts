@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26s';
+  var VERSION = 'v2.0-β-p26t';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -22446,8 +22446,212 @@
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 12. Ctrl+S 단축키
+  // 12. Ctrl+S 단축키 + p26t: 편집기 전용 단축키 세트
   // ═══════════════════════════════════════════════════════════
+
+  // p26t: 편집기 안에서만 작동하는 단축키 목록 (사용자님 요청)
+  //   Ctrl+B/I/U/S — 굵게/기울임/밑줄/취소선
+  //   Ctrl+E       — 선택 텍스트 → 인라인 코드 (없으면 코드블록 안내)
+  //   Ctrl+Q       — 콜아웃 편집창 (커서가 콜아웃 안에 있을 때만)
+  //   Ctrl+Shift+Q — 접은글 편집창 (커서가 접은글 안에 있을 때만 · Ctrl+W 는 브라우저 탭 닫기 충돌)
+  //   Ctrl+1/2/3   — 현재 커서 블록의 정렬 (왼쪽/가운데/오른쪽) — 모든 블록 타입 대상
+  //
+  //   각 항목의 안내 다이얼로그는 openDdlShortcutsHelp() 에서 표시.
+  function setupDdlEditorShortcuts(){
+    if (!contentEl) { log('[p26t] contentEl 없음 - 단축키 초기화 스킵'); return; }
+
+    // 편집기 안(contentEl 하위)에서 발생한 keydown 만 처리
+    function isInsideEditor(target){
+      if (!target || !target.closest) return false;
+      // 팝업/모달 안이면 편집기 단축키 발동 금지
+      if (target.closest('.ep-popup, .ep-popup-v2, .ddl-editor-popup, #ep-btn-popup, #ep-div-popup, #ep-cal-popup, #ep-img-popup, .ep-crop-popup, .ddl-editor-mask')) return false;
+      // contentEl 안에 있어야 함
+      return contentEl.contains(target);
+    }
+
+    function currentBlock(){
+      var sel = window.getSelection();
+      var anchor = sel && sel.anchorNode;
+      if (!anchor) return null;
+      var el = anchor.nodeType === 3 ? anchor.parentElement : anchor;
+      if (!el || !el.closest) return null;
+      return el.closest('.editor-block');
+    }
+
+    // 블록 정렬 적용 - .editor-block[data-align] 시스템 재사용
+    function applyBlockAlign(align){
+      var blk = currentBlock();
+      if (!blk) return false;
+      blk.setAttribute('data-align', align);
+      // 이미지 블록이면 내부 figure 에도 세팅 (p26q 이미지 정렬 함정)
+      var fig = blk.querySelector(':scope > figure.editor-image-figure');
+      if (fig) fig.setAttribute('data-align', align);
+      isDirty = true;
+      try { setStatus('정렬: ' + ({left:'왼쪽',center:'가운데',right:'오른쪽'}[align] || align), false); setTimeout(function(){ try{ setStatus(''); }catch(_){} }, 900); } catch(_){}
+      return true;
+    }
+
+    // 콜아웃 편집창 열기 (Ctrl+Q)
+    function tryOpenCalloutPopup(){
+      var sel = window.getSelection();
+      var anchor = sel && sel.anchorNode;
+      if (!anchor) return false;
+      var el = anchor.nodeType === 3 ? anchor.parentElement : anchor;
+      if (!el || !el.closest) return false;
+      var callout = el.closest('.callout-block, [data-block-type="callout"]');
+      if (!callout) return false;
+      // 실제 콜아웃 컨테이너 찾기 (callout-block 자체)
+      var box = callout.classList && callout.classList.contains('callout-block') ? callout : callout.querySelector('.callout-block');
+      if (!box) return false;
+      try {
+        selectedCallout = box;
+        if (typeof openCalloutPopup === 'function') { openCalloutPopup(); return true; }
+      } catch(err){ console.warn('[p26t] callout popup failed', err); }
+      return false;
+    }
+
+    // 접은글 편집창 열기 (Ctrl+Shift+Q)
+    function tryOpenFoldPopup(){
+      var sel = window.getSelection();
+      var anchor = sel && sel.anchorNode;
+      if (!anchor) return false;
+      var el = anchor.nodeType === 3 ? anchor.parentElement : anchor;
+      if (!el || !el.closest) return false;
+      var fold = el.closest('.ddl-fold-block, [data-block-type="fold"]');
+      if (!fold) return false;
+      var box = fold.classList && fold.classList.contains('ddl-fold-block') ? fold : fold.querySelector('.ddl-fold-block');
+      if (!box) return false;
+      try {
+        if (typeof selectedFold !== 'undefined') { try { selectedFold = box; } catch(_){} }
+        if (typeof openFoldPopup === 'function') { openFoldPopup(); return true; }
+      } catch(err){ console.warn('[p26t] fold popup failed', err); }
+      return false;
+    }
+
+    // 인라인 코드로 감싸기 (Ctrl+E)
+    function wrapAsInlineCode(){
+      var sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return false;
+      try { document.execCommand('insertHTML', false, '<code>' + escapeHtml(sel.toString()) + '</code>'); return true; }
+      catch(err){ console.warn('[p26t] inline code wrap failed', err); return false; }
+    }
+    function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    document.addEventListener('keydown', function(e){
+      var isCmd = e.ctrlKey || e.metaKey;
+      if (!isCmd) return;
+      // 편집기 컨텍스트 아니면 스킵 (팝업 안 · 다른 편집 상자)
+      if (!isInsideEditor(e.target)) return;
+
+      var k = (e.key || '').toLowerCase();
+
+      // Ctrl+B/I/U — 브라우저 기본 execCommand 사용 (이미 잘 됨. preventDefault 안 함)
+      // 다만 Ctrl+S 처럼 preventDefault 필요한 것들만 처리
+
+      // Ctrl+Shift+Q — 접은글 편집창
+      if (e.shiftKey && k === 'q'){
+        e.preventDefault();
+        if (!tryOpenFoldPopup()){
+          try { setStatus('접은글 안에 커서를 두고 다시 시도하세요', true); setTimeout(function(){ try{ setStatus(''); }catch(_){} }, 1400); } catch(_){}
+        }
+        return;
+      }
+
+      // Ctrl+Q — 콜아웃 편집창 (Shift 아닐 때)
+      if (!e.shiftKey && k === 'q'){
+        e.preventDefault();
+        if (!tryOpenCalloutPopup()){
+          try { setStatus('콜아웃 안에 커서를 두고 다시 시도하세요', true); setTimeout(function(){ try{ setStatus(''); }catch(_){} }, 1400); } catch(_){}
+        }
+        return;
+      }
+
+      // Ctrl+S 취소선 (브라우저 기본은 저장). Ctrl+S 는 이미 위 setupCtrlSaveShortcut 이 저장 용도로 쓰고 있음.
+      //   → 취소선은 Alt+S 로 대체하지 않고, 사용자님 원문 "Ctrl+S = 취소선" 을 존중하되
+      //   → Ctrl+Shift+S 로 매핑 (Ctrl+S 저장 유지 위해). 안내창에 명시.
+      if (e.shiftKey && k === 's'){
+        e.preventDefault();
+        try { document.execCommand('strikeThrough', false, null); } catch(_){}
+        return;
+      }
+
+      // Ctrl+E — 인라인 코드 감싸기
+      if (!e.shiftKey && k === 'e'){
+        e.preventDefault();
+        if (!wrapAsInlineCode()){
+          try { setStatus('먼저 텍스트를 드래그로 선택하세요', true); setTimeout(function(){ try{ setStatus(''); }catch(_){} }, 1400); } catch(_){}
+        }
+        return;
+      }
+
+      // Ctrl+1/2/3 — 현재 블록 정렬
+      if (!e.shiftKey && (k === '1' || k === '2' || k === '3')){
+        e.preventDefault();
+        var alignMap = { '1':'left', '2':'center', '3':'right' };
+        applyBlockAlign(alignMap[k]);
+        return;
+      }
+
+      // Ctrl+B/I/U 는 브라우저 기본 동작 그대로 (편집기 안에서 잘 작동함).
+      // preventDefault 안 함 - 브라우저의 execCommand 가 자동 실행됨.
+    }, true); // capture 단계 - 다른 리스너보다 먼저
+
+    log('[p26t] 편집기 단축키 설치 완료 (Ctrl+B/I/U/Shift+S/E/Q/Shift+Q/1/2/3)');
+  }
+
+  // p26t: 단축키 안내 다이얼로그
+  function openDdlShortcutsHelp(){
+    // 기존 openEditorConfirm 스타일 재사용 대신 자체 오버레이 - 정보 표시용
+    var mask = document.createElement('div');
+    mask.className = 'ddl-editor-mask';
+    mask.style.cssText = 'position:fixed;inset:0;background:rgba(15,58,58,0.35);z-index:99999;display:flex;align-items:center;justify-content:center;';
+    var box = document.createElement('div');
+    box.style.cssText = 'background:#fff;border-radius:14px;padding:22px 26px;min-width:360px;max-width:520px;box-shadow:0 8px 32px rgba(15,58,58,0.2);font-family:inherit;color:#0F3A3A;';
+    var rowStyle = 'display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed rgba(15,58,58,0.08);font-size:13px;';
+    var kbdStyle = 'font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:rgba(15,58,58,0.06);padding:2px 7px;border-radius:4px;border:1px solid rgba(15,58,58,0.12);font-size:12px;';
+    function row(k, d){ return '<div style="'+rowStyle+'"><span>'+d+'</span><span style="'+kbdStyle+'">'+k+'</span></div>'; }
+    box.innerHTML =
+      '<div style="font-size:15px;font-weight:700;margin-bottom:6px;">편집기 단축키</div>' +
+      '<div style="font-size:11px;opacity:0.55;margin-bottom:12px;">편집기 안에서만 작동 · Mac 은 Ctrl 대신 Cmd</div>' +
+      '<div style="margin-bottom:12px;">' +
+        '<div style="font-size:11px;font-weight:600;opacity:0.65;margin-bottom:4px;">서식</div>' +
+        row('Ctrl + B', '굵게') +
+        row('Ctrl + I', '기울임') +
+        row('Ctrl + U', '밑줄') +
+        row('Ctrl + Shift + S', '취소선') +
+        row('Ctrl + E', '선택 텍스트 → 인라인 코드') +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+        '<div style="font-size:11px;font-weight:600;opacity:0.65;margin-bottom:4px;">블록 정렬 (커서가 있는 블록 전체)</div>' +
+        row('Ctrl + 1', '왼쪽 정렬') +
+        row('Ctrl + 2', '가운데 정렬') +
+        row('Ctrl + 3', '오른쪽 정렬') +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+        '<div style="font-size:11px;font-weight:600;opacity:0.65;margin-bottom:4px;">편집창</div>' +
+        row('Ctrl + Q', '콜아웃 편집창 (콜아웃 안에서)') +
+        row('Ctrl + Shift + Q', '접은글 편집창 (접은글 안에서)') +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+        '<div style="font-size:11px;font-weight:600;opacity:0.65;margin-bottom:4px;">기타</div>' +
+        row('Ctrl + S', '저장 (초안)') +
+        row('F2', '편집기 진입') +
+      '</div>' +
+      '<div style="font-size:10.5px;opacity:0.5;line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px solid rgba(15,58,58,0.08);">' +
+        '※ Ctrl+W (탭 닫기) 는 브라우저가 잡아 편집기가 쓸 수 없어 접은글 단축키는 Ctrl+Shift+Q 로 설정되어 있습니다.' +
+      '</div>' +
+      '<div style="text-align:right;margin-top:14px;">' +
+        '<button id="ddl-shortcuts-close" style="padding:6px 16px;border:1px solid rgba(15,58,58,0.2);border-radius:6px;background:#0F3A3A;color:#fff;cursor:pointer;font-size:12px;">닫기</button>' +
+      '</div>';
+    mask.appendChild(box);
+    document.body.appendChild(mask);
+    function closeIt(){ try { mask.remove(); } catch(_){} }
+    mask.addEventListener('click', function(e){ if (e.target === mask) closeIt(); });
+    box.querySelector('#ddl-shortcuts-close').addEventListener('click', closeIt);
+    var esc = function(e){ if (e.key === 'Escape') { closeIt(); document.removeEventListener('keydown', esc); } };
+    document.addEventListener('keydown', esc);
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.openShortcutsHelp = openDdlShortcutsHelp; } catch(_){}
 
   function setupCtrlSaveShortcut(){
     document.addEventListener('keydown', function(e){
@@ -25481,6 +25685,12 @@
         if (hub === 'code') {  // p20a: 인라인 코드 스타일 편집
           mask.remove();
           setTimeout(function(){ try { openInlineCodeStyleEditor(); } catch(_){} }, 10);
+          return;
+        }
+        // p26t: 단축키 카드 → 안내 다이얼로그
+        if (hub === 'shortcut'){
+          mask.remove();
+          setTimeout(function(){ try { openDdlShortcutsHelp(); } catch(_){} }, 10);
           return;
         }
         // 나머지는 아직 구현 안 됨 — 토스트만
@@ -33863,6 +34073,7 @@
     initEditor(function(){
       setupEditHooks();
       setupCtrlSaveShortcut();
+      setupDdlEditorShortcuts(); // p26t: 편집기 전용 단축키 세트 (B/I/U/S/E/Q · Ctrl+Shift+Q · Ctrl+1/2/3)
       setupBeforeUnload();
 
       // β 기능
