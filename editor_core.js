@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25o';
+  var VERSION = 'v2.0-β-p25p';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -6047,36 +6047,25 @@
   function renderTextTab(){
     var box = calPopupLock || selectedCallout;
     if (!box) return '';
-    var body = box.querySelector('.callout-body');
-    var textColor = box.getAttribute('data-text-color') || 'auto';
     var fontFamily = box.getAttribute('data-font') || '';
-    var isTransparent = box.getAttribute('data-text-transparent') === '1';
-    var settings = loadCalloutSettings();
-    var groupKeys = ['notion', 'site'];
-    var userGroups = {};
-    (settings.userPresets || []).forEach(function(p){
-      var g = p.group || '내 프리셋';
-      if (!userGroups[g]) userGroups[g] = [];
-      userGroups[g].push(p);
-    });
-    Object.keys(userGroups).forEach(function(k){ if (groupKeys.indexOf(k) < 0) groupKeys.push(k); });
+
+    // p25p: 텍스트 색상은 서식 툴바(A 버튼)이 담당하도록 위임.
+    //   이 탭에서는 ‘자동 (배경 계열)’ 여부만 유지. 꺼지면 툴바 A 버튼으로 지정한 색이 적용.
+    //   기존 프리셋/직접 셀션, native <input type="color">, 글자색 투명도 슬라이더 제거.
+    var isAutoColor = (box.getAttribute('data-text-color') || 'auto') === 'auto';
 
     var html = ''
-      + '<div class="row"><div class="row-label">텍스트 색상 방식</div>'
-      + '<button class="pop-btn' + (textColor==='auto'?' is-active':'') + '" data-text-mode="auto">자동 (배경 계열)</button>'
-      + '<button class="pop-btn' + (textColor==='custom'?' is-active':'') + '" data-text-mode="custom">프리셋/직접</button>'
+      + '<div class="row" style="background:rgba(15,58,58,0.04); border-radius:6px; padding:0.6em 0.8em; margin-bottom:0.6em;">'
+      + '<div style="font-size:0.78em; opacity:0.8; line-height:1.5;">'
+      + '색상·강조·자간 같은 개별 텍스트 서식은 <b>상단 툴바 A 버튼</b>을 사용하세요. '
+      + '다른 배경 위에서 자동으로 읽힐 만한 색으로 맞춤 보고 싶으면 아래 <b>자동</b>을 켜세요.'
+      + '</div></div>'
+      + '<div class="row"><div class="row-label">배경 계열 자동 색</div>'
+      + '<label style="display:flex; align-items:center; gap:0.4em; font-size:0.85em;">'
+      + '<input type="checkbox" id="pop-text-auto-color"' + (isAutoColor?' checked':'') + '> 콜아웃 배경에 따라 자동으로 진하거나 연하게'
+      + '</label>'
+      + '<div style="font-size:0.72em; opacity:0.5; margin-top:0.3em;">꺼면 툴바 A 버튼으로 지정한 색이 적용됩니다.</div>'
       + '</div>';
-
-    if (textColor === 'custom') {
-      var curColor = box.style.color || '#0F3A3A';
-      // p12.2: 배경과 동일한 색상 섹션 (그룹+프리셋+직접+저장)
-      html += renderColorSection('text', curColor);
-      // p18i: 글자 색상 자체 알파
-      var textColorAlpha = box.getAttribute('data-text-color-alpha') || '100';
-      html += '<div class="row"><div class="row-label">글자색 투명도 (' + textColorAlpha + '%)</div>'
-        + '<input type="range" id="pop-text-color-alpha" min="0" max="100" step="5" value="' + textColorAlpha + '" style="width:100%;">'
-        + '</div>';
-    }
 
     // p20a: 폰트 라이브러리 통합 → p20b: 카드 선택 버튼 추가
     var _fontOpts = (window.__DDL_EDITOR && window.__DDL_EDITOR.buildFontSelectOptions)
@@ -6504,14 +6493,8 @@
         savePresetFromCurrent(_svTgt, _svNs);
         return;
       }
-      var textMode = e.target.closest('[data-text-mode]');
-      if (textMode) {
-        var m = textMode.getAttribute('data-text-mode');
-        box.setAttribute('data-text-color', m);
-        if (m === 'auto') applyAutoTextColor();
-        renderCalloutPopupBody();
-        return;
-      }
+      // p25p: [프리셋/직접] 토글 제거. 자동 색은 체크박스로 대체 (아래 change 리스너에서 처리).
+      //         기존 data-text-mode 서렝은 더 이상 있지 않음 · 이 분기 불필요.
       // p13g: 정렬 버튼
       var alignBtn = e.target.closest('[data-align-btn]');
       if (alignBtn) {
@@ -6662,6 +6645,8 @@
         if (lblIA) lblIA.innerHTML = '색상 투명도 (' + iAlpha + '%) <span style="font-size:0.7em; opacity:0.55;">— 도형 색만 반투명</span>';
         return;
       }
+      // p25p: 글자색 투명도 슬라이더 제거됨 · 이 분기는 이제 실행되지 않지만 안전 대시 유지
+      // (id 자체가 DOM 에 없으므로 t.id 비교 자체가 상시 비매칭)
       // p18i: 텍스트 색상 자체 알파
       if (t.id === 'pop-text-color-alpha') {
         var tAlpha = parseInt(t.value, 10);
@@ -6774,6 +6759,22 @@
       var box = calPopupLock || selectedCallout;
       if (!box) return;
       var t = e.target;
+
+      // p25p: 자동 색 체크박스 — 텍스트 색을 서식 툴바에 위임하되, 필요 시 배경 계열 자동 색 적용
+      if (t.id === 'pop-text-auto-color') {
+        if (t.checked) {
+          box.setAttribute('data-text-color', 'auto');
+          try { if (typeof applyAutoTextColor === 'function') applyAutoTextColor(); } catch(_){}
+        } else {
+          // 꺼짐 = 툴바가 직접 지정한 색 유지 (data-text-color 삭제 · 자동 로직 비활성)
+          box.setAttribute('data-text-color', 'custom');
+          // 이전에 자동으로 설정된 color 를 되돌려놓으면 툴바 서식이 보임
+          var bodyEl0 = box.querySelector('.callout-body');
+          if (bodyEl0) bodyEl0.style.color = '';
+          box.style.color = '';
+        }
+        return;
+      }
 
       if (t.id === 'pop-radius') {
         box.style.borderRadius = t.value + 'px';
