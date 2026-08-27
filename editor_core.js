@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p25z
+ * 2vvena Editor Core - v2.0-β-p26a
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25z';
+  var VERSION = 'v2.0-β-p26a';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -1752,6 +1752,13 @@
     '.ep-modern-toolbar .mtb-swatch:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }',
     '.ep-modern-toolbar .mtb-swatch.is-active {',
     '  box-shadow: 0 0 0 2px var(--point, #FF9A76), 0 0 0 3px #fff inset;',
+    '}',
+    // p26a: 최근 색 스와치 → 상단에 작은 점을 넣어 식별
+    '.ep-modern-toolbar .mtb-swatch-recent { position: relative; }',
+    '.ep-modern-toolbar .mtb-swatch-recent::after {',
+    '  content: ""; position: absolute; top: -2px; right: -2px;',
+    '  width: 5px; height: 5px; border-radius: 50%;',
+    '  background: var(--point, #FF9A76); border: 1px solid #fff;',
     '}',
     '.ep-modern-toolbar .mtb-swatch-custom {',
     '  width: 22px; height: 22px; border-radius: 4px;',
@@ -4394,6 +4401,31 @@
   };
   // 하위 호환
   var CALLOUT_GROUPS = GROUPS_BG;
+
+  // p26a: 사이트 그라디언트 프리셋 (구분선 등에서 재사용)
+  //   각 프리셋: { name, bg (색 1), bg2 (색 2), angle }
+  //   사이트 톤(딥그린/살구/담쟁이/모래) 기반 그라디언트
+  var GRADIENT_PRESETS = [
+    { name:'딥그린 → 살구', bg:'#0F3A3A', bg2:'#FF9A76', angle:90 },
+    { name:'살구 → 딥그린', bg:'#FF9A76', bg2:'#0F3A3A', angle:90 },
+    { name:'딥그린 → 투명',  bg:'#0F3A3A', bg2:'rgba(15,58,58,0)', angle:90 },
+    { name:'살구 → 투명',    bg:'#FF9A76', bg2:'rgba(255,154,118,0)', angle:90 },
+    { name:'담쟁이 → 모래', bg:'#3D5040', bg2:'#5C4F32', angle:90 },
+    { name:'모래 → 담쟁이', bg:'#5C4F32', bg2:'#3D5040', angle:90 },
+    { name:'살구 → 노랑',  bg:'#FF9A76', bg2:'#CB912F', angle:90 },
+    { name:'보라 → 분홍',    bg:'#9065B0', bg2:'#C14C8A', angle:90 },
+    { name:'파랑 → 초록',    bg:'#337EA9', bg2:'#448361', angle:90 },
+    { name:'무지개(3색)', bg:'#FF9A76', bg2:'#9065B0', angle:90, mid:'#337EA9' }
+  ];
+
+  // p26a: 그라디언트 CSS 문자열 생성 (재사용)
+  function _makeGradientCss(bg, bg2, angle, mid){
+    var a = (angle == null) ? 90 : angle;
+    if (mid) {
+      return 'linear-gradient(' + a + 'deg, ' + bg + ' 0%, ' + mid + ' 50%, ' + bg2 + ' 100%)';
+    }
+    return 'linear-gradient(' + a + 'deg, ' + bg + ' 0%, ' + bg2 + ' 100%)';
+  }
 
   function getGroupsForTarget(target){
     if (target === 'icon' || target === 'border' || target === 'divider') {
@@ -9558,6 +9590,25 @@
     var effectiveH = preset.heightPx * stroke;
 
     var styleVars = '--ddl-hr-shape-fill:' + shapeFill + '; --ddl-hr-shape-stroke:' + shapeStroke + ';';
+
+    // p26a: 그라디언트 모드 → CSS mask 로 SVG 를 복면하고 배경에 linear-gradient
+    if (opts.colorMode === 'gradient' && opts.bg2) {
+      var gradCss = _makeGradientCss(color, opts.bg2, opts.gradientAngle, opts.gradientMid);
+      // SVG 를 data:image 로 만들어 mask-image 로 쓰기 (currentColor → black 으로 치환)
+      var svgForMask = preset.svg
+        .replace(/currentColor/g, '#000')
+        .replace(/var\(--ddl-hr-shape-fill,[^)]*\)/g, '#000')
+        .replace(/var\(--ddl-hr-shape-stroke,[^)]*\)/g, '#000');
+      var svgUrl = 'url("data:image/svg+xml;utf8,' + encodeURIComponent(svgForMask) + '")';
+      var maskCss = '-webkit-mask:' + svgUrl + ' no-repeat center/100% 100%; '
+                  + 'mask:' + svgUrl + ' no-repeat center/100% 100%; '
+                  + 'background:' + gradCss + ';';
+      return '<span class="ddl-divider-svg ddl-divider-grad" style="'
+        + 'display:inline-block; vertical-align:middle; line-height:0; opacity:' + opacity + '; '
+        + widthStyle
+        + ' height:' + effectiveH + 'px; ' + maskCss + '"></span>';
+    }
+
     var inner = '<span class="ddl-divider-svg" style="'
       + 'display:inline-block; vertical-align:middle; line-height:0; '
       + 'color:' + color + '; opacity:' + opacity + '; '
@@ -9593,7 +9644,25 @@
     // 저장용은 var(--base) 못 씀 (컨텍스트 없음). 명시 색으로 hardcode.
     var shapeFill = isFilled ? shapeFillColor : '#F5F5F5';
 
-    // SVG 문자열 취득 후 currentColor → 실제 color 값으로 치환 + shape 변수도 치환
+    // p26a: 그라디언트 모드 → <span> + CSS mask 로 저장
+    if (opts.colorMode === 'gradient' && opts.bg2) {
+      var gradCssS = _makeGradientCss(color, opts.bg2, opts.gradientAngle, opts.gradientMid);
+      var svgForMaskS = preset.svg
+        .replace(/currentColor/g, '#000')
+        .replace(/var\(--ddl-hr-shape-fill,[^)]*\)/g, '#000')
+        .replace(/var\(--ddl-hr-shape-stroke,[^)]*\)/g, '#000');
+      var svgUrlS = 'url("data:image/svg+xml;utf8,' + encodeURIComponent(svgForMaskS) + '")';
+      var wPxS = preset.widthPx || 600;
+      var hPxS = preset.heightPx * stroke;
+      return '<span class="ddl-divider-svg ddl-divider-grad" style="'
+        + 'display:inline-block; vertical-align:middle; line-height:0; '
+        + 'width:' + wPxS + 'px; height:' + hPxS + 'px; opacity:' + opacity + '; '
+        + '-webkit-mask:' + svgUrlS + ' no-repeat center/100% 100%; '
+        + 'mask:' + svgUrlS + ' no-repeat center/100% 100%; '
+        + 'background:' + gradCssS + ';'
+        + '"></span>';
+    }
+
     var svgStr = preset.svg;
     svgStr = svgStr.replace(/currentColor/g, color);
     svgStr = svgStr.replace(/var\(--ddl-hr-shape-fill,[^)]*\)/g, shapeFill);
@@ -9696,7 +9765,12 @@
       shapeFill: block.getAttribute('data-shape-fill') || 'empty',
       shapeFillColor: block.getAttribute('data-shape-fill-color') || '#FFFFFF',
       shapeStroke: block.getAttribute('data-shape-stroke') || block.getAttribute('data-color') || '#555555',
-      align: block.getAttribute('data-align') || 'center'
+      align: block.getAttribute('data-align') || 'center',
+      // p26a: 그라디언트 지원
+      colorMode: block.getAttribute('data-color-mode') || 'solid',
+      bg2: block.getAttribute('data-bg2') || '#FF9A76',
+      gradientAngle: parseInt(block.getAttribute('data-gradient-angle') || '90', 10),
+      gradientMid: block.getAttribute('data-gradient-mid') || ''
     };
   }
 
@@ -9715,6 +9789,11 @@
     block.setAttribute('data-shape-fill-color', opts.shapeFillColor);
     block.setAttribute('data-shape-stroke', opts.shapeStroke);
     if (opts.align) block.setAttribute('data-align', opts.align);
+    // p26a: 그라디언트 속성
+    if (opts.colorMode) block.setAttribute('data-color-mode', opts.colorMode);
+    if (opts.bg2 != null) block.setAttribute('data-bg2', opts.bg2);
+    if (opts.gradientAngle != null) block.setAttribute('data-gradient-angle', String(opts.gradientAngle));
+    if (opts.gradientMid != null) block.setAttribute('data-gradient-mid', opts.gradientMid);
     var wrap = block.querySelector('.ep-divider-wrap');
     if (wrap) {
       wrap.innerHTML = renderDividerInner(opts);
@@ -10943,6 +11022,48 @@
   var _modernToolbarEl = null;
   var _modernToolbarState = { activeSize: 16, activeColor: 'var(--color, #0F3A3A)' };
 
+  // p26a: 모던 툴바 색상 - 최근 색 저장/로드 (최대 6개)
+  function _getModernRecentColors(){
+    try {
+      var raw = GM_getValue('modern_recent_colors', '');
+      var arr = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(arr)) return [];
+      return arr.slice(0, 6);
+    } catch(_) { return []; }
+  }
+  function _pushModernRecentColor(color){
+    if (!color) return;
+    try {
+      var arr = _getModernRecentColors();
+      // 이미 있으면 제거 후 먼 앞으로
+      arr = arr.filter(function(c){ return c !== color; });
+      arr.unshift(color);
+      arr = arr.slice(0, 6);
+      GM_setValue('modern_recent_colors', JSON.stringify(arr));
+    } catch(_){}
+  }
+  // 모던 툴바 색 로우 다시 그리기 (최근 색 갱신 시)
+  function _refreshModernColorRow(){
+    if (!_modernToolbarEl) return;
+    var row = _modernToolbarEl.querySelector('.mtb-color-row');
+    if (!row) return;
+    // 기존 .mtb-swatch-recent 제거
+    row.querySelectorAll('.mtb-swatch-recent').forEach(function(el){ el.parentNode && el.parentNode.removeChild(el); });
+    // 최근 색을 + 버튼 앞에 삽입
+    var plusBtn = row.querySelector('.mtb-swatch-custom');
+    var recent = _getModernRecentColors();
+    recent.slice(0, 4).forEach(function(c){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mtb-swatch mtb-swatch-recent';
+      b.setAttribute('data-color', c);
+      b.style.background = c;
+      b.title = '최근 색';
+      if (plusBtn) row.insertBefore(b, plusBtn);
+      else row.appendChild(b);
+    });
+  }
+
   function _getToolbarStyle(){
     try { return localStorage.getItem('ddl.toolbarStyle') || 'classic'; }
     catch(_){ return 'classic'; }
@@ -11077,6 +11198,8 @@
 
     document.body.appendChild(bar);
     _modernToolbarEl = bar;
+    // p26a: 최근 색 하이드로이션
+    try { _refreshModernColorRow(); } catch(_){}
 
     // 클릭 핸들러 (직접 execCommand 보존. 생속적 서식은 기존 클래식 툴바 로직을 재사용하는 것이 안전 —
     // 이번 라운드는 UI 구조만 만든다. 실제 서식 부여는 다음 AI 세션에서 연결 권장.)
@@ -11237,6 +11360,36 @@
         try { document.execCommand('fontSize', false, '3'); } catch(_){}
         return;
       }
+      // p26a: '+' 커스텀 색 → openCustomColorPicker 颜믄 팭오버
+      if (cmd === 'custom-color'){
+        e.preventDefault(); e.stopPropagation();
+        try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
+        try {
+          if (typeof openCustomColorPicker === 'function'){
+            openCustomColorPicker({
+              initial: _modernToolbarState.activeColor || '#0F3A3A',
+              context: 'text',
+              detectFromSelection: false,
+              onChange: function(colorValue){
+                if (!colorValue) return;
+                try { if (typeof restoreRange === 'function') restoreRange(); } catch(_){}
+                try { document.execCommand('foreColor', false, colorValue); } catch(_){}
+                _modernToolbarState.activeColor = colorValue;
+              },
+              onDone: function(colorValue){
+                if (!colorValue) return;
+                try { if (typeof restoreRange === 'function') restoreRange(); } catch(_){}
+                try { document.execCommand('foreColor', false, colorValue); } catch(_){}
+                _modernToolbarState.activeColor = colorValue;
+                // 최근 색에 추가
+                try { _pushModernRecentColor(colorValue); _refreshModernColorRow(); } catch(_){}
+              }
+            });
+          }
+        } catch(err){ try { console.warn('[custom-color]', err); } catch(_){} }
+        return;
+      }
+
       // 색 스와치 활성 토글
       var swatch = e.target.closest('.mtb-swatch');
       if (swatch){
@@ -11245,6 +11398,8 @@
         var color = swatch.getAttribute('data-color');
         _modernToolbarState.activeColor = color;
         try { document.execCommand('foreColor', false, color); } catch(_){}
+        // p26a: 최근 색에 추가 (최근 색 자체에서 클릭해도 맨 앞으로 이동)
+        try { _pushModernRecentColor(color); _refreshModernColorRow(); } catch(_){}
         return;
       }
       // 기본 서식 명령 (bold/italic/underline/justify*)
@@ -11386,10 +11541,42 @@
     bar.style.top  = y + 'px';
   }
 
+  // p26a: 선택 텍스트의 실제 font-family 를 읽어서 라벨 반환
+  //   여러 노드가 섞이면 가장 앞의(anchorNode) 것 사용
+  function _detectSelectionFontFamily(){
+    try {
+      var sel = window.getSelection && window.getSelection();
+      if (!sel || sel.rangeCount === 0) return null;
+      var range = sel.getRangeAt(0);
+      var node = range.startContainer;
+      if (node && node.nodeType === 3) node = node.parentElement;
+      if (!node) return null;
+      var ff = window.getComputedStyle(node).fontFamily || '';
+      return ff;
+    } catch(_) { return null; }
+  }
+
+  // p26a: font-family 문자열에서 첫 번째 폰트 이름 추출
+  function _shortFontName(ff){
+    if (!ff) return '';
+    var first = String(ff).split(',')[0].trim();
+    return first.replace(/^['"]|['"]$/g, '');
+  }
+
   function openModernToolbar(rect){
     var bar = setupModernToolbar();
     _positionModernToolbar(bar, rect);
     bar.classList.add('is-open');
+    // p26a: 폰트 버튼 라벨을 선택 텍스트의 실제 폰트로 갱신
+    try {
+      var ff = _detectSelectionFontFamily();
+      var tfBtn = bar.querySelector('.mtb-typeface-btn');
+      if (tfBtn && ff) {
+        var shortName = _shortFontName(ff) || 'Font';
+        tfBtn.textContent = shortName;
+        tfBtn.setAttribute('data-cur-font', ff);
+      }
+    } catch(_){}
   }
 
   function closeModernToolbar(){
@@ -14647,9 +14834,11 @@
     pop.appendChild(head);
 
     // 그리드 컨테이너
+    // p26a: max-height 를 뷰포트 높이의 65% 로 유연하게 지정 (폰트 많을 수록 길어지지만 화면 밖으로 리지 않음)
+    var _maxH = Math.max(240, Math.floor(window.innerHeight * 0.55));
     var gridWrap = document.createElement('div');
     gridWrap.className = 'ddl-scroll-invisible';
-    gridWrap.style.cssText = 'padding: 8px; max-height: 320px; overflow-y: auto;';
+    gridWrap.style.cssText = 'padding: 8px; max-height: ' + _maxH + 'px; overflow-y: auto; overscroll-behavior: contain;';
     pop.appendChild(gridWrap);
 
     function _selectValue(font){
@@ -18090,9 +18279,16 @@
       }
     }
     else if (tab === 'color') {
-      // p25x: 큰 스와치 버튼 추가 (native input 위쪽 · 사용자 요청)
+      var _cMode = opts.colorMode || 'solid';
+      // p26a: 모드 선택 버튼 (단일 / 그라디언트)
+      html += '<div class="row"><div class="row-label">색상 모드</div><div>'
+        + '  <button type="button" class="pop-btn' + (_cMode==='solid'?' is-active':'') + '" data-div-set="colorMode" data-value="solid">단일</button>'
+        + '  <button type="button" class="pop-btn' + (_cMode==='gradient'?' is-active':'') + '" data-div-set="colorMode" data-value="gradient">그라디언트</button>'
+        + '</div></div>';
+
+      // p25x: 큰 스와치 버튼 (native input 위쪽 · 사용자 요청)
       html += '<div class="row" style="padding-bottom:0.8em; border-bottom:1px solid rgba(15,58,58,0.1); margin-bottom:0.8em;">'
-        + '<div class="row-label" style="font-weight:600;">현재 색상</div>'
+        + '<div class="row-label" style="font-weight:600;">' + (_cMode==='gradient' ? '색 1' : '현재 색상') + '</div>'
         + '<div style="display:flex; align-items:center; gap:0.6em;">'
         + '<button type="button" class="ep-color-swatch" data-div-color-swatch="1" data-cur="' + toHex(opts.color) + '"'
         + '        style="width:44px; height:44px; border:1px solid rgba(15,58,58,0.2);'
@@ -18101,6 +18297,43 @@
         + '        title="클릭해서 색 선택"></button>'
         + '<span style="opacity:0.7; font-size:0.85em;">' + toHex(opts.color).toUpperCase() + '</span>'
         + '</div></div>';
+
+      // p26a: 그라디언트 모드 → 색 2 스와치 + 각도 + 프리셋
+      if (_cMode === 'gradient') {
+        var bg2Hex = toHex(opts.bg2 || '#FF9A76');
+        html += '<div class="row" style="padding-bottom:0.8em; border-bottom:1px solid rgba(15,58,58,0.1); margin-bottom:0.8em;">'
+          + '<div class="row-label" style="font-weight:600;">색 2</div>'
+          + '<div style="display:flex; align-items:center; gap:0.6em;">'
+          + '<button type="button" class="ep-color-swatch" data-div-color-swatch="2" data-cur="' + bg2Hex + '"'
+          + '        style="width:44px; height:44px; border:1px solid rgba(15,58,58,0.2);'
+          + '               border-radius:4px; padding:0; cursor:pointer;'
+          + '               background:' + bg2Hex + '; flex-shrink:0;"'
+          + '        title="클릭해서 색 선택"></button>'
+          + '<span style="opacity:0.7; font-size:0.85em;">' + bg2Hex.toUpperCase() + '</span>'
+          + '</div></div>';
+
+        // 각도 슬라이더
+        var curAng = (opts.gradientAngle != null) ? opts.gradientAngle : 90;
+        html += '<div class="row"><div class="row-label">그라디언트 각도 (' + curAng + '°)</div>'
+          + '<input type="range" data-div-set="gradientAngle" min="0" max="360" step="5" value="' + curAng + '" style="width:100%;">'
+          + '<div style="font-size:0.72em; opacity:0.55; margin-top:0.2em;">90° = 좌→우, 0° = 하→상, 180° = 상→하</div>'
+          + '</div>';
+
+        // 그라디언트 프리셋 그리드
+        html += '<div class="row"><div class="row-label">그라디언트 프리셋</div>'
+          + '<div class="ep-preset-grid" style="grid-template-columns:repeat(auto-fill, minmax(80px, 1fr)); gap:6px;">';
+        GRADIENT_PRESETS.forEach(function(gp, i){
+          var gCss = _makeGradientCss(gp.bg, gp.bg2, gp.angle, gp.mid);
+          html += '<div class="ep-preset-chip" data-div-gradient-preset="' + i + '" style="cursor:pointer;">'
+            + '<div class="cp-swatch" style="height:24px; border-radius:4px; background:' + gCss + ';"></div>'
+            + '<div style="font-size:0.7em; margin-top:3px; text-align:center;">' + escapeHtml(gp.name) + '</div>'
+            + '</div>';
+        });
+        html += '</div></div>';
+
+        html += '<div style="font-size:0.75em; opacity:0.6; margin-top:0.4em; padding:0.5em; background:rgba(255,154,118,0.08); border-radius:4px;">💡 그라디언트는 CSS mask 방식으로 적용됩니다. 일부 구본 브라우저에서는 지원 안될 수 있습니다.</div>';
+      }
+
       html += renderColorSection('divider', opts.color);
     }
     else if (tab === 'size') {
@@ -18451,16 +18684,22 @@
       }
       // 정렬 / 도형 모드 / 채움 버튼 (data-value 있는 pop-btn)
       // p25x: 구분선 [색상] 탭 스와치 → 커스텀 픽커 · opts.color 변경 · 실시간 · 취소 복원
+      // p26a: data-div-color-swatch="1" → color, "2" → bg2
       var _dcSw = t.closest && t.closest('[data-div-color-swatch]');
       if (_dcSw && selectedDivider) {
         e.preventDefault(); e.stopPropagation();
+        var _dcKind = _dcSw.getAttribute('data-div-color-swatch');
         var _dcOptsOrig = (typeof readDividerOpts === 'function') ? readDividerOpts(selectedDivider) : {};
-        var _dcOrig = _dcOptsOrig.color || '#0F3A3A';
+        var _dcOrig = (_dcKind === '2') ? (_dcOptsOrig.bg2 || '#FF9A76') : (_dcOptsOrig.color || '#0F3A3A');
         var _dcApply = function(colorValue){
           if (!colorValue) return;
           var _o = (typeof readDividerOpts === 'function') ? readDividerOpts(selectedDivider) : {};
-          _o.color = colorValue;
-          if (_o.shapeMode === 'unified') _o.shapeStroke = colorValue;
+          if (_dcKind === '2') {
+            _o.bg2 = colorValue;
+          } else {
+            _o.color = colorValue;
+            if (_o.shapeMode === 'unified') _o.shapeStroke = colorValue;
+          }
           if (typeof applyDividerOpts === 'function') applyDividerOpts(selectedDivider, _o);
           _dcSw.style.background = colorValue;
           _dcSw.setAttribute('data-cur', colorValue);
@@ -18476,6 +18715,26 @@
             onDone: _dcApply,
             onCancel: function(){ _dcApply(_dcOrig); }
           });
+        }
+        return;
+      }
+
+      // p26a: 그라디언트 프리셋 클릭
+      var _gpBtn = t.closest && t.closest('[data-div-gradient-preset]');
+      if (_gpBtn && selectedDivider) {
+        e.preventDefault(); e.stopPropagation();
+        var _gpIdx = parseInt(_gpBtn.getAttribute('data-div-gradient-preset'), 10);
+        var _gp = GRADIENT_PRESETS[_gpIdx];
+        if (_gp) {
+          var _gOpts = readDividerOpts(selectedDivider);
+          _gOpts.colorMode = 'gradient';
+          _gOpts.color = _gp.bg;
+          _gOpts.bg2 = _gp.bg2;
+          _gOpts.gradientAngle = _gp.angle || 90;
+          _gOpts.gradientMid = _gp.mid || '';
+          if (_gOpts.shapeMode === 'unified') _gOpts.shapeStroke = _gp.bg;
+          applyDividerOpts(selectedDivider, _gOpts);
+          renderDividerPopupBody('color');
         }
         return;
       }
@@ -18521,6 +18780,9 @@
           if (val === 'unified') opts.shapeStroke = opts.color;
         } else if (setKey === 'shapeFill') {
           opts.shapeFill = val;
+        } else if (setKey === 'colorMode') {
+          // p26a: 단일 / 그라디언트 모드 전환
+          opts.colorMode = val;
         }
         applyDividerOpts(selectedDivider, opts);
         // 현재 활성 탭 다시 그리기
@@ -18546,6 +18808,14 @@
         var opts = readDividerOpts(selectedDivider);
         if (setKey === 'stroke') opts.stroke = parseFloat(t.value);
         else if (setKey === 'opacity') opts.opacity = parseFloat(t.value);
+        else if (setKey === 'gradientAngle') {  // p26a: 그라디언트 각도
+          opts.gradientAngle = parseInt(t.value, 10);
+          // 라벨만 즉시 갱신 (전체 리렌더링은 안 함)
+          try {
+            var _al = t.parentNode && t.parentNode.querySelector('.row-label');
+            if (_al) _al.textContent = '그라디언트 각도 (' + opts.gradientAngle + '°)';
+          } catch(_){}
+        }
         else if (setKey === 'shapeStroke') opts.shapeStroke = t.value;
         else if (setKey === 'shapeFillColor') opts.shapeFillColor = t.value;
         else if (setKey === 'imageWidth') opts.imageWidth = parseInt(t.value, 10);
