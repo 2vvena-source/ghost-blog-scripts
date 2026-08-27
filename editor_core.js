@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26y';
+  var VERSION = 'v2.0-β-p26z';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -22763,24 +22763,11 @@
   }
 
   function installSidebarLink(){
-    if (document.querySelector('.ddl-editor-link')) return;
-    var tries = 0;
-    var timer = setInterval(function(){
-      tries++;
-      if (document.querySelector('.ddl-editor-link')) { clearInterval(timer); return; }
-      // 사이드바 A 프로필 블록 찾기
-      var target = document.querySelector('.ddl-profile') || document.querySelector('.ddl-block');
-      if (target) {
-        var link = document.createElement('a');
-        link.className = 'ddl-editor-link';
-        link.href = '/editor/';
-        link.textContent = '\u270e 새 글 쓰기 (F2)';
-        target.insertBefore(link, target.firstChild);
-        clearInterval(timer);
-        log('사이드바 링크 삽입');
-      }
-      if (tries > 30) clearInterval(timer);
-    }, 300);
+    // p26z: 사용자 요청 — 홈 화면 '새 글 쓰기 (F2)' 링크 제거
+    //   그대로 유지하됔 기존에 삽입된 링크가 DOM 에 남아있으면 이 함수가 재호출될 때 지움
+    var existing = document.querySelectorAll('.ddl-editor-link');
+    existing.forEach(function(el){ if (el.parentNode) el.parentNode.removeChild(el); });
+    // F2 단축키 진입은 별도 함수에 있으므로 그대로 유지됨
   }
 
   // ═══════════════════════════════════════════════════════════
