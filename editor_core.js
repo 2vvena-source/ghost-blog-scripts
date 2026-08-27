@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26w';
+  var VERSION = 'v2.0-β-p26x';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2873,15 +2873,19 @@
     '.ddl-slider-btn:hover { background: rgba(15,58,58,0.8); opacity: 1 !important; }',
     '.ddl-slider-prev { left: 12px; }',
     '.ddl-slider-next { right: 12px; }',
-    /* 하단 도트 인디케이터 */
+    /* 하단 도트 인디케이터 · p26x: 편집기 안 항상 잘 보이게 (배경박스+z-index 20+box-shadow) */
     '.ddl-slider-dots {',
     '  position: absolute;',
-    '  bottom: 12px;',
+    '  bottom: 10px;',
     '  left: 50%;',
     '  transform: translateX(-50%);',
     '  display: flex;',
-    '  gap: 8px;',
-    '  z-index: 10;',
+    '  gap: 7px;',
+    '  z-index: 20;',
+    '  padding: 5px 9px;',
+    '  background: rgba(15,58,58,0.35);',
+    '  border-radius: 999px;',
+    '  pointer-events: auto;',
     '}',
     '.ddl-slider-dot {',
     '  width: 8px;',
@@ -2889,8 +2893,9 @@
     '  border-radius: 50%;',
     '  background: rgba(245,245,245,0.55);',
     '  cursor: pointer;',
-    '  border: 1px solid rgba(15,58,58,0.15);',
+    '  border: none;',
     '  padding: 0;',
+    '  box-shadow: 0 1px 2px rgba(0,0,0,0.35);',
     '  transition: background 180ms ease, transform 180ms ease;',
     '}',
     '.ddl-slider-dot.is-current { background: #F5F5F5; transform: scale(1.25); }',
@@ -32267,6 +32272,16 @@
 
     // p26v: 애니메이션 모드 변수로 저장
     var _anim = slider.getAttribute('data-anim') || 'slide';
+    // p26x: data-anim 명시적 재설정 (sanitizer나 재하이드러이션으로 속성 잎을 수 있음)
+    slider.setAttribute('data-anim', _anim);
+    // p26x: fade/zoom 모드에서 첫 아이템에 is-current 강제 보장 (사이트 런타임 이전에도 보이도록)
+    if (_anim === 'fade' || _anim === 'zoom') {
+      var _anyCurrent = slider.querySelector('.ddl-slider-item.is-current');
+      if (!_anyCurrent) {
+        var _firstItem = slider.querySelector('.ddl-slider-item');
+        if (_firstItem) _firstItem.classList.add('is-current');
+      }
+    }
 
     var track = slider.querySelector(':scope > .ddl-slider-viewport > .ddl-slider-track');
     if (track) {
