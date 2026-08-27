@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25m';
+  var VERSION = 'v2.0-β-p25n';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -5608,6 +5608,8 @@
     else if (calPopupTab === 'border') body.innerHTML = renderBorderTab();
     else if (calPopupTab === 'text') body.innerHTML = renderTextTab();
     // p12.3: 리스너 안 붙임 (setupPopupBodyListeners가 이미 처리)
+    // p25n: [배경] 탭이 다시 렌더될 때마다 그라데이션/패턴 미리보기 바 초기 갱신
+    try { if (calPopupTab === 'bg') _updateGradientPreviewBar(box); } catch(_){}
   }
 
   function renderIconTab(){
@@ -5855,6 +5857,19 @@
       + '<button class="pop-btn' + (bgMode==='image'?' is-active':'') + '" data-cal-set="bgMode" data-value="image">이미지</button>'
       + '</div></div>';
 
+    // p25n: 그라데이션/패턴 미리보기 바 (긴 가로바) — 사용자 요청
+    //   색 1 + 색 2 + 각도 + 투명도가 모두 반영된 결과를 미리 보여줌
+    //   그라데이션과 패턴 모드에서만 표시 (단색/이미지는 이미 스와치가 결과색 자체라 있으면 중복)
+    if (bgMode === 'gradient' || bgMode === 'pattern') {
+      html += '<div class="row" data-gradient-preview-row style="margin-bottom:0.6em;">'
+        + '<div class="row-label">미리보기</div>'
+        + '<div class="ep-gradient-preview-bar" data-cal-preview'
+        + ' style="width:100%; height:44px; border-radius:6px; border:1px solid rgba(15,58,58,0.2);'
+        + ' background-color:#F5F5F5;'  // 메원(fallback)
+        + ' background-image:none; background-size:auto; background-position:0 0; background-repeat:repeat;"></div>'
+        + '</div>';
+    }
+
     // 이미지 모드가 아니면 색 1 섹션 (namespace: callout-bg)
     // p25l: <input type="color"> → 커스텀 스와치 버튼으로 교체 (openCustomColorPicker 사용)
     //       데이터 속성은 동일: data-cal-set="bg" · change/input 대신 버튼 클릭 시 커스텀 픽커 호출
@@ -6008,9 +6023,14 @@
       html += '<div class="row"><div class="row-label">투명도 (' + borderOpacity + '%)</div>'
         + '<input type="range" id="pop-border-opacity" min="0" max="100" step="5" value="' + borderOpacity + '" style="width:100%;"></div>';
 
-      // 색상 (단색)
+      // 색상 (단색) — p25n: 커스텀 스와치로 교체 (bg/bg2와 동일 패턴)
+      var _borderHex = toHex(borderColor);
       html += '<div class="row"><div class="row-label">테두리 색</div>'
-        + '<div class="ep-color-row"><input type="color" data-cal-set="borderColor" value="' + escapeAttr(toHex(borderColor)) + '"></div></div>';
+        + '<div class="ep-color-row">'
+        + '<button type="button" class="ep-color-swatch" data-cal-swatch="borderColor" data-cur="' + escapeAttr(_borderHex) + '"'
+        + ' style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2); border-radius:4px; padding:0; cursor:pointer; background:' + escapeAttr(_borderHex) + '; flex-shrink:0;"'
+        + ' title="클릭해서 색 선택"></button>'
+        + '</div></div>';
       html += renderColorSection('border', borderColor, 'callout-border');
 
       // 컷아웃
@@ -6154,10 +6174,38 @@
                 try { applyCalloutBg(box); } catch(_){}
                 bg2Swatch.style.background = colorValue;
                 bg2Swatch.setAttribute('data-cur', colorValue);
+                // p25n: 미리보기 바 갱신
+                try { _updateGradientPreviewBar(box); } catch(_){}
               }
             });
           }
         } catch(err){ try { console.warn('[cal-bg2-swatch]', err); } catch(_){} }
+        return;
+      }
+
+      // p25n: 테두리색 스와치 — bg/bg2 와 동일 패턴
+      // 기존 data-cal-set='borderColor' input 분기와 동일: data-border-color + data-border-hex + applyBorderToBox
+      var borderColorSwatch = e.target.closest('[data-cal-swatch="borderColor"]');
+      if (borderColorSwatch){
+        e.preventDefault(); e.stopPropagation();
+        var _curBc = borderColorSwatch.getAttribute('data-cur') || box.getAttribute('data-border-hex') || box.getAttribute('data-border-color') || '#0F3A3A';
+        try {
+          if (typeof openCustomColorPicker === 'function'){
+            openCustomColorPicker({
+              initial: _curBc,
+              context: 'bg',
+              detectFromSelection: false,
+              onDone: function(colorValue){
+                if (!colorValue) return;
+                box.setAttribute('data-border-color', colorValue);
+                box.setAttribute('data-border-hex', colorValue);
+                try { applyBorderToBox(box); } catch(_){}
+                borderColorSwatch.style.background = colorValue;
+                borderColorSwatch.setAttribute('data-cur', colorValue);
+              }
+            });
+          }
+        } catch(err){ try { console.warn('[cal-border-swatch]', err); } catch(_){} }
         return;
       }
 
@@ -7189,6 +7237,35 @@
     }
   }
 
+  // p25n: 그라데이션/패턴 미리보기 바 갱신
+  //   편집 팝업 안에 [data-cal-preview] 가 있으면 box 의 현재 backgroundImage / 관련 CSS 를 그대로 미러링함
+  //   applyCalloutBg 가 이미 backgroundImage 에 linear-gradient(...) 또는 패턴을 완성해 넣었기 때문에
+  //   미리보기는 그 문자열을 복사만 해도 각도/투명도/색상/패턴이 자동 반영됨
+  function _updateGradientPreviewBar(box){
+    try {
+      if (!box) return;
+      // 편집 팝업은 body 만 보면 됨 (여러 팝업 만드셔도 selectedCallout 하나만)
+      var previews = document.querySelectorAll('[data-cal-preview]');
+      if (!previews || !previews.length) return;
+      var mode = box.getAttribute('data-bg-mode') || 'solid';
+      // 미리보기는 gradient/pattern 모드에서만 의미. 다른 모드럼 숨김 (러닝 시 모드 변경 대비)
+      var show = (mode === 'gradient' || mode === 'pattern');
+      for (var i = 0; i < previews.length; i++){
+        var pv = previews[i];
+        var row = pv.closest('[data-gradient-preview-row]');
+        if (row) row.style.display = show ? '' : 'none';
+        if (!show) continue;
+        // box 의 computed background 를 그대로 적용
+        var cs = box.style;
+        pv.style.backgroundColor = cs.backgroundColor || 'transparent';
+        pv.style.backgroundImage = cs.backgroundImage || 'none';
+        pv.style.backgroundSize = cs.backgroundSize || 'auto';
+        pv.style.backgroundPosition = cs.backgroundPosition || '0 0';
+        pv.style.backgroundRepeat = cs.backgroundRepeat || 'repeat';
+      }
+    } catch(_){}
+  }
+
   function applyCalloutBg(box){
     if (!box) return;
     var mode = box.getAttribute('data-bg-mode');
@@ -7217,6 +7294,7 @@
       box.style.backgroundColor = 'transparent';
       box.style.backgroundImage = 'linear-gradient(' + angle + 'deg, ' + c1 + ', ' + c2 + ')';
       box.setAttribute('data-bg', 'linear-gradient(' + angle + 'deg, ' + c1 + ', ' + c2 + ')');
+      try { _updateGradientPreviewBar(box); } catch(_){} // p25n
       return;
     }
 
@@ -7250,6 +7328,7 @@
         box.style.setProperty('background-repeat', patObj.repeat);
         box.setAttribute('data-bg', patObj.image);
       }
+      try { _updateGradientPreviewBar(box); } catch(_){} // p25n
       return;
     }
 
