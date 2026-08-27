@@ -9,7 +9,7 @@
  *         * body class 에 tag-template / page-template / home-template / author-template / archive-template
  *         * URL 이 /tag/ /author/ /series/ /categories/ /tags/ 로 시작
  *       - 진입 허용 조건: body.post-template 또는 (article.gh-article 가 있고 section.gh-content 도 있음)
- *   [+] 이번 수정으로 시리즈 페이지(/tag/series-*/)를 확실히 제외
+ *   [+] 이번 수정으로 시리즈 페이지 (/tag/series-XXX/) 를 확실히 제외
  * 
  * v2.9 변경사항 (v2.8 대비):
  *   [!] 하이라이트 표시 로직 비활성화 (TASK D 이월)
