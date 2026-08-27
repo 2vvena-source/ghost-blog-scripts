@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25c';
+  var VERSION = 'v2.0-β-p25d';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -16350,6 +16350,484 @@
     }, 100);
   }
 
+
+  // ═══════════════════════════════════════════════════════════
+  // p25d: 커스텀 컬러 픽커 (openCustomColorPicker)
+  //   - 사이트 톤 3색 (딥그린/살구/배경) · 밑줄 인풋 · 얇은 hairline
+  //   - 폭 340px · 픽커 내부 요소 260~280px
+  //   - 큰 원 미리보기 (48px 원)
+  //   - hex 코드 입력 (편집 가능 · 밑줄만)
+  //   - 색상(Hue) · 채도(Saturation) · 명도(Lightness) 슬라이더
+  //   - 투명도 슬라이더 (5% 스텝 · 살구색 accent)
+  //   - 스포이드 (EyeDropper API · 미지원 브라우저 자동 숨김)
+  //   - 브리프/상세 토글 (기본 brief = HSL 감춤 · detail 이면 노출)
+  //   - onDone(colorValue) 로 hex or rgba() 문자열 반환
+  //   - 컨텍스트 자동 감지 옵션: options.detectFromSelection === true 이면 선택 텍스트의 color 읽어 초기값
+  //
+  //   사용법:
+  //     openCustomColorPicker({
+  //       initial: '#FF9A76',             // 초기 색 (hex or rgba · 생략 시 딥그린 or 감지)
+  //       context: 'text',                // 'text' | 'bg' | 'highlight' | 'header' (미래 확장용 · 지금은 라벨만)
+  //       showAlpha: true,                // 투명도 슬라이더
+  //       showSaturation: true,           // 채도·명도 슬라이더 (기본 brief 모드에서 숨김)
+  //       showEyedropper: true,           // 자동으로 브라우저 지원 확인
+  //       detectFromSelection: true,      // 옵션 · 선택 텍스트의 인라인 color 를 초기값으로
+  //       mode: 'brief',                  // 'brief' | 'detail'
+  //       onDone: function(color){ ... }, // 확정
+  //       onCancel: function(){ ... }     // 취소 (선택적)
+  //     });
+  // ═══════════════════════════════════════════════════════════
+  function openCustomColorPicker(opts){
+    opts = opts || {};
+    var _fired = false;
+
+    // ── 유틸: 색 파싱/변환 ──
+    function _hexToRgb(hex){
+      var m = String(hex || '').match(/^#([0-9a-f]{6})$/i);
+      if (!m) return null;
+      var n = parseInt(m[1], 16);
+      return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+    }
+    function _rgbToHex(r, g, b){
+      function h(x){ x = Math.max(0, Math.min(255, Math.round(x))); var s = x.toString(16); return s.length === 1 ? '0'+s : s; }
+      return '#' + h(r) + h(g) + h(b);
+    }
+    function _rgbToHsl(r, g, b){
+      r /= 255; g /= 255; b /= 255;
+      var mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+      var h, s, l = (mx + mn) / 2;
+      if (mx === mn){ h = s = 0; }
+      else {
+        var d = mx - mn;
+        s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+        switch(mx){
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+    }
+    function _hslToRgb(h, s, l){
+      h /= 360; s /= 100; l /= 100;
+      var r, g, b;
+      if (s === 0){ r = g = b = l; }
+      else {
+        function hue2rgb(p, q, t){
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1/6) return p + (q - p) * 6 * t;
+          if (t < 1/2) return q;
+          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+          return p;
+        }
+        var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        var p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+      }
+      return { r: r * 255, g: g * 255, b: b * 255 };
+    }
+    function _parseInitial(v){
+      var s = String(v || '').trim();
+      if (/^#[0-9a-f]{6}$/i.test(s)){
+        var rgb = _hexToRgb(s);
+        return { hex: s.toLowerCase(), r: rgb.r, g: rgb.g, b: rgb.b, alpha: 100 };
+      }
+      var m = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i);
+      if (m){
+        var r = parseInt(m[1],10), g = parseInt(m[2],10), b = parseInt(m[3],10);
+        var a = m[4] ? parseFloat(m[4]) : 1;
+        return { hex: _rgbToHex(r,g,b), r: r, g: g, b: b, alpha: Math.round(a * 100) };
+      }
+      return { hex: '#0F3A3A', r: 15, g: 58, b: 58, alpha: 100 };
+    }
+    function _formatOutput(state){
+      if (state.alpha >= 100) return state.hex.toUpperCase();
+      return 'rgba(' + state.r + ',' + state.g + ',' + state.b + ',' + (state.alpha/100).toFixed(2) + ')';
+    }
+
+    // ── 선택 텍스트에서 현재 색 자동 감지 (옵션) ──
+    function _detectCurrentColor(){
+      try {
+        var sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) return null;
+        var range = sel.getRangeAt(0);
+        var el = range.startContainer;
+        if (el && el.nodeType === 3) el = el.parentNode;
+        while (el && el.nodeType === 1){
+          if (el.style && el.style.color) return el.style.color;
+          // computed color 은 상속 때문에 부정확 → 인라인 style 만 참조
+          if (el.classList && el.classList.contains('editor-canvas')) break;
+          el = el.parentNode;
+        }
+      } catch(_){}
+      return null;
+    }
+
+    // ── 초기 상태 결정 ──
+    var initialRaw = opts.initial;
+    if (!initialRaw && opts.detectFromSelection){
+      initialRaw = _detectCurrentColor();
+    }
+    var state = _parseInitial(initialRaw || '#0F3A3A');
+    // HSL 파생
+    (function _syncHsl(){
+      var hsl = _rgbToHsl(state.r, state.g, state.b);
+      state.h = hsl.h; state.s = hsl.s; state.l = hsl.l;
+    })();
+
+    var mode = (opts.mode === 'detail') ? 'detail' : 'brief';
+    var showAlpha       = opts.showAlpha !== false;
+    var showSaturation  = opts.showSaturation !== false;
+    var showEyedropper  = (opts.showEyedropper !== false) && ('EyeDropper' in window);
+
+    // ── 오버레이 & 다이얼로그 ──
+    var overlay = document.createElement('div');
+    overlay.className = 'ddl-editor-popup';
+    overlay.style.cssText = 'position: fixed; inset: 0; z-index: 100020;'
+      + ' background: rgba(15,58,58,0.22);'
+      + ' display: flex; align-items: center; justify-content: center;'
+      + ' font-family: "Pretendard Variable","Pretendard","Noto Sans KR",sans-serif;'
+      + ' color: var(--color, #0F3A3A);';
+
+    var box = document.createElement('div');
+    box.style.cssText = 'background: #fff; border: 1px solid rgba(15,58,58,0.15); border-radius: 6px;'
+      + ' width: 340px; max-width: 92vw; padding: 20px 24px 18px;'
+      + ' box-shadow: 0 10px 30px rgba(0,0,0,0.12);';
+    ['click','mousedown','mouseup'].forEach(function(evt){
+      box.addEventListener(evt, function(e){ e.stopPropagation(); });
+    });
+
+    // 컨텍스트별 제목
+    var ctxLabels = {
+      'text':      '글자 색',
+      'bg':        '배경 색',
+      'highlight': '형광펜 색',
+      'header':    '헤더 색'
+    };
+    var titleText = ctxLabels[opts.context] || '색 선택';
+
+    // ── 제목 ──
+    var titleEl = document.createElement('div');
+    titleEl.textContent = titleText;
+    titleEl.style.cssText = 'font-family: "Cafe24Danjunghae","Gowun Batang","Nanum Myeongjo",serif;'
+      + ' font-size: 20px; font-weight: 400; color: var(--color, #0F3A3A);'
+      + ' padding-bottom: 10px; margin-bottom: 16px;'
+      + ' border-bottom: 1px solid rgba(15,58,58,0.1);';
+    box.appendChild(titleEl);
+
+    // ── 상단 · 큰 원 미리보기 + hex 입력 + 스포이드 ──
+    var topRow = document.createElement('div');
+    topRow.style.cssText = 'display: flex; align-items: center; gap: 14px; margin-bottom: 18px;';
+
+    // 큰 원 (48px)
+    var previewCircle = document.createElement('div');
+    previewCircle.style.cssText = 'width: 48px; height: 48px; border-radius: 50%;'
+      + ' border: 1px solid rgba(15,58,58,0.15); flex-shrink: 0;'
+      + ' box-shadow: 0 1px 3px rgba(0,0,0,0.06);';
+    topRow.appendChild(previewCircle);
+
+    // hex 입력 + 스포이드
+    var hexWrap = document.createElement('div');
+    hexWrap.style.cssText = 'flex: 1; display: flex; flex-direction: column; gap: 4px;';
+
+    var hexLabelRow = document.createElement('div');
+    hexLabelRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center;';
+    var hexLabel = document.createElement('span');
+    hexLabel.textContent = 'HEX';
+    hexLabel.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.5); letter-spacing: 0.06em;';
+    hexLabelRow.appendChild(hexLabel);
+    // 스포이드 버튼 (지원 시)
+    var eyedropperBtn = null;
+    if (showEyedropper){
+      eyedropperBtn = document.createElement('button');
+      eyedropperBtn.type = 'button';
+      eyedropperBtn.title = '화면에서 색 뽑기 (스포이드)';
+      eyedropperBtn.style.cssText = 'background: transparent; border: none; cursor: pointer;'
+        + ' padding: 2px 4px; color: rgba(15,58,58,0.5); border-radius: 4px;'
+        + ' display: inline-flex; align-items: center; font-size: 11px; gap: 4px;';
+      // 스포이드 SVG 아이콘
+      eyedropperBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 6l6 6-9 9H4v-6z"/><path d="M14 5l3-3 4 4-3 3z"/></svg><span>스포이드</span>';
+      eyedropperBtn.addEventListener('mouseenter', function(){ eyedropperBtn.style.color = 'var(--point, #FF9A76)'; });
+      eyedropperBtn.addEventListener('mouseleave', function(){ eyedropperBtn.style.color = 'rgba(15,58,58,0.5)'; });
+      eyedropperBtn.addEventListener('click', function(){
+        try {
+          var ed = new window.EyeDropper();
+          ed.open().then(function(r){
+            if (r && r.sRGBHex){
+              _setFromHex(r.sRGBHex);
+            }
+          }).catch(function(){});
+        } catch(_){}
+      });
+      hexLabelRow.appendChild(eyedropperBtn);
+    }
+    hexWrap.appendChild(hexLabelRow);
+
+    var hexInput = document.createElement('input');
+    hexInput.type = 'text';
+    hexInput.value = state.hex.toUpperCase();
+    hexInput.style.cssText = 'width: 100%; box-sizing: border-box; padding: 4px 0 6px;'
+      + ' border: none; border-bottom: 1px solid rgba(15,58,58,0.15);'
+      + ' font-family: "SF Mono","Menlo","Consolas",monospace; font-size: 14px; color: var(--color, #0F3A3A);'
+      + ' outline: none; background: transparent; letter-spacing: 0.02em;'
+      + ' transition: border-color 120ms ease;';
+    hexInput.addEventListener('focus', function(){ hexInput.style.borderBottomColor = 'var(--point, #FF9A76)'; });
+    hexInput.addEventListener('blur',  function(){
+      hexInput.style.borderBottomColor = 'rgba(15,58,58,0.15)';
+      _normalizeHexInput();
+    });
+    hexInput.addEventListener('input', function(){
+      var v = hexInput.value.trim();
+      if (v && v[0] !== '#') v = '#' + v;
+      if (/^#[0-9a-fA-F]{6}$/.test(v)){
+        _setFromHex(v);
+      }
+    });
+    function _normalizeHexInput(){
+      var v = hexInput.value.trim();
+      if (v && v[0] !== '#') v = '#' + v;
+      if (/^#[0-9a-fA-F]{6}$/.test(v)){
+        hexInput.value = v.toUpperCase();
+      } else {
+        hexInput.value = state.hex.toUpperCase();
+      }
+    }
+    hexWrap.appendChild(hexInput);
+    topRow.appendChild(hexWrap);
+    box.appendChild(topRow);
+
+    // ── 색상(Hue) 슬라이더 ──
+    //   무지개 그라디언트를 배경으로. accent 는 살구.
+    var hueRow = _makeSliderRow('색상 (H)', 0, 360, 1, state.h, '°', function(v){
+      state.h = v;
+      var rgb = _hslToRgb(state.h, state.s, state.l);
+      state.r = Math.round(rgb.r); state.g = Math.round(rgb.g); state.b = Math.round(rgb.b);
+      state.hex = _rgbToHex(state.r, state.g, state.b);
+      _renderAll();
+    });
+    // 배경 그라디언트를 무지개로
+    hueRow.slider.style.background = 'linear-gradient(to right,'
+      + '#f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%)';
+    box.appendChild(hueRow.wrap);
+
+    // ── 채도(S) & 명도(L) 슬라이더 (brief 에서는 감춤) ──
+    var satRow = _makeSliderRow('채도 (S)', 0, 100, 1, state.s, '%', function(v){
+      state.s = v;
+      var rgb = _hslToRgb(state.h, state.s, state.l);
+      state.r = Math.round(rgb.r); state.g = Math.round(rgb.g); state.b = Math.round(rgb.b);
+      state.hex = _rgbToHex(state.r, state.g, state.b);
+      _renderAll();
+    });
+    var lightRow = _makeSliderRow('명도 (L)', 0, 100, 1, state.l, '%', function(v){
+      state.l = v;
+      var rgb = _hslToRgb(state.h, state.s, state.l);
+      state.r = Math.round(rgb.r); state.g = Math.round(rgb.g); state.b = Math.round(rgb.b);
+      state.hex = _rgbToHex(state.r, state.g, state.b);
+      _renderAll();
+    });
+    box.appendChild(satRow.wrap);
+    box.appendChild(lightRow.wrap);
+    // brief 모드에서 채도·명도 숨김
+    if (mode === 'brief'){
+      satRow.wrap.style.display = 'none';
+      lightRow.wrap.style.display = 'none';
+    }
+
+    // ── 투명도(A) 슬라이더 ──
+    var alphaRow = null;
+    if (showAlpha){
+      alphaRow = _makeSliderRow('투명도 (A)', 0, 100, 5, state.alpha, '%', function(v){
+        state.alpha = v;
+        _renderAll();
+      });
+      box.appendChild(alphaRow.wrap);
+    }
+
+    // ── 상세 모드 토글 ──
+    var toggleRow = document.createElement('div');
+    toggleRow.style.cssText = 'display: flex; justify-content: center; margin: 8px 0 14px;';
+    var toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.textContent = mode === 'brief' ? '＋ 상세 옵션 (채도·명도)' : '－ 간단히 보기';
+    toggleBtn.style.cssText = 'background: transparent; border: none; cursor: pointer;'
+      + ' font-size: 11px; color: rgba(15,58,58,0.6); padding: 4px 8px; border-radius: 4px; font-family: inherit;';
+    toggleBtn.addEventListener('mouseenter', function(){ toggleBtn.style.color = 'var(--point, #FF9A76)'; });
+    toggleBtn.addEventListener('mouseleave', function(){ toggleBtn.style.color = 'rgba(15,58,58,0.6)'; });
+    toggleBtn.addEventListener('click', function(){
+      mode = (mode === 'brief') ? 'detail' : 'brief';
+      if (mode === 'detail'){
+        satRow.wrap.style.display   = '';
+        lightRow.wrap.style.display = '';
+        toggleBtn.textContent = '－ 간단히 보기';
+      } else {
+        satRow.wrap.style.display   = 'none';
+        lightRow.wrap.style.display = 'none';
+        toggleBtn.textContent = '＋ 상세 옵션 (채도·명도)';
+      }
+    });
+    toggleRow.appendChild(toggleBtn);
+    box.appendChild(toggleRow);
+
+    // ── 하단 · 취소 · 확인 ──
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = '취소';
+    cancelBtn.style.cssText = 'background: transparent; border: 1px solid rgba(15,58,58,0.15);'
+      + ' color: rgba(15,58,58,0.65); padding: 6px 16px; border-radius: 4px; cursor: pointer;'
+      + ' font-family: inherit; font-size: 12px;';
+    cancelBtn.addEventListener('mouseenter', function(){ cancelBtn.style.borderColor = 'rgba(15,58,58,0.35)'; });
+    cancelBtn.addEventListener('mouseleave', function(){ cancelBtn.style.borderColor = 'rgba(15,58,58,0.15)'; });
+    cancelBtn.addEventListener('click', function(){ _fire(null); });
+    btnRow.appendChild(cancelBtn);
+
+    var okBtn = document.createElement('button');
+    okBtn.type = 'button';
+    okBtn.textContent = '적용';
+    okBtn.style.cssText = 'background: var(--point, #FF9A76); border: none;'
+      + ' color: #fff; padding: 6px 20px; border-radius: 4px; cursor: pointer;'
+      + ' font-family: inherit; font-size: 12px; font-weight: 500;';
+    okBtn.addEventListener('mouseenter', function(){ okBtn.style.filter = 'brightness(0.95)'; });
+    okBtn.addEventListener('mouseleave', function(){ okBtn.style.filter = 'none'; });
+    okBtn.addEventListener('click', function(){ _fire(_formatOutput(state)); });
+    btnRow.appendChild(okBtn);
+
+    box.appendChild(btnRow);
+    overlay.appendChild(box);
+
+    // ── 유틸: 슬라이더 만들기 (라벨 + [-] [슬라이더] [+] + 값 표시) ──
+    function _makeSliderRow(labelText, min, max, step, value, unit, onChange){
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'margin-bottom: 10px;';
+
+      var head = document.createElement('div');
+      head.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;';
+      var l = document.createElement('span');
+      l.textContent = labelText;
+      l.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.5); letter-spacing: 0.06em;';
+      head.appendChild(l);
+      var val = document.createElement('span');
+      val.textContent = value + unit;
+      val.style.cssText = 'font-size: 11px; color: var(--color, #0F3A3A); font-variant-numeric: tabular-nums;';
+      head.appendChild(val);
+      wrap.appendChild(head);
+
+      var row = document.createElement('div');
+      row.style.cssText = 'display: flex; align-items: center; gap: 6px;';
+
+      var minus = document.createElement('button');
+      minus.type = 'button';
+      minus.textContent = '−';
+      minus.style.cssText = 'width: 22px; height: 22px; border: 1px solid rgba(15,58,58,0.15);'
+        + ' background: transparent; color: var(--color, #0F3A3A); border-radius: 3px;'
+        + ' cursor: pointer; font-size: 12px; line-height: 1; padding: 0;';
+      minus.addEventListener('click', function(){
+        var v = Math.max(min, parseInt(slider.value,10) - step);
+        slider.value = v; val.textContent = v + unit; if (typeof onChange === 'function') onChange(v);
+      });
+      row.appendChild(minus);
+
+      var slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = min; slider.max = max; slider.step = step; slider.value = value;
+      slider.style.cssText = 'flex: 1; accent-color: var(--point, #FF9A76); height: 4px;';
+      slider.addEventListener('input', function(){
+        var v = parseInt(slider.value, 10);
+        val.textContent = v + unit;
+        if (typeof onChange === 'function') onChange(v);
+      });
+      row.appendChild(slider);
+
+      var plus = document.createElement('button');
+      plus.type = 'button';
+      plus.textContent = '＋';
+      plus.style.cssText = minus.style.cssText;
+      plus.addEventListener('click', function(){
+        var v = Math.min(max, parseInt(slider.value,10) + step);
+        slider.value = v; val.textContent = v + unit; if (typeof onChange === 'function') onChange(v);
+      });
+      row.appendChild(plus);
+
+      wrap.appendChild(row);
+      return { wrap: wrap, slider: slider, val: val };
+    }
+
+    // ── 렌더 (프리뷰 + hex 입력 + 슬라이더 값 동기화) ──
+    function _renderAll(){
+      // 미리보기 원 (알파 반영)
+      var bg = (state.alpha >= 100) ? state.hex : 'rgba(' + state.r + ',' + state.g + ',' + state.b + ',' + (state.alpha/100).toFixed(2) + ')';
+      previewCircle.style.background = bg;
+      // hex 입력
+      if (document.activeElement !== hexInput){
+        hexInput.value = state.hex.toUpperCase();
+      }
+      // 슬라이더 위치 (내부 setter 로 이벤트 안 튀게)
+      hueRow.slider.value = state.h;   hueRow.val.textContent   = state.h + '°';
+      satRow.slider.value = state.s;   satRow.val.textContent   = state.s + '%';
+      lightRow.slider.value = state.l; lightRow.val.textContent = state.l + '%';
+      if (alphaRow){
+        alphaRow.slider.value = state.alpha;
+        alphaRow.val.textContent = state.alpha + '%';
+      }
+    }
+
+    // 외부 조작 헬퍼 (스포이드/hex 인풋에서 호출)
+    function _setFromHex(newHex){
+      var s = String(newHex || '').trim();
+      if (!/^#[0-9a-f]{6}$/i.test(s)) return;
+      s = s.toLowerCase();
+      state.hex = s;
+      var rgb = _hexToRgb(s);
+      state.r = rgb.r; state.g = rgb.g; state.b = rgb.b;
+      var hsl = _rgbToHsl(rgb.r, rgb.g, rgb.b);
+      state.h = hsl.h; state.s = hsl.s; state.l = hsl.l;
+      _renderAll();
+    }
+
+    // ── ESC/Enter 핸들러 ──
+    function _onKey(e){
+      if (e.key === 'Escape'){ e.stopPropagation(); _fire(null); }
+      else if (e.key === 'Enter' && document.activeElement !== hexInput){
+        e.stopPropagation(); _fire(_formatOutput(state));
+      }
+    }
+    document.addEventListener('keydown', _onKey);
+
+    function _fire(result){
+      if (_fired) return;
+      _fired = true;
+      document.removeEventListener('keydown', _onKey);
+      try { overlay.remove(); } catch(_){}
+      if (result === null){
+        if (typeof opts.onCancel === 'function') opts.onCancel();
+      } else {
+        if (typeof opts.onDone === 'function') opts.onDone(result);
+      }
+    }
+
+    // ── 오버레이 밖 클릭 = 취소 ──
+    overlay.addEventListener('click', function(){ _fire(null); });
+
+    // 최초 렌더
+    _renderAll();
+
+    document.body.appendChild(overlay);
+
+    // hex 입력에 자동 포커스 (편집 편의)
+    setTimeout(function(){ try { hexInput.focus(); hexInput.select(); } catch(_){} }, 50);
+  }
+
+  try {
+    window.__DDL_EDITOR = window.__DDL_EDITOR || {};
+    window.__DDL_EDITOR.openCustomColorPicker = openCustomColorPicker;
+  } catch(_){}
+
   // 색깔 편집 미니 다이얼로그 (이름 + 색)
   // p24j: 색깔 편집 미니 다이얼로그 · 사이트 톤으로 전면 재작성
   //   ★ 사용자 피드백: "이건 너무 당신 디자인 같음. 우리 사이트와 어울리지 않음"
@@ -24602,6 +25080,49 @@
         else if (filter === 'used') em.textContent = '현재 페이지 사용 중인 색이 없어요.';
         else                        em.textContent = '표시할 그룹이 없어요. ⚙ 아이콘으로 그룹 관리창을 열어보세요.';
         bodyEl.appendChild(em);
+      }
+
+      // p25d: 직접 색 만들기 (＋ 카드) — 커스텀 컬러 픽커 진입
+      //   ★ 하나의 카드만 · 마지막 섹션 아래에 추가
+      //   ★ 클릭 → openCustomColorPicker → 선택한 색 즉시 적용 + "내 색" 그룹에 저장
+      if (filter === 'all'){
+        var addSection = document.createElement('div');
+        addSection.style.cssText = 'margin-top: 8px; padding-top: 10px; border-top: 1px solid rgba(15,58,58,0.06);';
+
+        var addCard = document.createElement('button');
+        addCard.type = 'button';
+        addCard.title = '직접 색 만들기 (스포이드 · hex · 슬라이더)';
+        addCard.style.cssText = 'display: flex; align-items: center; justify-content: center; gap: 6px;'
+          + ' width: 100%; padding: 8px; border-radius: 5px; cursor: pointer;'
+          + ' background: transparent; border: 1px dashed rgba(15,58,58,0.25);'
+          + ' color: rgba(15,58,58,0.6); font-family: inherit; font-size: 11px;';
+        addCard.innerHTML = '＋ 직접 색 만들기';
+        addCard.addEventListener('mouseenter', function(){ addCard.style.borderColor = 'var(--point, #FF9A76)'; addCard.style.color = 'var(--point, #FF9A76)'; });
+        addCard.addEventListener('mouseleave', function(){ addCard.style.borderColor = 'rgba(15,58,58,0.25)'; addCard.style.color = 'rgba(15,58,58,0.6)'; });
+        addCard.addEventListener('mousedown', function(e){ e.preventDefault(); });
+        addCard.addEventListener('click', function(e){
+          e.preventDefault(); e.stopPropagation();
+          try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
+          pop.remove();
+          try {
+            if (typeof openCustomColorPicker === 'function'){
+              openCustomColorPicker({
+                context: 'text',
+                detectFromSelection: true,   // 선택된 텍스트의 현재 색이 있으면 초기값
+                showAlpha: true,
+                showSaturation: true,
+                showEyedropper: true,
+                mode: 'brief',
+                onDone: function(colorValue){
+                  if (!colorValue) return;
+                  try { applyTextColor(colorValue); } catch(_){}
+                }
+              });
+            }
+          } catch(err){ try { console.warn('[custom-picker]', err); } catch(_){} }
+        });
+        addSection.appendChild(addCard);
+        bodyEl.appendChild(addSection);
       }
     }
 
