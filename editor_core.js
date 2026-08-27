@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p25r
+ * 2vvena Editor Core - v2.0-β-p25s
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25r';
+  var VERSION = 'v2.0-β-p25s';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -8231,6 +8231,48 @@
   //              + 정렬은 접은글의 data-align 을 읽어 반영 (사이드바 정렬 시스템과 완전 연동)
   //              + 진단 로그 확장 (window.__DDL_DBG_FOLD_RZ = true 로 켜기)
   var _foldRzDragging = null;
+
+  // p25s: 접은글 폭 적용 헬퍼 — 리사이저 드래그 / 슬라이더 / ±버튼 세 곳에서 공통 사용
+  //       헤더+본문을 함께 이동시키는 것은 CSS 상 blk (=.ddl-fold-block) 자체의 width 를
+  //       설정하면 보장됨 (헤더와 본문 모두 blk 의 자손)
+  function _applyFoldWidthPct(blk, pct){
+    if (!blk) return;
+    pct = parseInt(pct, 10);
+    if (isNaN(pct)) pct = 100;
+    pct = Math.max(25, Math.min(100, pct));
+    pct = Math.round(pct / 5) * 5;
+    blk.setAttribute('data-width-pct', String(pct));
+    if (pct >= 100) {
+      blk.style.setProperty('width', '', '');
+      blk.style.setProperty('margin-left', '', '');
+      blk.style.setProperty('margin-right', '', '');
+    } else {
+      blk.style.setProperty('width', pct + '%', 'important');
+      blk.style.setProperty('box-sizing', 'border-box', 'important');
+      var al = blk.getAttribute('data-align') || 'center';
+      if (al === 'left')       { blk.style.setProperty('margin-left','0','important');    blk.style.setProperty('margin-right','auto','important'); }
+      else if (al === 'right') { blk.style.setProperty('margin-left','auto','important'); blk.style.setProperty('margin-right','0','important'); }
+      else                     { blk.style.setProperty('margin-left','auto','important'); blk.style.setProperty('margin-right','auto','important'); }
+    }
+    // 사이드바 폭 라벨/슬라이더 동기화 (공통 시스템이 접은글을 early-return 하므로 이젠 수동 동기화)
+    try {
+      var pctLbl = document.getElementById('ep-block-pct-lbl');
+      var pctSli = document.getElementById('ep-block-pct');
+      if (pctLbl) pctLbl.textContent = '폭 ' + pct + '%';
+      if (pctSli && document.activeElement !== pctSli) pctSli.value = pct;
+    } catch(_){}
+    // 팝업 [모양] 탭 안 폭 슬라이더/라벨/값 동기화 (열려있을 때만 반영)
+    try {
+      var _fWs = document.getElementById('pop-fold-width-pct');
+      var _fWl = document.getElementById('pop-fold-width-lbl');
+      var _fWv = document.getElementById('pop-fold-width-val');
+      if (_fWs && document.activeElement !== _fWs) _fWs.value = pct;
+      if (_fWl) _fWl.textContent = '접은글 폭 (' + pct + '%)';
+      if (_fWv) _fWv.textContent = pct + '%';
+    } catch(_){}
+    return pct;
+  }
+
   function attachFoldResizerHandler(rz){
     if (!rz || rz._foldRzAttached) return;
     rz._foldRzAttached = true;
@@ -8290,30 +8332,10 @@
       if (!_foldRzDragging) return;
       var dx = e.clientX - _foldRzDragging.startX;
       var newW = _foldRzDragging.startWidth + dx;
-      var pct = Math.round((newW / _foldRzDragging.parentWidth) * 100);
-      pct = Math.max(25, Math.min(100, pct));
-      pct = Math.round(pct / 5) * 5;
-      var blk = _foldRzDragging.block;
-      blk.setAttribute('data-width-pct', String(pct));
-      if (pct >= 100) {
-        blk.style.setProperty('width', '', '');
-        blk.style.setProperty('margin-left', '', '');
-        blk.style.setProperty('margin-right', '', '');
-      } else {
-        blk.style.setProperty('width', pct + '%', 'important');
-        blk.style.setProperty('box-sizing', 'border-box', 'important');
-        // 정렬은 접은글의 data-align 을 그대로 사용 (사이드바에서 설정된 값 유지)
-        var al = blk.getAttribute('data-align') || 'center';
-        if (al === 'left')       { blk.style.setProperty('margin-left','0','important');    blk.style.setProperty('margin-right','auto','important'); }
-        else if (al === 'right') { blk.style.setProperty('margin-left','auto','important'); blk.style.setProperty('margin-right','0','important'); }
-        else                     { blk.style.setProperty('margin-left','auto','important'); blk.style.setProperty('margin-right','auto','important'); }
-      }
-      if (window.__DDL_DBG_FOLD_RZ) console.log('[FOLD-RZ] mousemove', { pct: pct, width: blk.style.width });
-      // 팡 안 사이드바 정렬/폭 UI 동기화
-      var pctLbl = document.getElementById('ep-block-pct-lbl');
-      var pctSli = document.getElementById('ep-block-pct');
-      if (pctLbl) pctLbl.textContent = '폭 ' + pct + '%';
-      if (pctSli && document.activeElement !== pctSli) pctSli.value = pct;
+      var rawPct = Math.round((newW / _foldRzDragging.parentWidth) * 100);
+      // p25s: 공통 헬퍼로 위임 — 슬라이더/±버튼도 모두 동일 로직
+      var pct = _applyFoldWidthPct(_foldRzDragging.block, rawPct);
+      if (window.__DDL_DBG_FOLD_RZ) console.log('[FOLD-RZ] mousemove', { pct: pct });
     }, true);
 
     document.addEventListener('mouseup', function(){
@@ -29491,17 +29513,36 @@
         + '<div style="font-size:0.72em; opacity:0.55; margin-top:0.2em;">100% = 좌우 꽉참, 80% = 좌우 10%씩 여백 (중앙 앵커)</div></div>';
     }
 
-    // p21c: 폭 슬라이더 제거 (리사이저 드래그로만 조정)
-    // p21d: 정렬 3버튼 (좌/중/우) 재추가 - 사이드바 정렬 시스템과 완전 연동 (사용자 요청)
-    var currentAlign = block.getAttribute('data-align') || 'center';
+    // p25s: 접은글 폭 슬라이더 + ±버튼 재도입 (사용자 지적: 사이드바는 early-return 되어 동작 안 함)
+    //       슬라이더가 모닠 환경에서 이벤트 받을지 모르니 ±버튼을 병행 (자간/줄간격과 같은 안전장치)
+    //       Ghost 편집기 환경에서 슬라이더가 가끔 잠기는 것 대비
+    var _curWidthPct = block.getAttribute('data-width-pct') || '100';
     html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;">'
+      + '<div class="row-label" style="font-weight:600;" id="pop-fold-width-lbl">접은글 폭 (' + _curWidthPct + '%)</div>'
+      + '<div style="display:flex; align-items:center; gap:0.4em;">'
+      + '<button type="button" class="pop-btn" data-fold-width-step="-5" title="5% 줄이기" style="min-width:2em;">−</button>'
+      + '<input type="range" id="pop-fold-width-pct" min="25" max="100" step="5" value="' + _curWidthPct + '" style="flex:1;">'
+      + '<button type="button" class="pop-btn" data-fold-width-step="5" title="5% 늘리기" style="min-width:2em;">+</button>'
+      + '<span id="pop-fold-width-val" style="min-width:2.6em; text-align:right; font-size:0.85em; opacity:0.7;">' + _curWidthPct + '%</span>'
+      + '</div>'
+      + '<div style="display:flex; gap:0.3em; margin-top:0.4em;">'
+      + '<button type="button" class="pop-btn" data-fold-width-preset="25"  style="flex:1; font-size:0.75em;">25%</button>'
+      + '<button type="button" class="pop-btn" data-fold-width-preset="50"  style="flex:1; font-size:0.75em;">50%</button>'
+      + '<button type="button" class="pop-btn" data-fold-width-preset="75"  style="flex:1; font-size:0.75em;">75%</button>'
+      + '<button type="button" class="pop-btn" data-fold-width-preset="100" style="flex:1; font-size:0.75em;">100%</button>'
+      + '</div>'
+      + '<div style="font-size:0.72em; opacity:0.55; margin-top:0.3em;">슬라이더 · ±버튼 · 25/50/75/100% 프리셋 · 우하단 리사이저 드래그 모두 가능</div>'
+      + '</div>';
+
+    // p21d: 정렬 3버튼 (좌/중/우) - 사이드바 정렬 시스템과 완전 연동
+    var currentAlign = block.getAttribute('data-align') || 'center';
+    html += '<div class="row" style="margin-top:0.8em;">'
       + '<div class="row-label" style="font-weight:600;">정렬 (폭 100% 미만일 때만 시각적)</div>'
       + '<div style="display:flex; gap:0.4em;">'
       + '<button type="button" class="pop-btn' + (currentAlign==='left'?' is-active':'') + '" data-fold-align="left" style="flex:1;">◀ 좌</button>'
       + '<button type="button" class="pop-btn' + (currentAlign==='center'?' is-active':'') + '" data-fold-align="center" style="flex:1;">■ 중</button>'
       + '<button type="button" class="pop-btn' + (currentAlign==='right'?' is-active':'') + '" data-fold-align="right" style="flex:1;">▶ 우</button>'
       + '</div>'
-      + '<div style="font-size:0.72em; opacity:0.55; margin-top:0.3em;">우측 사이드바「블록 정렬·폭」과 동일. 폭은 우하단 리사이저 드래그.</div>'
       + '</div>';
 
     html += _renderFoldPresetSection();
@@ -29904,6 +29945,22 @@
       var block = foldPopupLock || selectedFold;
       if (!block) return;
 
+      // p25s: 접은글 폭 ±버튼 · 프리셋 4버튼 (25/50/75/100%)
+      var _fwStep = e.target.closest && e.target.closest('[data-fold-width-step]');
+      if (_fwStep) {
+        e.preventDefault(); e.stopPropagation();
+        var _fwStepVal = parseInt(_fwStep.getAttribute('data-fold-width-step'), 10) || 0;
+        var _fwCur = parseInt(block.getAttribute('data-width-pct') || '100', 10) || 100;
+        _applyFoldWidthPct(block, _fwCur + _fwStepVal);
+        return;
+      }
+      var _fwPreset = e.target.closest && e.target.closest('[data-fold-width-preset]');
+      if (_fwPreset) {
+        e.preventDefault(); e.stopPropagation();
+        _applyFoldWidthPct(block, _fwPreset.getAttribute('data-fold-width-preset'));
+        return;
+      }
+
       var libHead = e.target.closest('[data-btn="fold-open-font-library-head"]');
       var libBody = e.target.closest('[data-btn="fold-open-font-library-body"]');
       if (libHead || libBody) {
@@ -30171,7 +30228,11 @@
         _applyFoldStyles(block);
         return;
       }
-      // p21c: pop-fold-width-pct 리스너 삭제 (UI 자체 제거됨 · 리사이저 드래그로 대체)
+      // p25s: pop-fold-width-pct 슬라이더 재추가 (±버튼과 병행)
+      if (e.target.id === 'pop-fold-width-pct') {
+        _applyFoldWidthPct(block, e.target.value);
+        return;
+      }
       if (e.target.id === 'pop-fold-divider-width') {
         block.setAttribute('data-fold-divider-width', e.target.value);
         _applyFoldStyles(block);
