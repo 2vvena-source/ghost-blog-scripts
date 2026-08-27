@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p25u
+ * 2vvena Editor Core - v2.0-β-p25v
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25u';
+  var VERSION = 'v2.0-β-p25v';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -17999,7 +17999,11 @@
         if (opts.shapeMode === 'separate') {
           html += '<div class="row"><div class="row-label">도형 선 색</div>'
             + '<div class="ep-color-row">'
-            + '  <input type="color" data-div-set="shapeStroke" value="' + toHex(opts.shapeStroke) + '">'
+            + '  <button type="button" class="ep-color-swatch" data-div-swatch="shapeStroke" data-cur="' + toHex(opts.shapeStroke) + '"'
+            + '        style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2);'
+            + '               border-radius:4px; padding:0; cursor:pointer;'
+            + '               background:' + toHex(opts.shapeStroke) + '; flex-shrink:0;"'
+            + '        title="클릭해서 색 선택"></button>'
             + '  <span style="opacity:0.55; font-size:0.78em;">도형 테두리 색</span>'
             + '</div></div>';
         }
@@ -18010,7 +18014,11 @@
         if (opts.shapeFill === 'filled') {
           html += '<div class="row"><div class="row-label">채움 색</div>'
             + '<div class="ep-color-row">'
-            + '  <input type="color" data-div-set="shapeFillColor" value="' + toHex(opts.shapeFillColor) + '">'
+            + '  <button type="button" class="ep-color-swatch" data-div-swatch="shapeFillColor" data-cur="' + toHex(opts.shapeFillColor) + '"'
+            + '        style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2);'
+            + '               border-radius:4px; padding:0; cursor:pointer;'
+            + '               background:' + toHex(opts.shapeFillColor) + '; flex-shrink:0;"'
+            + '        title="클릭해서 색 선택"></button>'
             + '  <span style="opacity:0.55; font-size:0.78em;">도형 내부 채움 색</span>'
             + '</div></div>';
         }
@@ -18317,6 +18325,37 @@
         return;
       }
       // 정렬 / 도형 모드 / 채움 버튼 (data-value 있는 pop-btn)
+      // p25v: 구분선 색 스와치 (shapeStroke / shapeFillColor) → 커스텀 픽커 · 실시간 · 취소 복원
+      var _dvSw = t.closest && t.closest('[data-div-swatch]');
+      if (_dvSw && selectedDivider) {
+        e.preventDefault(); e.stopPropagation();
+        var _dvKind = _dvSw.getAttribute('data-div-swatch'); // 'shapeStroke' | 'shapeFillColor'
+        var _dvAttrMap = { 'shapeStroke':'data-div-shape-stroke', 'shapeFillColor':'data-div-shape-fill-color' };
+        var _dvAttr = _dvAttrMap[_dvKind];
+        var _dvCur = _dvSw.getAttribute('data-cur') || (selectedDivider.getAttribute(_dvAttr) || '#0F3A3A');
+        var _dvOrig = _dvCur;
+        var _dvApply = function(colorValue){
+          if (!colorValue) return;
+          // p25v: 구분선은 readDividerOpts/applyDividerOpts 패턴 사용
+          var _dvOpts = (typeof readDividerOpts === 'function') ? readDividerOpts(selectedDivider) : {};
+          if (_dvKind === 'shapeStroke')     _dvOpts.shapeStroke = colorValue;
+          else if (_dvKind === 'shapeFillColor') _dvOpts.shapeFillColor = colorValue;
+          if (typeof applyDividerOpts === 'function') applyDividerOpts(selectedDivider, _dvOpts);
+          _dvSw.style.background = colorValue;
+          _dvSw.setAttribute('data-cur', colorValue);
+        };
+        if (typeof openCustomColorPicker === 'function') {
+          openCustomColorPicker({
+            initial: _dvCur,
+            context: 'divider',
+            detectFromSelection: false,
+            onChange: _dvApply,
+            onDone: _dvApply,
+            onCancel: function(){ _dvApply(_dvOrig); }
+          });
+        }
+        return;
+      }
       var btn = t.closest('[data-div-set][data-value]');
       if (btn && selectedDivider) {
         var setKey = btn.getAttribute('data-div-set');
@@ -18939,7 +18978,11 @@
       html += '<div class="row"><div class="row-label">링크 URL</div>'
         + '<input type="text" data-btn-set="url" value="' + escapeAttr(opts.url) + '" placeholder="https://..." style="width:100%;"></div>';
       html += '<div class="row"><div class="row-label">글자색</div>'
-        + '<div class="ep-color-row"><input type="color" data-btn-set="color" value="' + escapeAttr(opts.color) + '"></div></div>';
+        + '<div class="ep-color-row"><button type="button" class="ep-color-swatch" data-btn-swatch="color" data-cur="' + escapeAttr(opts.color) + '"'
+          + '        style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2);'
+          + '               border-radius:4px; padding:0; cursor:pointer;'
+          + '               background:' + escapeAttr(opts.color) + '; flex-shrink:0;"'
+          + '        title="클릭해서 색 선택"></button></div></div>';
       // p20a: 폰트 라이브러리 통합 (기존 p17e loadUserFonts 시스템 대체)
       var _btnFontOpts = (window.__DDL_EDITOR && window.__DDL_EDITOR.buildFontSelectOptions)
         ? window.__DDL_EDITOR.buildFontSelectOptions(opts.fontFamily, { value: 'inherit', label: '기본 (본문)' }, escapeAttr, escapeHtml)
@@ -18994,14 +19037,22 @@
       // p17g: 이미지 모드에서는 색상(색1, 색2) 섹션 자체를 렌더하지 않음 — 사용자 요청
       if (opts.bgMode !== 'image') {
         html += '<div class="row"><div class="row-label">' + (opts.bgMode==='gradient'||opts.bgMode==='pattern'?'색 1':'배경색') + '</div>'
-          + '<div class="ep-color-row"><input type="color" data-btn-set="bg" value="' + escapeAttr(opts.bg) + '"></div></div>';
+          + '<div class="ep-color-row"><button type="button" class="ep-color-swatch" data-btn-swatch="bg" data-cur="' + escapeAttr(opts.bg) + '"'
+          + '        style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2);'
+          + '               border-radius:4px; padding:0; cursor:pointer;'
+          + '               background:' + escapeAttr(opts.bg) + '; flex-shrink:0;"'
+          + '        title="클릭해서 색 선택"></button></div></div>';
         // 프리셋 (namespace: btn-bg)
         html += renderColorSection('border', opts.bg, 'btn-bg');
       }
       // 그라데이션·패턴이면 색 2 + 세부
       if (opts.bgMode === 'gradient' || opts.bgMode === 'pattern') {
         html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;"><div class="row-label" style="font-weight:600;">색 2</div>'
-          + '<div class="ep-color-row"><input type="color" data-btn-set="bg2" value="' + escapeAttr(opts.bg2) + '"></div></div>';
+          + '<div class="ep-color-row"><button type="button" class="ep-color-swatch" data-btn-swatch="bg2" data-cur="' + escapeAttr(opts.bg2) + '"'
+          + '        style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2);'
+          + '               border-radius:4px; padding:0; cursor:pointer;'
+          + '               background:' + escapeAttr(opts.bg2) + '; flex-shrink:0;"'
+          + '        title="클릭해서 색 선택"></button></div></div>';
         // p17g: 정규식 치환 폭탄 제거 → namespace 파라미터로 격리
         html += renderColorSection('border', opts.bg2, 'btn-bg2');
       }
@@ -19074,6 +19125,39 @@
     btnPopupEl.addEventListener('click', function(e){
       var t = e.target;
       if (t.closest('[data-btn-pop="close"]')) { closeButtonPopup(); return; }
+
+      // p25v: 버튼 색 스와치 (color / bg / bg2) → 커스텀 픽커 · 실시간 반영 · 취소 복원
+      var _btnSw = t.closest && t.closest('[data-btn-swatch]');
+      if (_btnSw && selectedButton) {
+        e.preventDefault(); e.stopPropagation();
+        var _bskKind = _btnSw.getAttribute('data-btn-swatch'); // 'color' | 'bg' | 'bg2'
+        var _bskAttrMap = { 'color':'data-btn-color', 'bg':'data-btn-bg', 'bg2':'data-btn-bg2' };
+        var _bskCtxMap = { 'color':'text', 'bg':'bg', 'bg2':'bg' };
+        var _bskAttr = _bskAttrMap[_bskKind];
+        var _bskDefault = (_bskKind === 'bg2') ? '#FFFFFF' : (_bskKind === 'color' ? '#0F3A3A' : '#FF9A76');
+        var _bskCur = _btnSw.getAttribute('data-cur') || (selectedButton.getAttribute(_bskAttr) || _bskDefault);
+        var _bskOrig = _bskCur;
+        var _bskApply = function(colorValue){
+          if (!colorValue) return;
+          // p25v: 버튼은 readButtonOpts/writeButtonOpts 패턴 사용 (data-btn-set input 리스너와 동일 경로)
+          var _bskOpts = (typeof readButtonOpts === 'function') ? readButtonOpts(selectedButton) : {};
+          _bskOpts[_bskKind] = colorValue; // 'color' | 'bg' | 'bg2'
+          if (typeof writeButtonOpts === 'function') writeButtonOpts(selectedButton, _bskOpts);
+          _btnSw.style.background = colorValue;
+          _btnSw.setAttribute('data-cur', colorValue);
+        };
+        if (typeof openCustomColorPicker === 'function') {
+          openCustomColorPicker({
+            initial: _bskCur,
+            context: _bskCtxMap[_bskKind] || 'bg',
+            detectFromSelection: false,
+            onChange: _bskApply,
+            onDone: _bskApply,
+            onCancel: function(){ _bskApply(_bskOrig); }
+          });
+        }
+        return;
+      }
 
       // p20a: 버튼 편집 다이얼로그 안 “라이브러리 관리 →” 버튼
       if (t.closest('[data-btn-open-font-library]')){
