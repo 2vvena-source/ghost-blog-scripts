@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25e';
+  var VERSION = 'v2.0-β-p25f';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -19459,13 +19459,14 @@
         // p23g: 인라인 style (letter-spacing / line-height 등) 또는 span[data-inline-format] 이 있는 경우도 감싸도록 확장
         //         (Ghost sanitizer 가 style 속성을 벗겨내지 않도록)
         var hasAlignOrWidth = (b.getAttribute('data-align') && b.getAttribute('data-align') !== 'left') || (b.getAttribute('data-width-pct') && b.getAttribute('data-width-pct') !== '100');
-        // 블록 안 편집 요소의 inline style (letter-spacing / line-height) 감지
+        // 블록 안 편집 요소의 inline style (letter-spacing / line-height / color) 감지
+        //   p25f: color(글자색) 도 감지 대상에 추가 — Ghost sanitizer 가 span[style*="color"] 를 벗겨냄
         var hasInlineFormat = false;
         try {
           innerEls.forEach(function(el){
             if (hasInlineFormat) return;
-            if (el && el.style && (el.style.letterSpacing || el.style.lineHeight)) hasInlineFormat = true;
-            if (!hasInlineFormat && el && el.querySelector && el.querySelector('[data-inline-format], [style*="letter-spacing"], [style*="line-height"]')) hasInlineFormat = true;
+            if (el && el.style && (el.style.letterSpacing || el.style.lineHeight || el.style.color)) hasInlineFormat = true;
+            if (!hasInlineFormat && el && el.querySelector && el.querySelector('[data-inline-format], [style*="letter-spacing"], [style*="line-height"], [style*="color:"], font[color]')) hasInlineFormat = true;
           });
         } catch(_){}
         // p23z: 형광펜(mark.ddl-hl) 감지 — 형광펜이 있으면 무조건 kg-card 로 감싸서 Ghost 가 style 을 못 지우게
@@ -24921,9 +24922,53 @@
   function applyTextColor(color){
     if (!color) return;
     restoreRange();
-    try { document.execCommand('foreColor', false, color); } catch(_){}
+
+    // p25f: 알파(투명도) 지원
+    //   - hex (#RRGGBB) or rgb() : document.execCommand('foreColor') 로 처리 (기존 방식)
+    //   - rgba() (알파 <100%) : execCommand 는 알파를 무시하므로,
+    //                          선택 범위를 <span style="color:rgba(...)"> 로 직접 감싼다.
+    var isRgba = /^rgba\(/i.test(color);
+
+    if (isRgba){
+      // 선택 영역 감싸기
+      try {
+        var sel = window.getSelection();
+        if (sel && sel.rangeCount > 0){
+          var range = sel.getRangeAt(0);
+          if (range.collapsed){
+            // 선택 영역 없으면 그냥 caret 위치 마커만 (아무 것도 안 함이 안전)
+          } else {
+            // 방법: 선택 안 텍스트 노드를 순회하며 <span style="color:rgba(...)"> 로 감싸기
+            //   - 이미 span 안에 있으면 상위 span 의 color 만 갱신
+            var span = document.createElement('span');
+            span.style.color = color;
+            // extractContents + span 삽입 (표준 안전 방식)
+            try {
+              var frag = range.extractContents();
+              span.appendChild(frag);
+              range.insertNode(span);
+              // 선택 유지
+              var newRange = document.createRange();
+              newRange.selectNodeContents(span);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+            } catch(err){
+              // extract 실패 시 execCommand fallback
+              try { document.execCommand('foreColor', false, color); } catch(_){}
+            }
+          }
+        }
+      } catch(err){
+        try { console.warn('[applyTextColor rgba]', err); } catch(_){}
+      }
+    } else {
+      // hex / rgb() → 기존 execCommand
+      try { document.execCommand('foreColor', false, color); } catch(_){}
+    }
+
     _lastTextColor = color;
     updateTextColorButton();
+
     // p25a: 사용자 색 저장 (시드에 없는 색만)
     //   - 하위 호환: 기존 addUserTextColor (ddl_user_text_colors, ddl.textColorGroups) 도 계속 호출
     //   - 신규: ddl.textColorLib 안 "내 색" 사용자 그룹에도 자동 저장
