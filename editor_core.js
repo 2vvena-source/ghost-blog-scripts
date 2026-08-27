@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25f';
+  var VERSION = 'v2.0-β-p25g';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -25035,10 +25035,71 @@
       + ' font-family: "Pretendard Variable","Pretendard",sans-serif; color: var(--color, #0F3A3A);'
       + ' padding: 0;';
 
-    // ── 상단: 3탭 + ⚙ 기어 ──────────────────────────────
+    // ── 상단: [현재색 사각형] + 3탭 + ⚙ 기어 ──────────────────
+    //   p25g: 형광펜 미니처럼 좌측에 "현재 선택된 색" 사각형 아이콘 추가
+    //         클릭 시 커스텀 컬러 픽커 열림 (detectFromSelection: true)
     var topbar = document.createElement('div');
     topbar.style.cssText = 'display: flex; justify-content: space-between; align-items: center;'
       + ' padding: 8px 10px; border-bottom: 1px solid rgba(15,58,58,0.06);';
+
+    // p25g: 좌측 묶음 = [현재색 아이콘] + [3탭]
+    var leftGroup = document.createElement('div');
+    leftGroup.style.cssText = 'display: inline-flex; align-items: center; gap: 8px;';
+
+    // p25g: 현재 색 감지 (선택된 텍스트의 인라인 style.color · 없으면 _lastTextColor)
+    function _detectCurrentColorForMini(){
+      try {
+        var sel = window.getSelection();
+        if (sel && sel.rangeCount > 0){
+          var el = sel.getRangeAt(0).startContainer;
+          if (el && el.nodeType === 3) el = el.parentNode;
+          while (el && el.nodeType === 1){
+            if (el.style && el.style.color) return el.style.color;
+            if (el.classList && el.classList.contains('editor-canvas')) break;
+            el = el.parentNode;
+          }
+        }
+      } catch(_){}
+      return (typeof _lastTextColor === 'string' && _lastTextColor) ? _lastTextColor : '#0F3A3A';
+    }
+    var _currentColor = _detectCurrentColorForMini();
+
+    var curColorBtn = document.createElement('button');
+    curColorBtn.type = 'button';
+    curColorBtn.title = '현재 색 · 클릭해서 편집';
+    curColorBtn.style.cssText = 'width: 24px; height: 24px; border-radius: 5px;'
+      + ' border: 1px solid rgba(15,58,58,0.2); padding: 0; cursor: pointer;'
+      + ' background: ' + _currentColor + ';'
+      + ' transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;'
+      + ' flex-shrink: 0;';
+    curColorBtn.addEventListener('mouseenter', function(){
+      curColorBtn.style.borderColor = 'var(--point, #FF9A76)';
+      curColorBtn.style.boxShadow = '0 0 0 2px rgba(255,154,118,0.18)';
+    });
+    curColorBtn.addEventListener('mouseleave', function(){
+      curColorBtn.style.borderColor = 'rgba(15,58,58,0.2)';
+      curColorBtn.style.boxShadow = 'none';
+    });
+    curColorBtn.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    curColorBtn.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
+      pop.remove();
+      try {
+        if (typeof openCustomColorPicker === 'function'){
+          openCustomColorPicker({
+            initial: _currentColor,
+            context: 'text',
+            detectFromSelection: false,   // 이미 감지해서 initial 로 넘겼으니 중복 감지 방지
+            onDone: function(colorValue){
+              if (!colorValue) return;
+              try { applyTextColor(colorValue); } catch(_){}
+            }
+          });
+        }
+      } catch(err){ try { console.warn('[tc-current-picker]', err); } catch(_){} }
+    });
+    leftGroup.appendChild(curColorBtn);
 
     var tabs = document.createElement('div');
     tabs.style.cssText = 'display: inline-flex; gap: 4px;';
@@ -25075,7 +25136,8 @@
       tabButtons[td.key] = b;
       tabs.appendChild(b);
     });
-    topbar.appendChild(tabs);
+    leftGroup.appendChild(tabs);
+    topbar.appendChild(leftGroup);
 
     // ⚙ 기어 (그룹 관리창 진입)
     var gear = document.createElement('button');
