@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26j
+ * 2vvena Editor Core - v2.0-β-p26k
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26j';
+  var VERSION = 'v2.0-β-p26k';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2683,6 +2683,8 @@
     '.ddl-column > *:first-child { margin-top: 0; }',
     '.ddl-column > *:last-child  { margin-bottom: 0; }',
     /* 컬럼 리사이저 (컬럼 사이 세로 손잡이) */
+    /* p26k: draggable=false 를 CSS 로 강제 (사용자 브라우저별 native drag 방지 보강) */
+    '.ddl-column-resizer[draggable] { pointer-events: auto; }',
     '.ddl-column-resizer {',
     '  flex: 0 0 20px;',
     '  align-self: stretch;',
@@ -3351,7 +3353,8 @@
               var rs2 = document.createElement('div');
               rs2.className = 'ddl-column-resizer';
               rs2.setAttribute('contenteditable', 'false');
-              rs2.setAttribute('title', '드래그해서 컬럼 폭 조절');
+              rs2.setAttribute('draggable', 'false'); // p26k: native drag 고스트 억제
+              rs2.setAttribute('title', '드래그해서 컴럼 폭 조절');
               rs2.setAttribute('data-column-resizer', String(ci2));
               wrap2.insertBefore(rs2, next2);
             }
@@ -4260,7 +4263,10 @@
       var h = t.closest && t.closest('.block-handle');
       if (h) return h.closest('.editor-block');
       // 편집 팝업·다이얼로그 안은 드래그 안 됨
-      if (t.closest && (t.closest('.ep-popup') || t.closest('.ep-popup-v2') || t.closest('.ddl-editor-popup') || t.closest('#ep-btn-popup') || t.closest('#ep-div-popup') || t.closest('#ep-cal-popup') || t.closest('#ep-img-popup') || t.closest('.ep-crop-popup') || t.closest('.callout-resizer') || t.closest('.ddl-fold-resizer') || t.closest('.editor-image-resizer'))) return null;
+      // p26k: 다단 리사이저(.ddl-column-resizer)도 예외 추가 — 리사이저 조작 중
+      //       브라우저/에디터가 만드는 반투명 고스트 프리뷰가 뜨는 버그 억제.
+      //       (기존 .callout-resizer / .ddl-fold-resizer / .editor-image-resizer 와 동일한 취급)
+      if (t.closest && (t.closest('.ep-popup') || t.closest('.ep-popup-v2') || t.closest('.ddl-editor-popup') || t.closest('#ep-btn-popup') || t.closest('#ep-div-popup') || t.closest('#ep-cal-popup') || t.closest('#ep-img-popup') || t.closest('.ep-crop-popup') || t.closest('.callout-resizer') || t.closest('.ddl-fold-resizer') || t.closest('.editor-image-resizer') || t.closest('.ddl-column-resizer'))) return null;
       // text editable 안이면 거부 (contenteditable=false 자식 예외는 허용)
       var editable = t.closest && t.closest('[contenteditable="true"]');
       var nonEd = t.closest && t.closest('[contenteditable="false"]');
@@ -30309,7 +30315,8 @@
         var rs = document.createElement('div');
         rs.className = 'ddl-column-resizer';
         rs.setAttribute('contenteditable', 'false');
-        rs.setAttribute('title', '드래그해서 컬럼 폭 조절');
+        rs.setAttribute('draggable', 'false'); // p26k: native drag 고스트 억제
+        rs.setAttribute('title', '드래그해서 컴럼 폭 조절');
         rs.setAttribute('data-column-resizer', String(j));
         wrap.appendChild(rs);
       }
@@ -30378,6 +30385,15 @@
       if (!handle) return;
       var wrap = handle.parentNode;
       if (!wrap || !wrap.classList.contains('ddl-columns-block')) return;
+      // p26k: 안전벨트 — 혹시 문서 레벨 mousedown 리스너가 먼저 잡아서
+      //       _blockDragState 를 세팅해두었다면 여기서 즉시 취소해 고스트가
+      //       뜨지 못하게 함. (capture 순서상 이 함수는 body 등록이라 document
+      //       리스너보다 늦게 실행되므로 반드시 필요한 리셋.)
+      try {
+        if (typeof _blockDragState !== 'undefined' && _blockDragState) {
+          _blockDragState = null;
+        }
+      } catch(_){}
       var block = wrap.parentNode;
       var idx = parseInt(handle.getAttribute('data-column-resizer'), 10);
       // 인접 두 컬럼 찾기
