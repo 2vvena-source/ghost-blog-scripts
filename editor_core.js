@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25g';
+  var VERSION = 'v2.0-β-p25i';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -10634,6 +10634,8 @@
         // p23v: 새 형광펜 미니 팝오버 우선 사용 (헤더 미니와 동일 구조).
         //   사용자가 사이트 설정에서 돌리고 싶으면 legacy openPalette 로 대체 가능하도록 openPalette 는 그대로 유지.
         e.preventDefault(); e.stopPropagation();
+        // p25i: 팝오버 열기 전 selection 저장 → "현재색" 아이콘이 올바른 색을 감지하도록
+        try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
         try {
           if (typeof openHighlighterMiniPopover === 'function'){
             openHighlighterMiniPopover(btn);
@@ -10664,8 +10666,10 @@
         return;
       }
       // p22f: 글자색 (모던 툴바도 새 미니 팝오버 사용)
+      // p25h: 미니 열기 전에 selection 을 savedRange 로 백업 → 현재 색 감지가 A 클릭에도 유지됨
       if (cmd === 'text-color'){
         e.preventDefault(); e.stopPropagation();
+        try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
         try {
           if (window.__DDL_EDITOR && window.__DDL_EDITOR.openTextColorMini) window.__DDL_EDITOR.openTextColorMini(btn);
         } catch(err){ console.warn(err); }
@@ -16058,15 +16062,89 @@
       + ' border: 1px solid rgba(15,58,58,0.2); padding: 0; cursor: pointer;'
       + ' background: #FFF176; transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;'
       + ' flex-shrink: 0;';
+    // p25i: 3단계 폴백으로 "현재 형광펜 색"을 감지
+    //   (1) savedRange 안에 <mark.ddl-hl> 가 있으면 그 spec 재구성
+    //   (2) 현재 window.getSelection() 안에 <mark.ddl-hl> 가 있으면 그 spec 재구성
+    //   (3) localStorage['ddl.lastAppliedHlSpec']
     (function _initLastSpecBtn(){
-      try {
-        var _lastJson = localStorage.getItem('ddl.lastAppliedHlSpec');
-        if (_lastJson){
-          var _lastSp = JSON.parse(_lastJson);
-          if (_lastSp && typeof _lastSp === 'object'){
-            var _bg = (typeof _hlSpecToPreview === 'function') ? _hlSpecToPreview(_lastSp) : (_lastSp.c1 || '#FFF176');
-            lastSpecBtn.style.background = _bg;
+      function _specFromMark(mk){
+        if (!mk) return null;
+        try {
+          var sj = mk.getAttribute('data-hl-spec');
+          if (sj){
+            var s = JSON.parse(sj);
+            if (s && typeof s === 'object') return s;
           }
+        } catch(_){}
+        // fallback: 개별 속성
+        var mode = mk.getAttribute('data-hl-mode') || 'marker';
+        var c1   = mk.getAttribute('data-hl-c1')   || '#FFF176';
+        var a1   = parseInt(mk.getAttribute('data-hl-a1') || '100', 10);
+        var pos  = mk.getAttribute('data-hl-pos') || null;
+        var ratio = mk.getAttribute('data-hl-ratio');
+        var sp = { mode: mode, c1: c1, a1: isNaN(a1) ? 100 : a1 };
+        if (pos) sp.pos = pos;
+        if (ratio){ var r = parseInt(ratio, 10); if (!isNaN(r)) sp.ratio = r; }
+        return sp;
+      }
+      function _findMarkInRange(rng){
+        if (!rng) return null;
+        try {
+          var node = rng.commonAncestorContainer;
+          if (node && node.nodeType === 3) node = node.parentNode;
+          if (!node || !node.closest) return null;
+          // 선택 재질이 mark 안에 있거나, 조상이 mark 인 경우
+          var mk = node.closest ? node.closest('mark.ddl-hl') : null;
+          if (mk) return mk;
+          // 범위 안에 mark 가 포함된 경우 (element node)
+          if (node.querySelector){
+            var inner = node.querySelector('mark.ddl-hl');
+            if (inner) return inner;
+          }
+        } catch(_){}
+        return null;
+      }
+      try {
+        var _detected = null;
+
+        // (1) savedRange 사용
+        try {
+          var _sr = (typeof savedRange !== 'undefined' && savedRange) ? savedRange
+                  : (typeof _savedRange !== 'undefined' && _savedRange) ? _savedRange
+                  : null;
+          if (_sr){
+            var _mk1 = _findMarkInRange(_sr);
+            if (_mk1) _detected = _specFromMark(_mk1);
+          }
+        } catch(_){}
+
+        // (2) 현재 선택에서 감지
+        if (!_detected){
+          try {
+            var _sel = window.getSelection && window.getSelection();
+            if (_sel && _sel.rangeCount > 0){
+              var _mk2 = _findMarkInRange(_sel.getRangeAt(0));
+              if (_mk2) _detected = _specFromMark(_mk2);
+            }
+          } catch(_){}
+        }
+
+        // (3) localStorage 폴백
+        if (!_detected){
+          try {
+            var _lastJson = localStorage.getItem('ddl.lastAppliedHlSpec');
+            if (_lastJson){
+              var _lastSp = JSON.parse(_lastJson);
+              if (_lastSp && typeof _lastSp === 'object') _detected = _lastSp;
+            }
+          } catch(_){}
+        }
+
+        if (_detected){
+          var _bg = (typeof _hlSpecToPreview === 'function') ? _hlSpecToPreview(_detected) : (_detected.c1 || '#FFF176');
+          lastSpecBtn.style.background = _bg;
+          // 다음 클릭에서 바로 적용할 수 있도록 spec 저장 (data-*)
+          try { lastSpecBtn.setAttribute('data-detected-spec', JSON.stringify(_detected)); } catch(_){}
         }
       } catch(_){}
     })();
@@ -16083,10 +16161,19 @@
       e.preventDefault(); e.stopPropagation();
       try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
       pop.remove();
+      // p25i: 감지된 spec이 있으면 그것을 사용, 없으면 기본값
+      var _initSpec = { mode:'marker', c1:'#FFF176', a1:100 };
+      try {
+        var _dsj = lastSpecBtn.getAttribute('data-detected-spec');
+        if (_dsj){
+          var _ds = JSON.parse(_dsj);
+          if (_ds && typeof _ds === 'object') _initSpec = _ds;
+        }
+      } catch(_){}
       try {
         if (typeof openHighlighterPresetEditor === 'function'){
           openHighlighterPresetEditor(
-            { name: '', spec: { mode:'marker', c1:'#FFF176', a1:100 } },
+            { name: '', spec: _initSpec },
             null,
             { mode: 'apply-hl' }
           );
@@ -25046,20 +25133,37 @@
     var leftGroup = document.createElement('div');
     leftGroup.style.cssText = 'display: inline-flex; align-items: center; gap: 8px;';
 
-    // p25g: 현재 색 감지 (선택된 텍스트의 인라인 style.color · 없으면 _lastTextColor)
+    // p25g: 현재 색 감지
+    //   p25h: A 버튼 클릭으로 selection 이 소실될 수 있어, savedRange 도 함께 확인
+    //         우선순위: (1) savedRange (버튼 클릭 전 백업) → (2) 현재 window.getSelection() → (3) _lastTextColor
     function _detectCurrentColorForMini(){
+      // 안쪽 어느 요소든 상위 방향으로 올라가며 인라인 color 를 찾음
+      function _walkUpForColor(startEl){
+        var el = startEl;
+        if (el && el.nodeType === 3) el = el.parentNode;
+        while (el && el.nodeType === 1){
+          if (el.style && el.style.color) return el.style.color;
+          if (el.classList && el.classList.contains('editor-canvas')) break;
+          el = el.parentNode;
+        }
+        return null;
+      }
+      // (1) savedRange (툴바 A 클릭 이전 백업)
+      try {
+        if (typeof savedRange !== 'undefined' && savedRange && savedRange.startContainer){
+          var c1 = _walkUpForColor(savedRange.startContainer);
+          if (c1) return c1;
+        }
+      } catch(_){}
+      // (2) 현재 selection (savedRange 없거나 감지 실패 시)
       try {
         var sel = window.getSelection();
         if (sel && sel.rangeCount > 0){
-          var el = sel.getRangeAt(0).startContainer;
-          if (el && el.nodeType === 3) el = el.parentNode;
-          while (el && el.nodeType === 1){
-            if (el.style && el.style.color) return el.style.color;
-            if (el.classList && el.classList.contains('editor-canvas')) break;
-            el = el.parentNode;
-          }
+          var c2 = _walkUpForColor(sel.getRangeAt(0).startContainer);
+          if (c2) return c2;
         }
       } catch(_){}
+      // (3) 마지막 적용 색
       return (typeof _lastTextColor === 'string' && _lastTextColor) ? _lastTextColor : '#0F3A3A';
     }
     var _currentColor = _detectCurrentColorForMini();
