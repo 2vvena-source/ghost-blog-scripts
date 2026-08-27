@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p25v
+ * 2vvena Editor Core - v2.0-β-p25w
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25v';
+  var VERSION = 'v2.0-β-p25w';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -18411,6 +18411,10 @@
       if (divPopupEl.contains(e.target)) return;
       if (e.target.closest && e.target.closest('.ep-divider-block')) return;
       if (e.target.closest && e.target.closest('.block-handle')) return;
+      // p25v2: 커스텀 컬러 픽커 (.ddl-editor-popup) 안 클릭은 팝업 밖 아님
+      if (e.target.closest && e.target.closest('.ddl-editor-popup')) return;
+      // p25v2: 다른 편집기 팝업 (설정창/다이얼로그) 도 밖으로 판정하지 않음
+      if (e.target.closest && e.target.closest('.ep-dialog-overlay')) return;
       closeDividerPopup();
     };
     setTimeout(function(){
@@ -19508,6 +19512,9 @@
       if (e.target.closest && e.target.closest('.ep-button-block')) return;
       if (e.target.closest && e.target.closest('.block-handle')) return;
       if (e.target.closest && e.target.closest('.ep-dialog-overlay')) return;
+      // p25v2: 커스텀 컬러 픽커 (.ddl-editor-popup) 안 클릭은 팝업 밖 아님
+      //        스와치 클릭 → 픽커 열림 → 픽커 안 조작 시 팝업 닫히던 문제 해결
+      if (e.target.closest && e.target.closest('.ddl-editor-popup')) return;
       closeButtonPopup();
     };
     setTimeout(function(){
