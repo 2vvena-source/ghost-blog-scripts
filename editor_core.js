@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26p
+ * 2vvena Editor Core - v2.0-β-p26q
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26p';
+  var VERSION = 'v2.0-β-p26q';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2735,6 +2735,164 @@
     '  border-radius: 1px;',
     '}',
 
+    /* ═══════════════════════════════════════════════════════════ */
+    /* p26q: 이미지 슬라이드 블록 (좌우 캐러셀)                       */
+    /*   외부: .ep-slider-block (contenteditable=false wrapper)      */
+    /*   트랙: .ddl-slider-track (실제 슬라이드 컨테이너)              */
+    /*   슬라이드: .ddl-slider-item (각 이미지 슬라이드)               */
+    /*   버튼: .ddl-slider-prev / .ddl-slider-next (좌우 화살표)      */
+    /*   도트: .ddl-slider-dots (하단 인디케이터)                      */
+    /* ═══════════════════════════════════════════════════════════ */
+    '.ep-slider-block {',
+    '  position: relative;',
+    '  display: block;',
+    '  width: 100%;',
+    '  margin: 0.6em 0;',
+    '  overflow: hidden;',
+    '  background: rgba(15,58,58,0.03);',
+    '  border-radius: 6px;',
+    '  box-sizing: border-box;',
+    '}',
+    '.ddl-slider-viewport {',
+    '  position: relative;',
+    '  width: 100%;',
+    '  overflow: hidden;',
+    '  aspect-ratio: 16 / 9;',
+    '  background: rgba(15,58,58,0.06);',
+    '}',
+    '.ddl-slider-track {',
+    '  position: relative;',
+    '  width: 100%;',
+    '  height: 100%;',
+    '  display: flex;',
+    '  transition: transform 400ms ease;',
+    '  will-change: transform;',
+    '}',
+    '.ddl-slider-item {',
+    '  flex: 0 0 100%;',
+    '  width: 100%;',
+    '  height: 100%;',
+    '  position: relative;',
+    '  overflow: hidden;',
+    '  display: flex;',
+    '  align-items: center;',
+    '  justify-content: center;',
+    '}',
+    '.ddl-slider-item img {',
+    '  width: 100%;',
+    '  height: 100%;',
+    '  object-fit: cover;',
+    '  display: block;',
+    '  user-select: none;',
+    '  -webkit-user-drag: none;',
+    '}',
+    '.ddl-slider-item.is-empty::before {',
+    '  content: "이미지 없음 (편집창에서 이미지를 추가하세요)";',
+    '  color: rgba(15,58,58,0.35);',
+    '  font-style: italic;',
+    '  font-size: 0.9em;',
+    '}',
+    /* 페이드 애니메이션 (data-anim=fade) */
+    '.ep-slider-block[data-anim="fade"] .ddl-slider-track {',
+    '  display: block;',
+    '  transition: none;',
+    '}',
+    '.ep-slider-block[data-anim="fade"] .ddl-slider-item {',
+    '  position: absolute;',
+    '  top: 0; left: 0; right: 0; bottom: 0;',
+    '  width: 100%;',
+    '  opacity: 0;',
+    '  transition: opacity 500ms ease;',
+    '  pointer-events: none;',
+    '}',
+    '.ep-slider-block[data-anim="fade"] .ddl-slider-item.is-current {',
+    '  opacity: 1;',
+    '  pointer-events: auto;',
+    '  z-index: 1;',
+    '}',
+    /* 줌 애니메이션 (data-anim=zoom) - 슬라이드 유지 + 현재 슬라이드 살짝 확대 */
+    '.ep-slider-block[data-anim="zoom"] .ddl-slider-item img {',
+    '  transition: transform 700ms ease;',
+    '  transform: scale(1.05);',
+    '}',
+    '.ep-slider-block[data-anim="zoom"] .ddl-slider-item.is-current img {',
+    '  transform: scale(1.0);',
+    '}',
+    /* 좌우 화살표 버튼 */
+    '.ddl-slider-btn {',
+    '  position: absolute;',
+    '  top: 50%;',
+    '  transform: translateY(-50%);',
+    '  width: 40px;',
+    '  height: 40px;',
+    '  border-radius: 50%;',
+    '  background: rgba(15,58,58,0.55);',
+    '  color: #F5F5F5;',
+    '  border: none;',
+    '  cursor: pointer;',
+    '  display: flex;',
+    '  align-items: center;',
+    '  justify-content: center;',
+    '  font-size: 1.4em;',
+    '  z-index: 10;',
+    '  opacity: 0;',
+    '  transition: opacity 200ms ease, background 200ms ease;',
+    '  user-select: none;',
+    '}',
+    '.ep-slider-block:hover .ddl-slider-btn { opacity: 0.85; }',
+    '.ddl-slider-btn:hover { background: rgba(15,58,58,0.8); opacity: 1 !important; }',
+    '.ddl-slider-prev { left: 12px; }',
+    '.ddl-slider-next { right: 12px; }',
+    /* 하단 도트 인디케이터 */
+    '.ddl-slider-dots {',
+    '  position: absolute;',
+    '  bottom: 12px;',
+    '  left: 50%;',
+    '  transform: translateX(-50%);',
+    '  display: flex;',
+    '  gap: 8px;',
+    '  z-index: 10;',
+    '}',
+    '.ddl-slider-dot {',
+    '  width: 8px;',
+    '  height: 8px;',
+    '  border-radius: 50%;',
+    '  background: rgba(245,245,245,0.55);',
+    '  cursor: pointer;',
+    '  border: 1px solid rgba(15,58,58,0.15);',
+    '  padding: 0;',
+    '  transition: background 180ms ease, transform 180ms ease;',
+    '}',
+    '.ddl-slider-dot.is-current { background: #F5F5F5; transform: scale(1.25); }',
+    '.ddl-slider-dot:hover { background: rgba(245,245,245,0.85); }',
+    /* 편집기에서만 표시되는 마커 - 저장 시 제거 */
+    '.ep-slider-block.is-selected { outline: 1px dashed rgba(255,154,118,0.4); outline-offset: -2px; }',
+    /* 우측 하단 리사이즈 핸들 (콜아웃 방식 재사용) */
+    '.ddl-slider-resizer {',
+    '  position: absolute;',
+    '  right: 0;',
+    '  bottom: 0;',
+    '  width: 18px;',
+    '  height: 18px;',
+    '  cursor: nwse-resize;',
+    '  background: linear-gradient(135deg, transparent 50%, rgba(15,58,58,0.4) 50%);',
+    '  z-index: 12;',
+    '  opacity: 0;',
+    '  transition: opacity 180ms ease;',
+    '}',
+    '.ep-slider-block:hover .ddl-slider-resizer { opacity: 0.75; }',
+    '.ddl-slider-resizer:hover { opacity: 1 !important; }',
+    /* 정렬 */
+    '.editor-block[data-block-type="slider"][data-align="left"] > .ep-slider-block { margin-left: 0 !important; margin-right: auto !important; }',
+    '.editor-block[data-block-type="slider"][data-align="center"] > .ep-slider-block { margin-left: auto !important; margin-right: auto !important; }',
+    '.editor-block[data-block-type="slider"][data-align="right"] > .ep-slider-block { margin-left: auto !important; margin-right: 0 !important; }',
+    /* 모바일 대응 */
+    '@media (max-width: 480px) {',
+    '  .ddl-slider-btn { width: 32px; height: 32px; font-size: 1.1em; }',
+    '  .ddl-slider-dots { bottom: 8px; gap: 6px; }',
+    '  .ddl-slider-dot { width: 6px; height: 6px; }',
+    '}',
+
 
     /* ═══════════════════════════════════════════════════════════ */
     /* p22a: createMiniPopover 팩토리 전용 CSS                       */
@@ -3425,6 +3583,8 @@
     if (!contentEl) return;
     // p20e: 컨테이너 마커 + handle draggable 보장
     _markBlockContainers(contentEl);
+    // p26q: 슬라이드 블록 hydration (재진입 시 리사이저·도트·화살표·런타임 복원)
+    try { if (window.__DDL_EDITOR && window.__DDL_EDITOR.fixupAllSliders) window.__DDL_EDITOR.fixupAllSliders(contentEl); } catch(_){}
     _ensureHandleDraggable(contentEl);
     var boxes = contentEl.querySelectorAll('.callout-box');
     var fixed = 0;
@@ -5279,6 +5439,20 @@
         keywords:['4단','4컬럼','columns','컬럼','다단','4col','four column'],
         exec:function(originBlock){
           _insertColumnsFromSlash(originBlock, 4);
+        }
+      },
+      // p26q: 이미지 슬라이드 (좌우 캐러셀 · 최대 10장)
+      { id:'slider', label:'이미지 슬라이드', desc:'좌우 캐러셀 · 최대 10장 · 자동재생·애니메이션 옵션', icon:'<svg width="22" height="14" viewBox="0 0 22 14" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="20" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="4" cy="7" r="0.9" fill="currentColor"/><circle cx="7" cy="7" r="0.9" fill="currentColor"/><path d="M14 7 L18 7 M16 5 L18 7 L16 9" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        keywords:['슬라이드','이미지슬라이드','슬라이더','캐러셀','slider','carousel','gallery','갤러리'],
+        exec:function(originBlock){
+          if (window.__DDL_EDITOR && window.__DDL_EDITOR.insertSlideBlock) {
+            var b = window.__DDL_EDITOR.insertSlideBlock(originBlock);
+            // 삽입 직후 편집 팝업 자동 열기
+            var sl = b.querySelector(':scope > .ep-slider-block');
+            if (sl && typeof openSlidePopup === 'function') {
+              setTimeout(function(){ openSlidePopup(sl); }, 60);
+            }
+          }
         }
       },
       // p20k: 표 슬래시 항목은 별도 라운드에서 재설계 (TABLE_v2_SPEC.md)
@@ -9553,14 +9727,17 @@
       ['data-saturate','data-opacity','data-rotate','data-flip-h','data-flip-v','data-clip-path','data-trim-t','data-trim-r','data-trim-b','data-trim-l'].forEach(function(a){
         imgPopupTarget.removeAttribute(a);
       });
-    } else if (act === 'align-left') {
-      imgPopupTarget.setAttribute('data-align', 'left');
-      renderImagePopupBody();
-    } else if (act === 'align-center') {
-      imgPopupTarget.setAttribute('data-align', 'center');
-      renderImagePopupBody();
-    } else if (act === 'align-right') {
-      imgPopupTarget.setAttribute('data-align', 'right');
+    } else if (act === 'align-left' || act === 'align-center' || act === 'align-right') {
+      // p26q: 이미지 정렬 - figure 뿐 아니라 부모 .editor-block에도 data-align 세팅
+      //   원인: CSS 규칙 두 층 존재:
+      //     [1] .editor-image-figure[data-align=...] { margin: auto ... }
+      //     [2] .editor-block[data-block-type="image"][data-align=...] > figure { margin: auto ... }
+      //   [2] 가 더 강력히 위치를 강제하므로 [1] 만 세팅하면 부모 padding이 이겨 정렬이 안 먹힘.
+      //   해결: figure + parent block 둘 다 data-align 세팅.
+      var _al = act.replace('align-', '');
+      imgPopupTarget.setAttribute('data-align', _al);
+      var _pBlock = imgPopupTarget.closest('.editor-block');
+      if (_pBlock) _pBlock.setAttribute('data-align', _al);
       renderImagePopupBody();
     } else if (act === 'open-crop') {
       // p26p: 공용 크롭 대화창 사용 (이미지 자체 소스 크롭)
@@ -21486,6 +21663,17 @@
               }
             }
           } catch(_){}
+          // p26q: 슬라이드 블록
+          try {
+            if (clone.getAttribute && clone.getAttribute('data-block-type') === 'slider') {
+              enhanceSliderForSite(clone);
+            } else {
+              var innerSliderBlks = clone.querySelectorAll && clone.querySelectorAll('[data-block-type="slider"]');
+              if (innerSliderBlks && innerSliderBlks.length) {
+                innerSliderBlks.forEach(function(sb){ enhanceSliderForSite(sb); });
+              }
+            }
+          } catch(_){}
           // p23g: 불릿 블록 사이트 반영 (data-bullet-style / 프레임 / 특수문자 마커)
           try {
             if (clone.getAttribute && clone.getAttribute('data-bullet-style')){
@@ -31100,6 +31288,710 @@
   }
 
   try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.insertColumnsBlock = insertColumnsBlock; } catch(_){}
+
+  // ═══════════════════════════════════════════════════════════
+  // p26q: 이미지 슬라이드 블록 (좌우 캐러셀 · 최대 10장)
+  //   특징:
+  //     - 좌우 화살표·하단 도트 인디케이터
+  //     - 자동재생 on/off (data-ddl-autoplay="1" / interval ms)
+  //     - 애니메이션 3종: slide(기본) / fade / zoom
+  //     - 이미지당 크롭 가능 (공용 openImageCropDialog 재사용)
+  //     - 정렬(left/center/right) · 폭 · 리사이즈 핸들
+  //     - Ghost sanitizer 통과: 저장 시 contenteditable 제거, data-ddl-* 접두어, 인라인 style + !important
+  //     - 사이트에서 런타임 스크립트로 자동 초기화 (외부 라이브러리 없음)
+  // ═══════════════════════════════════════════════════════════
+
+  var SLIDER_MAX_IMAGES = 10;
+  var slidePopupEl = null;
+  var slidePopupTarget = null;
+  var slidePopupTab = 'images';
+
+  function _sliderMakeItem(imgSrc){
+    var item = document.createElement('div');
+    item.className = 'ddl-slider-item';
+    if (imgSrc) {
+      var img = document.createElement('img');
+      img.src = imgSrc;
+      img.setAttribute('alt', '');
+      item.appendChild(img);
+    } else {
+      item.classList.add('is-empty');
+    }
+    return item;
+  }
+
+  function insertSlideBlock(afterBlock){
+    var block = document.createElement('div');
+    block.className = 'editor-block';
+    block.setAttribute('data-block-type', 'slider');
+    block.setAttribute('data-align', 'center');
+    block.setAttribute('contenteditable', 'false');
+    block.appendChild(makeBlockHandle());
+
+    var slider = document.createElement('div');
+    slider.className = 'ep-slider-block';
+    slider.setAttribute('data-ddl-slider', '1');
+    slider.setAttribute('data-anim', 'slide');
+    slider.setAttribute('data-ddl-autoplay', '0');
+    slider.setAttribute('data-ddl-interval', '3500');
+    slider.setAttribute('contenteditable', 'false');
+
+    var viewport = document.createElement('div');
+    viewport.className = 'ddl-slider-viewport';
+
+    var track = document.createElement('div');
+    track.className = 'ddl-slider-track';
+    // 초기 빈 슬라이드 1개
+    track.appendChild(_sliderMakeItem(null));
+
+    viewport.appendChild(track);
+
+    // 좌우 버튼
+    var prev = document.createElement('button');
+    prev.type = 'button';
+    prev.className = 'ddl-slider-btn ddl-slider-prev';
+    prev.setAttribute('contenteditable', 'false');
+    prev.setAttribute('aria-label', '이전 슬라이드');
+    prev.textContent = '‹';
+
+    var next = document.createElement('button');
+    next.type = 'button';
+    next.className = 'ddl-slider-btn ddl-slider-next';
+    next.setAttribute('contenteditable', 'false');
+    next.setAttribute('aria-label', '다음 슬라이드');
+    next.textContent = '›';
+
+    // 도트
+    var dots = document.createElement('div');
+    dots.className = 'ddl-slider-dots';
+    var d0 = document.createElement('button');
+    d0.type = 'button';
+    d0.className = 'ddl-slider-dot is-current';
+    d0.setAttribute('contenteditable', 'false');
+    d0.setAttribute('data-ddl-slide-idx', '0');
+    dots.appendChild(d0);
+
+    // 리사이즈 핸들
+    var resizer = document.createElement('div');
+    resizer.className = 'ddl-slider-resizer';
+    resizer.setAttribute('contenteditable', 'false');
+    resizer.setAttribute('title', '드래그하여 크기 조절');
+
+    viewport.appendChild(prev);
+    viewport.appendChild(next);
+    viewport.appendChild(dots);
+    viewport.appendChild(resizer);
+
+    slider.appendChild(viewport);
+    block.appendChild(slider);
+
+    if (afterBlock && afterBlock.parentNode) {
+      afterBlock.parentNode.insertBefore(block, afterBlock.nextSibling);
+    } else {
+      contentEl.appendChild(block);
+    }
+
+    // 편집기 런타임 붙이기
+    _sliderInstallRuntime(slider);
+    return block;
+  }
+
+  // ─── 편집기 런타임 (좌우 이동, 도트, 자동재생) ───
+  function _sliderInstallRuntime(slider){
+    if (!slider || slider._sliderRuntimeInstalled) return;
+    slider._sliderRuntimeInstalled = true;
+
+    var track = slider.querySelector(':scope > .ddl-slider-viewport > .ddl-slider-track');
+    var dotsBox = slider.querySelector(':scope > .ddl-slider-viewport > .ddl-slider-dots');
+    var prevBtn = slider.querySelector(':scope > .ddl-slider-viewport > .ddl-slider-prev');
+    var nextBtn = slider.querySelector(':scope > .ddl-slider-viewport > .ddl-slider-next');
+
+    var state = { current: 0, timer: null };
+    slider._sliderState = state;
+
+    function getItems(){
+      return track ? Array.prototype.filter.call(track.children, function(c){
+        return c.classList && c.classList.contains('ddl-slider-item');
+      }) : [];
+    }
+    function getCount(){ return getItems().length; }
+    function updateVisual(){
+      var items = getItems();
+      var n = items.length;
+      if (state.current < 0) state.current = 0;
+      if (state.current >= n) state.current = n - 1;
+      var anim = slider.getAttribute('data-anim') || 'slide';
+      if (anim === 'slide') {
+        if (track) track.style.transform = 'translateX(' + (-100 * state.current) + '%)';
+        items.forEach(function(it, i){ it.classList.toggle('is-current', i === state.current); });
+      } else {
+        // fade / zoom
+        if (track) track.style.transform = '';
+        items.forEach(function(it, i){ it.classList.toggle('is-current', i === state.current); });
+      }
+      // 도트 갱신
+      if (dotsBox) {
+        var dots = dotsBox.querySelectorAll('.ddl-slider-dot');
+        for (var i = 0; i < dots.length; i++) {
+          dots[i].classList.toggle('is-current', i === state.current);
+        }
+      }
+    }
+    function rebuildDots(){
+      if (!dotsBox) return;
+      var n = getCount();
+      dotsBox.innerHTML = '';
+      for (var i = 0; i < n; i++){
+        var d = document.createElement('button');
+        d.type = 'button';
+        d.className = 'ddl-slider-dot' + (i === state.current ? ' is-current' : '');
+        d.setAttribute('contenteditable', 'false');
+        d.setAttribute('data-ddl-slide-idx', String(i));
+        dotsBox.appendChild(d);
+      }
+    }
+    function go(dir){
+      var n = getCount();
+      if (n <= 1) return;
+      state.current = (state.current + dir + n) % n;
+      updateVisual();
+    }
+    function stopAutoplay(){
+      if (state.timer) { clearInterval(state.timer); state.timer = null; }
+    }
+    function startAutoplay(){
+      stopAutoplay();
+      if (slider.getAttribute('data-ddl-autoplay') !== '1') return;
+      var interval = parseInt(slider.getAttribute('data-ddl-interval') || '3500', 10);
+      if (interval < 800) interval = 800;
+      state.timer = setInterval(function(){ go(1); }, interval);
+    }
+
+    slider._sliderGo = go;
+    slider._sliderUpdate = updateVisual;
+    slider._sliderRebuildDots = rebuildDots;
+    slider._sliderStartAutoplay = startAutoplay;
+    slider._sliderStopAutoplay = stopAutoplay;
+
+    if (prevBtn) prevBtn.addEventListener('click', function(e){ e.stopPropagation(); go(-1); });
+    if (nextBtn) nextBtn.addEventListener('click', function(e){ e.stopPropagation(); go(1); });
+    if (dotsBox) {
+      dotsBox.addEventListener('click', function(e){
+        var d = e.target.closest && e.target.closest('.ddl-slider-dot');
+        if (!d) return;
+        e.stopPropagation();
+        var idx = parseInt(d.getAttribute('data-ddl-slide-idx') || '0', 10);
+        state.current = idx;
+        updateVisual();
+      });
+    }
+
+    updateVisual();
+    startAutoplay();
+  }
+
+  // ─── 편집 팝업 (이미지 관리 · 옵션) ───
+  function openSlidePopup(slider){
+    if (!slider) return;
+    closeSlidePopup();
+    slidePopupTarget = slider;
+    slidePopupTab = 'images';
+
+    slidePopupEl = document.createElement('div');
+    slidePopupEl.id = 'ep-slide-popup';
+    slidePopupEl.className = 'ep-popup';
+    slidePopupEl.style.top = '120px';
+    slidePopupEl.style.right = '380px';
+    slidePopupEl.innerHTML = ''
+      + '<div class="ep-popup-header" id="ep-slide-popup-drag">'
+      + '  <span>이미지 슬라이드 편집</span>'
+      + '  <button type="button" class="ep-popup-close" data-slide-pop="close">×</button>'
+      + '</div>'
+      + '<div class="ep-popup-tabs">'
+      + '  <button type="button" class="ep-popup-tab is-active" data-slide-pop-tab="images">이미지</button>'
+      + '  <button type="button" class="ep-popup-tab" data-slide-pop-tab="options">옵션</button>'
+      + '  <button type="button" class="ep-popup-tab" data-slide-pop-tab="layout">레이아웃</button>'
+      + '</div>'
+      + '<div class="ep-popup-body" id="ep-slide-popup-body"></div>';
+    document.body.appendChild(slidePopupEl);
+    renderSlidePopupBody();
+    _setupSlidePopupDrag();
+    _setupSlidePopupHandlers();
+  }
+
+  function closeSlidePopup(){
+    if (slidePopupEl && slidePopupEl.parentNode) slidePopupEl.parentNode.removeChild(slidePopupEl);
+    slidePopupEl = null;
+    slidePopupTarget = null;
+  }
+
+  function _setupSlidePopupDrag(){
+    var header = document.getElementById('ep-slide-popup-drag');
+    if (!header || !slidePopupEl) return;
+    var isDragging = false, offsetX = 0, offsetY = 0;
+    header.addEventListener('mousedown', function(e){
+      if (e.target.closest('[data-slide-pop="close"]')) return;
+      isDragging = true;
+      var rect = slidePopupEl.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+      slidePopupEl.style.right = 'auto';
+      slidePopupEl.style.left = rect.left + 'px';
+    });
+    document.addEventListener('mousemove', function(e){
+      if (!isDragging || !slidePopupEl) return;
+      slidePopupEl.style.left = (e.clientX - offsetX) + 'px';
+      slidePopupEl.style.top = (e.clientY - offsetY) + 'px';
+    });
+    document.addEventListener('mouseup', function(){ isDragging = false; });
+  }
+
+  function _getSliderItems(slider){
+    var track = slider.querySelector(':scope > .ddl-slider-viewport > .ddl-slider-track');
+    return track ? Array.prototype.filter.call(track.children, function(c){
+      return c.classList && c.classList.contains('ddl-slider-item');
+    }) : [];
+  }
+
+  function renderSlidePopupBody(){
+    if (!slidePopupEl || !slidePopupTarget) return;
+    var body = document.getElementById('ep-slide-popup-body');
+    if (!body) return;
+    var s = slidePopupTarget;
+    var html = '';
+
+    if (slidePopupTab === 'images') {
+      var items = _getSliderItems(s);
+      html += '<div class="row"><div class="row-label">슬라이드 (' + items.length + ' / ' + SLIDER_MAX_IMAGES + ')</div>';
+      html += '<div id="ep-slide-list" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">';
+      items.forEach(function(it, i){
+        var img = it.querySelector('img');
+        var src = img ? img.getAttribute('src') : '';
+        html += '<div class="ep-slide-item-card" data-slide-idx="' + i + '" style="width:80px; position:relative; border:1px solid rgba(15,58,58,0.2); border-radius:4px; overflow:hidden;">'
+             + (src ? '<img src="' + escapeAttr(src) + '" style="width:100%; height:60px; object-fit:cover; display:block;">'
+                    : '<div style="width:100%; height:60px; background:rgba(15,58,58,0.06); display:flex; align-items:center; justify-content:center; font-size:0.7em; color:rgba(15,58,58,0.4);">(빈)</div>')
+             + '<div style="display:flex; justify-content:space-between; padding:2px; background:#fff; font-size:0.75em;">'
+             + '<span>' + (i + 1) + '</span>'
+             + '<span>'
+             + (i > 0 ? '<button class="pop-btn-mini" data-slide-act="move-up" data-idx="' + i + '" title="앞으로">◄</button>' : '')
+             + (i < items.length - 1 ? '<button class="pop-btn-mini" data-slide-act="move-down" data-idx="' + i + '" title="뒤로">►</button>' : '')
+             + '<button class="pop-btn-mini" data-slide-act="crop" data-idx="' + i + '" title="크롭" ' + (src ? '' : 'disabled') + '>✂</button>'
+             + '<button class="pop-btn-mini" data-slide-act="remove" data-idx="' + i + '" title="삭제" style="color:#c33;">×</button>'
+             + '</span></div>'
+             + '</div>';
+      });
+      html += '</div>';
+      html += '</div>';
+      html += '<div class="row">';
+      html += '<button class="pop-btn" data-slide-act="add" style="width:100%;"' + (items.length >= SLIDER_MAX_IMAGES ? ' disabled' : '') + '>+ 이미지 추가 (' + items.length + '/' + SLIDER_MAX_IMAGES + ')</button>';
+      html += '</div>';
+      html += '<div class="row" style="font-size:0.8em; color:rgba(15,58,58,0.6);">최대 ' + SLIDER_MAX_IMAGES + '장까지 · 크롭 아이콘(✂)으로 각 이미지 자르기 가능</div>';
+    } else if (slidePopupTab === 'options') {
+      var auto = s.getAttribute('data-ddl-autoplay') === '1';
+      var interval = parseInt(s.getAttribute('data-ddl-interval') || '3500', 10);
+      var anim = s.getAttribute('data-anim') || 'slide';
+      html += '<div class="row"><div class="row-label">자동 재생</div>'
+            + '<button class="pop-btn' + (auto ? ' is-active' : '') + '" data-slide-act="autoplay-on">켜기</button>'
+            + '<button class="pop-btn' + (!auto ? ' is-active' : '') + '" data-slide-act="autoplay-off">끄기</button>'
+            + '</div>';
+      html += '<div class="row"><div class="row-label">재생 간격 (' + (interval/1000).toFixed(1) + '초)</div>'
+            + '<input type="range" id="pop-slide-interval" min="1000" max="10000" step="500" value="' + interval + '" style="width:100%;"></div>';
+      html += '<div class="row"><div class="row-label">넘김 애니메이션</div>'
+            + '<button class="pop-btn' + (anim === 'slide' ? ' is-active' : '') + '" data-slide-act="anim-slide">슬라이드</button>'
+            + '<button class="pop-btn' + (anim === 'fade' ? ' is-active' : '') + '" data-slide-act="anim-fade">페이드</button>'
+            + '<button class="pop-btn' + (anim === 'zoom' ? ' is-active' : '') + '" data-slide-act="anim-zoom">줌</button>'
+            + '</div>';
+    } else if (slidePopupTab === 'layout') {
+      var block = s.closest('.editor-block');
+      var curAl = block ? (block.getAttribute('data-align') || 'center') : 'center';
+      html += '<div class="row"><div class="row-label">정렬</div>'
+            + '<button class="pop-btn' + (curAl === 'left' ? ' is-active' : '') + '" data-slide-act="align-left">왼쪽</button>'
+            + '<button class="pop-btn' + (curAl === 'center' ? ' is-active' : '') + '" data-slide-act="align-center">가운데</button>'
+            + '<button class="pop-btn' + (curAl === 'right' ? ' is-active' : '') + '" data-slide-act="align-right">오른쪽</button>'
+            + '</div>';
+      var curPct = block ? (block.getAttribute('data-width-pct') || '100') : '100';
+      html += '<div class="row"><div class="row-label">폭 (' + curPct + '%)</div>'
+            + '<input type="range" id="pop-slide-width" min="30" max="100" step="5" value="' + curPct + '" style="width:100%;"></div>';
+      var ratio = s.getAttribute('data-ddl-aspect') || '16/9';
+      html += '<div class="row"><div class="row-label">화면비</div>'
+            + '<button class="pop-btn' + (ratio === '16/9' ? ' is-active' : '') + '" data-slide-act="ratio-16-9">16:9</button>'
+            + '<button class="pop-btn' + (ratio === '4/3' ? ' is-active' : '') + '" data-slide-act="ratio-4-3">4:3</button>'
+            + '<button class="pop-btn' + (ratio === '1/1' ? ' is-active' : '') + '" data-slide-act="ratio-1-1">1:1</button>'
+            + '<button class="pop-btn' + (ratio === '21/9' ? ' is-active' : '') + '" data-slide-act="ratio-21-9">21:9</button>'
+            + '</div>';
+    }
+    body.innerHTML = html;
+  }
+
+  function _setupSlidePopupHandlers(){
+    if (!slidePopupEl) return;
+    // 미니 버튼 스타일 인젝션 (한 번만)
+    if (!document.getElementById('ep-slide-mini-style')){
+      var mini = document.createElement('style');
+      mini.id = 'ep-slide-mini-style';
+      mini.textContent = '.pop-btn-mini { border:none; background:transparent; cursor:pointer; padding:2px 4px; font-size:0.8em; color:rgba(15,58,58,0.75); } .pop-btn-mini:hover { color:var(--point, #FF9A76); } .pop-btn-mini[disabled] { opacity:0.3; cursor:default; }';
+      document.head.appendChild(mini);
+    }
+    slidePopupEl.addEventListener('click', function(e){
+      if (e.target.closest('[data-slide-pop="close"]')) { closeSlidePopup(); return; }
+      var tab = e.target.closest('[data-slide-pop-tab]');
+      if (tab) {
+        slidePopupTab = tab.getAttribute('data-slide-pop-tab');
+        slidePopupEl.querySelectorAll('.ep-popup-tab').forEach(function(t){ t.classList.remove('is-active'); });
+        tab.classList.add('is-active');
+        renderSlidePopupBody();
+        return;
+      }
+      var act = e.target.closest('[data-slide-act]');
+      if (act) { _handleSlideAct(act.getAttribute('data-slide-act'), act); return; }
+    });
+    slidePopupEl.addEventListener('input', function(e){
+      var t = e.target;
+      if (t.id === 'pop-slide-interval') {
+        slidePopupTarget.setAttribute('data-ddl-interval', String(t.value));
+        var lbl = t.parentNode.querySelector('.row-label');
+        if (lbl) lbl.textContent = '재생 간격 (' + (parseInt(t.value,10)/1000).toFixed(1) + '초)';
+        if (slidePopupTarget._sliderStartAutoplay) slidePopupTarget._sliderStartAutoplay();
+      } else if (t.id === 'pop-slide-width') {
+        var block = slidePopupTarget.closest('.editor-block');
+        if (block) {
+          block.setAttribute('data-width-pct', String(t.value));
+          block.style.setProperty('width', t.value + '%', 'important');
+          block.style.setProperty('max-width', t.value + '%', 'important');
+        }
+        var lbl2 = t.parentNode.querySelector('.row-label');
+        if (lbl2) lbl2.textContent = '폭 (' + t.value + '%)';
+      }
+    });
+  }
+
+  function _handleSlideAct(act, btnEl){
+    if (!slidePopupTarget) return;
+    var s = slidePopupTarget;
+    var track = s.querySelector(':scope > .ddl-slider-viewport > .ddl-slider-track');
+    if (!track) return;
+
+    if (act === 'add') {
+      // 파일 선택 → 업로드 → 슬라이드 추가
+      var items = _getSliderItems(s);
+      if (items.length >= SLIDER_MAX_IMAGES) return;
+      var input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.style.display = 'none';
+      document.body.appendChild(input);
+      input.onchange = function(e){
+        var f = e.target.files && e.target.files[0];
+        if (!f) { document.body.removeChild(input); return; }
+        var reader = new FileReader();
+        reader.onload = function(){
+          var dataUrl = reader.result;
+          // 첫 항목이 빈 슬라이드이면 그 자리에 넣음
+          var firstEmpty = track.querySelector('.ddl-slider-item.is-empty');
+          if (firstEmpty) {
+            firstEmpty.classList.remove('is-empty');
+            firstEmpty.innerHTML = '';
+            var img0 = document.createElement('img');
+            img0.src = dataUrl;
+            img0.setAttribute('alt', '');
+            firstEmpty.appendChild(img0);
+          } else {
+            var item = _sliderMakeItem(dataUrl);
+            track.appendChild(item);
+          }
+          // 서버 업로드 시도 (선택 — 실패해도 dataUrl 유지)
+          if (typeof uploadImageToGhost === 'function') {
+            uploadImageToGhost(f, function(err, result){
+              if (!err && result && result.url) {
+                var newestImg = track.querySelector('.ddl-slider-item:last-child img');
+                if (newestImg) newestImg.src = result.url;
+              }
+            });
+          }
+          if (s._sliderRebuildDots) s._sliderRebuildDots();
+          if (s._sliderUpdate) s._sliderUpdate();
+          renderSlidePopupBody();
+        };
+        reader.readAsDataURL(f);
+        document.body.removeChild(input);
+      };
+      input.click();
+      return;
+    }
+
+    var idx = parseInt(btnEl.getAttribute('data-idx') || '-1', 10);
+    var items = _getSliderItems(s);
+
+    if (act === 'remove' && idx >= 0 && idx < items.length) {
+      var target = items[idx];
+      if (target && target.parentNode) target.parentNode.removeChild(target);
+      // 최소 1개 유지
+      if (_getSliderItems(s).length === 0) {
+        track.appendChild(_sliderMakeItem(null));
+      }
+      if (s._sliderState && s._sliderState.current >= idx && s._sliderState.current > 0) s._sliderState.current -= 1;
+      if (s._sliderRebuildDots) s._sliderRebuildDots();
+      if (s._sliderUpdate) s._sliderUpdate();
+      renderSlidePopupBody();
+      return;
+    }
+
+    if ((act === 'move-up' || act === 'move-down') && idx >= 0 && idx < items.length) {
+      var swapIdx = act === 'move-up' ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= items.length) return;
+      if (act === 'move-up') track.insertBefore(items[idx], items[swapIdx]);
+      else track.insertBefore(items[swapIdx], items[idx]);
+      if (s._sliderRebuildDots) s._sliderRebuildDots();
+      if (s._sliderUpdate) s._sliderUpdate();
+      renderSlidePopupBody();
+      return;
+    }
+
+    if (act === 'crop' && idx >= 0 && idx < items.length) {
+      var img = items[idx].querySelector('img');
+      if (!img) return;
+      var origSrc = img.getAttribute('data-orig-src') || img.src;
+      if (!img.getAttribute('data-orig-src')) img.setAttribute('data-orig-src', origSrc);
+      if (window.__DDL_EDITOR && window.__DDL_EDITOR.openImageCropDialog) {
+        window.__DDL_EDITOR.openImageCropDialog(origSrc, { aspect: null }, function(dataUrl){
+          if (dataUrl) {
+            img.src = dataUrl;
+            renderSlidePopupBody();
+          }
+        });
+      }
+      return;
+    }
+
+    if (act === 'autoplay-on') { s.setAttribute('data-ddl-autoplay', '1'); if (s._sliderStartAutoplay) s._sliderStartAutoplay(); renderSlidePopupBody(); return; }
+    if (act === 'autoplay-off') { s.setAttribute('data-ddl-autoplay', '0'); if (s._sliderStopAutoplay) s._sliderStopAutoplay(); renderSlidePopupBody(); return; }
+    if (act === 'anim-slide' || act === 'anim-fade' || act === 'anim-zoom') {
+      var mode = act.replace('anim-', '');
+      s.setAttribute('data-anim', mode);
+      if (s._sliderUpdate) s._sliderUpdate();
+      renderSlidePopupBody();
+      return;
+    }
+    if (act === 'align-left' || act === 'align-center' || act === 'align-right') {
+      var al = act.replace('align-', '');
+      var block = s.closest('.editor-block');
+      if (block) block.setAttribute('data-align', al);
+      renderSlidePopupBody();
+      return;
+    }
+    if (act === 'ratio-16-9' || act === 'ratio-4-3' || act === 'ratio-1-1' || act === 'ratio-21-9') {
+      var r = act.replace('ratio-','').replace('-','/');
+      s.setAttribute('data-ddl-aspect', r);
+      var vp = s.querySelector(':scope > .ddl-slider-viewport');
+      if (vp) vp.style.setProperty('aspect-ratio', r.replace('/', ' / '), 'important');
+      renderSlidePopupBody();
+      return;
+    }
+  }
+
+  // ─── 슬라이더 블록 클릭 → 편집 팝업 열기 ───
+  function setupSliderClickHandler(){
+    contentEl.addEventListener('click', function(e){
+      // 슬라이더 자체 상호작용 (화살표/도트) 은 스킵
+      if (e.target.closest('.ddl-slider-btn') || e.target.closest('.ddl-slider-dot')) return;
+      if (e.target.closest('.ddl-slider-resizer')) return;
+      var slider = e.target.closest && e.target.closest('.ep-slider-block');
+      if (!slider) return;
+      contentEl.querySelectorAll('.ep-slider-block.is-selected').forEach(function(x){ x.classList.remove('is-selected'); });
+      slider.classList.add('is-selected');
+      openSlidePopup(slider);
+    });
+    document.addEventListener('click', function(e){
+      if (e.target.closest('.ep-slider-block')) return;
+      if (e.target.closest('#ep-slide-popup')) return;
+      if (e.target.closest('.ep-crop-popup')) return;
+      contentEl.querySelectorAll('.ep-slider-block.is-selected').forEach(function(x){ x.classList.remove('is-selected'); });
+    });
+  }
+  setupSliderClickHandler();
+
+  // ─── 리사이즈 핸들 (우측 하단) ───
+  (function(){
+    var st = null;
+    document.body.addEventListener('mousedown', function(e){
+      var h = e.target.closest && e.target.closest('.ddl-slider-resizer');
+      if (!h) return;
+      var slider = h.closest('.ep-slider-block');
+      var block = slider ? slider.closest('.editor-block') : null;
+      if (!block) return;
+      var rect = block.getBoundingClientRect();
+      st = { block: block, slider: slider, startX: e.clientX, startY: e.clientY, startW: rect.width, startH: slider.querySelector('.ddl-slider-viewport').getBoundingClientRect().height };
+      e.preventDefault(); e.stopPropagation();
+      document.body.style.cursor = 'nwse-resize';
+      document.body.style.userSelect = 'none';
+    }, true);
+    document.body.addEventListener('mousemove', function(e){
+      if (!st) return;
+      var dx = e.clientX - st.startX;
+      var dy = e.clientY - st.startY;
+      // 폭 조절 (블록 폭 %)
+      var parentRect = st.block.parentNode.getBoundingClientRect();
+      var newW = st.startW + dx;
+      if (newW < 100) newW = 100;
+      if (newW > parentRect.width) newW = parentRect.width;
+      var pct = Math.round((newW / parentRect.width) * 100);
+      if (pct < 20) pct = 20;
+      if (pct > 100) pct = 100;
+      st.block.setAttribute('data-width-pct', String(pct));
+      st.block.style.setProperty('width', pct + '%', 'important');
+      st.block.style.setProperty('max-width', pct + '%', 'important');
+      // 화면비 조절 (viewport aspect-ratio 직접 조절)
+      var newH = st.startH + dy;
+      if (newH < 80) newH = 80;
+      var vp = st.slider.querySelector('.ddl-slider-viewport');
+      if (vp) {
+        var ratio = newW / newH;
+        vp.style.setProperty('aspect-ratio', ratio.toFixed(4), 'important');
+        st.slider.setAttribute('data-ddl-aspect', ratio.toFixed(4));
+      }
+    }, true);
+    document.body.addEventListener('mouseup', function(){
+      if (!st) return;
+      st = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }, true);
+  })();
+
+  // ─── 저장용 enhance: 편집기 잔재 제거 + 인라인 스타일 심기 + 런타임용 data 유지 ───
+  function enhanceSliderForSite(block){
+    if (!block) return;
+    // 편집 클래스/속성 제거
+    block.classList.remove('is-editing-focus');
+    block.classList.remove('is-selected');
+    block.removeAttribute('contenteditable');
+    // block-handle 제거
+    block.querySelectorAll('.block-handle').forEach(function(h){ h.parentNode && h.parentNode.removeChild(h); });
+    // 정렬·폭 인라인 심기
+    var pct = block.getAttribute('data-width-pct') || '100';
+    var al = block.getAttribute('data-align') || 'center';
+    block.style.setProperty('width', pct + '%', 'important');
+    block.style.setProperty('max-width', pct + '%', 'important');
+    if (al === 'left') { block.style.setProperty('margin-left', '0', 'important'); block.style.setProperty('margin-right', 'auto', 'important'); }
+    else if (al === 'right') { block.style.setProperty('margin-left', 'auto', 'important'); block.style.setProperty('margin-right', '0', 'important'); }
+    else { block.style.setProperty('margin-left', 'auto', 'important'); block.style.setProperty('margin-right', 'auto', 'important'); }
+
+    var slider = block.querySelector(':scope > .ep-slider-block');
+    if (!slider) return;
+    // 리사이저 · is-selected · contenteditable 제거
+    slider.querySelectorAll('.ddl-slider-resizer').forEach(function(r){ r.parentNode && r.parentNode.removeChild(r); });
+    slider.classList.remove('is-selected');
+    slider.removeAttribute('contenteditable');
+    // 안 필요 편집기 상태 제거
+    slider.querySelectorAll('[contenteditable]').forEach(function(x){ x.removeAttribute('contenteditable'); });
+
+    // 슬라이더 스타일 인라인 강제
+    slider.style.setProperty('position', 'relative', 'important');
+    slider.style.setProperty('display', 'block', 'important');
+    slider.style.setProperty('width', '100%', 'important');
+    slider.style.setProperty('margin', '0.6em 0', 'important');
+    slider.style.setProperty('overflow', 'hidden', 'important');
+    slider.style.setProperty('border-radius', '6px', 'important');
+    slider.style.setProperty('box-sizing', 'border-box', 'important');
+
+    var vp = slider.querySelector(':scope > .ddl-slider-viewport');
+    if (vp) {
+      vp.style.setProperty('position', 'relative', 'important');
+      vp.style.setProperty('width', '100%', 'important');
+      vp.style.setProperty('overflow', 'hidden', 'important');
+      // aspect-ratio 저장
+      var asp = slider.getAttribute('data-ddl-aspect') || '16/9';
+      var aspVal = asp.indexOf('/') >= 0 ? asp.replace('/', ' / ') : asp;
+      vp.style.setProperty('aspect-ratio', aspVal, 'important');
+      vp.style.setProperty('background', 'rgba(15,58,58,0.06)', 'important');
+    }
+    var track = slider.querySelector(':scope > .ddl-slider-viewport > .ddl-slider-track');
+    if (track) {
+      track.style.setProperty('position', 'relative', 'important');
+      track.style.setProperty('width', '100%', 'important');
+      track.style.setProperty('height', '100%', 'important');
+      track.style.setProperty('display', 'flex', 'important');
+      track.style.setProperty('transition', 'transform 400ms ease', 'important');
+    }
+    slider.querySelectorAll('.ddl-slider-item').forEach(function(it){
+      it.style.setProperty('flex', '0 0 100%', 'important');
+      it.style.setProperty('width', '100%', 'important');
+      it.style.setProperty('height', '100%', 'important');
+      it.style.setProperty('position', 'relative', 'important');
+      it.style.setProperty('overflow', 'hidden', 'important');
+      var im = it.querySelector('img');
+      if (im) {
+        im.style.setProperty('width', '100%', 'important');
+        im.style.setProperty('height', '100%', 'important');
+        im.style.setProperty('object-fit', 'cover', 'important');
+        im.style.setProperty('display', 'block', 'important');
+      }
+    });
+    // 좌우 버튼·도트: 저장 시 그대로 유지 (사이트 스크립트가 클릭 처리)
+    // 인라인 스타일 최소한 (기본 CSS로 커버되지 않을 상황 대비)
+  }
+
+  // ─── 편집기 재진입 시 hydration ───
+  function fixupAllSliders(root){
+    if (!root) return;
+    root.querySelectorAll('.ep-slider-block[data-ddl-slider="1"]').forEach(function(sl){
+      var block = sl.closest('.editor-block');
+      if (block && !block.hasAttribute('data-block-type')) block.setAttribute('data-block-type', 'slider');
+      if (block) block.setAttribute('contenteditable', 'false');
+      sl.setAttribute('contenteditable', 'false');
+      // block-handle 복원
+      if (block && !block.querySelector(':scope > .block-handle')) {
+        try { block.insertBefore(makeBlockHandle(), block.firstChild); } catch(_){}
+      }
+      // 리사이저 복원
+      var vp = sl.querySelector(':scope > .ddl-slider-viewport');
+      if (vp && !vp.querySelector(':scope > .ddl-slider-resizer')) {
+        var rs = document.createElement('div');
+        rs.className = 'ddl-slider-resizer';
+        rs.setAttribute('contenteditable', 'false');
+        rs.setAttribute('title', '드래그하여 크기 조절');
+        vp.appendChild(rs);
+      }
+      // 도트가 없으면 재생성
+      if (vp && !vp.querySelector(':scope > .ddl-slider-dots')) {
+        var dots = document.createElement('div');
+        dots.className = 'ddl-slider-dots';
+        var items = sl.querySelectorAll('.ddl-slider-item');
+        for (var i = 0; i < items.length; i++){
+          var d = document.createElement('button');
+          d.type = 'button';
+          d.className = 'ddl-slider-dot' + (i === 0 ? ' is-current' : '');
+          d.setAttribute('contenteditable', 'false');
+          d.setAttribute('data-ddl-slide-idx', String(i));
+          dots.appendChild(d);
+        }
+        vp.appendChild(dots);
+      }
+      // 좌우 버튼 복원
+      if (vp && !vp.querySelector(':scope > .ddl-slider-prev')) {
+        var pb = document.createElement('button');
+        pb.type = 'button';
+        pb.className = 'ddl-slider-btn ddl-slider-prev';
+        pb.setAttribute('contenteditable', 'false');
+        pb.textContent = '‹';
+        vp.appendChild(pb);
+      }
+      if (vp && !vp.querySelector(':scope > .ddl-slider-next')) {
+        var nb = document.createElement('button');
+        nb.type = 'button';
+        nb.className = 'ddl-slider-btn ddl-slider-next';
+        nb.setAttribute('contenteditable', 'false');
+        nb.textContent = '›';
+        vp.appendChild(nb);
+      }
+      // 편집기 런타임 재부착
+      _sliderInstallRuntime(sl);
+    });
+  }
+
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.insertSlideBlock = insertSlideBlock; } catch(_){}
+  try { window.__DDL_EDITOR.fixupAllSliders = fixupAllSliders; } catch(_){}
+  try { window.__DDL_EDITOR.enhanceSliderForSite = enhanceSliderForSite; } catch(_){}
 
     // ─── selectionchange · 클릭으로 selectedFold 관리 (콜아웃 미러) ───────────
   var selectedFold = null;
