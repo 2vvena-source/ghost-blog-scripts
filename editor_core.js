@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p24j';
+  var VERSION = 'v2.0-β-p25a';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -12285,6 +12285,53 @@
     function renderColorTab(){
       // ★★★ 가장 중요: 함수 진입 즉시 기존 내용 말끔하게 지움 — 이게 없으면 증식됨
       tabContent.innerHTML = '';
+
+      // p25a: 모드별 저장소 분기
+      //   - save-preset (헤더 프리셋 저장): 기존 ddl.headerColorLibrary
+      //   - apply-format / apply-color (즉시 적용): 통일 ddl.textColorLib
+      //   ★ 필드 매핑: 헤더의 isBuiltin ↔ 새 lib 의 (isSeed || !deletable)
+      //   ★ 새 lib 는 시드 그룹도 이름 변경/삭제 가능 (사용자 요구)
+      var _useTCLib = (editorMode === 'apply-format' || editorMode === 'apply-color');
+      var _libLoad, _libAddColor, _libAddGroup, _libUpdateColor, _libDeleteColor, _libRenameGroup, _libDeleteGroup;
+      if (_useTCLib){
+        _libLoad = function(){
+          var raw = _loadTextColorLibrary();
+          // 새 lib → 헤더 편집창이 기대하는 형태 (isBuiltin 필드) 로 어댑터
+          return {
+            version: raw.version,
+            groups: (raw.groups || []).map(function(g){
+              return {
+                id: g.id,
+                name: g.name,
+                isBuiltin: (g.isSeed === true || g.deletable === false), // 시드/삭제불가만 built-in 처리
+                colors: (g.colors || []).map(function(c){
+                  return {
+                    id: c.id,
+                    name: c.name || '',
+                    value: c.value,
+                    isBuiltin: (g.isSeed === true), // 시드 그룹 색은 built-in 취급 (편집만 가능, 삭제도 가능하지만 UI 는 built-in 처럼 표시)
+                    isFavorite: !!c.isFavorite
+                  };
+                })
+              };
+            })
+          };
+        };
+        _libAddColor    = function(gid, payload){ return _tclAddColorToGroup(gid, payload); };
+        _libAddGroup    = function(name){ return _tclAddGroup(name); };
+        _libUpdateColor = function(gid, cid, patch){ return _tclUpdateColor(gid, cid, patch); };
+        _libDeleteColor = function(gid, cid){ return _tclDeleteColor(gid, cid); };
+        _libRenameGroup = function(gid, newName){ return _tclRenameGroup(gid, newName); };
+        _libDeleteGroup = function(gid){ return _tclDeleteGroup(gid); };
+      } else {
+        _libLoad        = _loadHeaderColorLibrary;
+        _libAddColor    = _addHeaderColorToGroup;
+        _libAddGroup    = _addHeaderColorGroup;
+        _libUpdateColor = _updateHeaderColor;
+        _libDeleteColor = _deleteHeaderColor;
+        _libRenameGroup = _renameHeaderColorGroup;
+        _libDeleteGroup = _deleteHeaderColorGroup;
+      }
       // === 1. 현재 색 표시 (큰 원) ===
       var current_color = current.style.color || 'var(--color, #0F3A3A)';
       var big = document.createElement('div');
@@ -12336,7 +12383,7 @@
       tabContent.appendChild(colHeader);
 
       // === 3. 라이브러리 로드 (매 렌더마다 새로) + 뷰 필터 ===
-      var lib = _loadHeaderColorLibrary();
+      var lib = _libLoad();
 
       function _collectUsedColorValues(){
         var used = {};
@@ -12402,7 +12449,7 @@
                 label: '그룹 이름',
                 value: gName,
                 onDone: function(nv){
-                  if (nv){ _renameHeaderColorGroup(gId, nv); renderColorTab(); }
+                  if (nv){ _libRenameGroup(gId, nv); renderColorTab(); }
                 }
               });
             });
@@ -12418,7 +12465,7 @@
             delBtn.addEventListener('click', function(e){
               e.stopPropagation();
               if (confirm('그룹 "' + gName + '" 을(를) 삭제할까요?\n그룹 안 색깔들도 함께 삭제됩니다.')){
-                _deleteHeaderColorGroup(gId);
+                _libDeleteGroup(gId);
                 renderColorTab();
               }
             });
@@ -12465,7 +12512,7 @@
           (function(gId, cId, curFav){
             favMark.addEventListener('click', function(e){
               e.stopPropagation();
-              _updateHeaderColor(gId, cId, { isFavorite: !curFav });
+              _libUpdateColor(gId, cId, { isFavorite: !curFav });
               renderColorTab();
             });
           })(group.id, c.id, !!c.isFavorite);
@@ -12484,7 +12531,7 @@
               e.stopPropagation();
               _openHeaderColorEditMini(colorSnapshot, function(updated){
                 if (!updated) return;
-                _updateHeaderColor(gId, cId, { name: updated.name, value: updated.value });
+                _libUpdateColor(gId, cId, { name: updated.name, value: updated.value });
                 // 현재 선택된 색이 이 색이었다면 미리보기 갱신
                 if (current.style.color === colorSnapshot.value){
                   current.style.color = updated.value;
@@ -12509,7 +12556,7 @@
               delIcon.addEventListener('click', function(e){
                 e.stopPropagation();
                 if (confirm('색깔 "' + (cName || '') + '"을(를) 삭제할까요?')){
-                  _deleteHeaderColor(gId, cId);
+                  _libDeleteColor(gId, cId);
                   renderColorTab();
                 }
               });
@@ -12557,7 +12604,7 @@
             e.stopPropagation();
             _openHeaderColorEditMini(null, function(newColor){
               if (!newColor) return;
-              _addHeaderColorToGroup(gId, newColor);
+              _libAddColor(gId, newColor);
               renderColorTab();
             });
           });
@@ -12593,7 +12640,7 @@
           value: '',
           placeholder: '예: 내 색깔',
           onDone: function(nm){
-            if (nm){ _addHeaderColorGroup(nm); renderColorTab(); }
+            if (nm){ _libAddGroup(nm); renderColorTab(); }
           }
         });
       });
@@ -23901,6 +23948,330 @@
     _saveTextColorGroupLib(lib);
   }
 
+
+  // ═══════════════════════════════════════════════════════════
+  // p25a: 통일 글자색 라이브러리 (textColorLib)
+  //   저장소 키: localStorage['ddl.textColorLib']
+  //   구조: {
+  //     version: 1,
+  //     migratedFromCallout: boolean,   // 콜아웃 이관 1회성 플래그
+  //     groups: [
+  //       {
+  //         id: string,
+  //         name: string,
+  //         deletable: boolean,   // 시드 그룹도 삭제 가능하게 완화
+  //         isSeed: boolean,      // 시드 여부 (부활 방지 참고용)
+  //         colors: [
+  //           { id, name, value, isFavorite }
+  //         ]
+  //       }
+  //     ]
+  //   }
+  //
+  //   ★ 시드 원칙: localStorage 가 "완전히 없을 때"만 시드 (사용자가 지운 기본 그룹 부활 방지).
+  //   ★ 콜아웃 이관: 시드 시점에 callout_settings GM 저장소에서 사용자 프리셋 백업 후
+  //                  "콜아웃 이관" 그룹 자동 생성. 원본 callout_settings 는 삭제하지 않음(백업).
+  //   ★ 4개 시드 그룹: 사이트 기본 · 노션 진한 · 노션 연한 · 파스텔
+  // ═══════════════════════════════════════════════════════════
+  var TCOLOR_LIB_KEY = 'ddl.textColorLib';
+
+  function _tclUid(prefix){
+    return (prefix || 'tcl') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+  }
+
+  // 4개 시드 그룹 정의
+  function _textColorLibInitialSeed(){
+    return {
+      version: 1,
+      migratedFromCallout: false,
+      groups: [
+        {
+          id: 'tcl-site',
+          name: '사이트 기본',
+          deletable: true,
+          isSeed: true,
+          colors: [
+            { id: 'tcl-site-1', name: '딥그린',    value: '#0F3A3A', isFavorite: true  },
+            { id: 'tcl-site-2', name: '살구',      value: '#FF9A76', isFavorite: true  },
+            { id: 'tcl-site-3', name: '흐림 50%', value: '#87A0A0', isFavorite: false },
+            { id: 'tcl-site-4', name: '흐림 25%', value: '#C3CFCF', isFavorite: false }
+          ]
+        },
+        {
+          id: 'tcl-notion-dark',
+          name: '노션 진한',
+          deletable: true,
+          isSeed: true,
+          colors: [
+            { id: 'tcl-nd-1',  name: '회색',   value: '#787774', isFavorite: false },
+            { id: 'tcl-nd-2',  name: '갈색',   value: '#8C2E00', isFavorite: false },
+            { id: 'tcl-nd-3',  name: '주황',   value: '#D9730D', isFavorite: false },
+            { id: 'tcl-nd-4',  name: '노랑',   value: '#CB912F', isFavorite: false },
+            { id: 'tcl-nd-5',  name: '초록',   value: '#448361', isFavorite: false },
+            { id: 'tcl-nd-6',  name: '파랑',   value: '#337EA9', isFavorite: false },
+            { id: 'tcl-nd-7',  name: '보라',   value: '#9065B0', isFavorite: false },
+            { id: 'tcl-nd-8',  name: '분홍',   value: '#C14C8A', isFavorite: false },
+            { id: 'tcl-nd-9',  name: '빨강',   value: '#D44C47', isFavorite: false }
+          ]
+        },
+        {
+          id: 'tcl-notion-light',
+          name: '노션 연한',
+          deletable: true,
+          isSeed: true,
+          colors: [
+            { id: 'tcl-nl-1',  name: '회색',   value: 'rgba(120,119,116,0.5)', isFavorite: false },
+            { id: 'tcl-nl-2',  name: '갈색',   value: 'rgba(140,46,0,0.5)',    isFavorite: false },
+            { id: 'tcl-nl-3',  name: '주황',   value: 'rgba(217,115,13,0.5)',  isFavorite: false },
+            { id: 'tcl-nl-4',  name: '노랑',   value: 'rgba(203,145,47,0.5)',  isFavorite: false },
+            { id: 'tcl-nl-5',  name: '초록',   value: 'rgba(68,131,97,0.5)',   isFavorite: false },
+            { id: 'tcl-nl-6',  name: '파랑',   value: 'rgba(51,126,169,0.5)',  isFavorite: false },
+            { id: 'tcl-nl-7',  name: '보라',   value: 'rgba(144,101,176,0.5)', isFavorite: false },
+            { id: 'tcl-nl-8',  name: '분홍',   value: 'rgba(193,76,138,0.5)',  isFavorite: false },
+            { id: 'tcl-nl-9',  name: '빨강',   value: 'rgba(212,76,71,0.5)',   isFavorite: false }
+          ]
+        },
+        {
+          id: 'tcl-pastel',
+          name: '파스텔',
+          deletable: true,
+          isSeed: true,
+          colors: [
+            { id: 'tcl-ps-1', name: '살구',   value: '#F8B195', isFavorite: false },
+            { id: 'tcl-ps-2', name: '분홍',   value: '#F67280', isFavorite: false },
+            { id: 'tcl-ps-3', name: '보라',   value: '#C06C84', isFavorite: false },
+            { id: 'tcl-ps-4', name: '남색',   value: '#6C5B7B', isFavorite: false },
+            { id: 'tcl-ps-5', name: '민트',   value: '#99CBB1', isFavorite: false },
+            { id: 'tcl-ps-6', name: '하늘',   value: '#A8D8EA', isFavorite: false }
+          ]
+        }
+      ]
+    };
+  }
+
+  // 콜아웃 프리셋을 "콜아웃 이관" 그룹으로 백업 (ⓒ 방식)
+  //   callout_settings.byTarget.callout-bg / callout-bg2 / bg 안 userPresets 를 스캔.
+  //   컬러 hex/rgba 만 추출 (프리셋 안 다른 속성은 무시). 중복은 hex 기준으로 제거.
+  //   삭제 가능한 사용자 그룹으로 반환. 프리셋이 하나도 없으면 null 반환.
+  function _tclCollectCalloutPresets(){
+    var collected = [];
+    var seen = {};
+    try {
+      if (typeof GM_getValue !== 'function') return null;
+      var raw = GM_getValue('callout_settings', '');
+      if (!raw) return null;
+      var s = null;
+      try { s = JSON.parse(raw); } catch(_){ return null; }
+      if (!s || !s.byTarget) return null;
+
+      var keysToScan = ['callout-bg', 'callout-bg2', 'bg']; // 콜아웃 배경 관련만
+      keysToScan.forEach(function(k){
+        var t = s.byTarget[k];
+        if (!t || !Array.isArray(t.userPresets)) return;
+        t.userPresets.forEach(function(p){
+          if (!p) return;
+          // p 안에 color(단색) / c1 (그라데이션) / hex 등 여러 필드가 있을 수 있음
+          var candidates = [p.color, p.c1, p.c2, p.value, p.hex, p.bg, p.bg1, p.bg2];
+          candidates.forEach(function(v){
+            if (!v) return;
+            if (typeof v !== 'string') return;
+            var trimmed = v.trim();
+            if (!trimmed) return;
+            // hex 또는 rgba/rgb 만 인정
+            if (!/^(#[0-9a-fA-F]{3,8}|rgba?\()/.test(trimmed)) return;
+            var lowered = trimmed.toLowerCase();
+            if (seen[lowered]) return;
+            seen[lowered] = true;
+            collected.push({
+              id: _tclUid('tcc'),
+              name: (p.name || '') + (candidates.indexOf(v) > 0 ? ' (' + (candidates.indexOf(v) === 1 ? '색1' : '색2') + ')' : ''),
+              value: trimmed,
+              isFavorite: false
+            });
+          });
+        });
+      });
+    } catch(err){
+      try { console.warn('[textColorLib] 콜아웃 프리셋 스캔 실패', err); } catch(_){}
+      return null;
+    }
+    if (collected.length === 0) return null;
+    return {
+      id: 'tcl-callout-migrated',
+      name: '콜아웃 이관',
+      deletable: true,
+      isSeed: false,
+      colors: collected
+    };
+  }
+
+  function _loadTextColorLibrary(){
+    try {
+      var raw = localStorage.getItem(TCOLOR_LIB_KEY);
+      if (raw === null || raw === undefined){
+        // 최초 시드
+        var seeded = _textColorLibInitialSeed();
+        // 콜아웃 이관 시도 (1회성)
+        try {
+          var calloutGroup = _tclCollectCalloutPresets();
+          if (calloutGroup){
+            seeded.groups.push(calloutGroup);
+          }
+          seeded.migratedFromCallout = true;
+        } catch(err){
+          try { console.warn('[textColorLib] 콜아웃 이관 실패', err); } catch(_){}
+          seeded.migratedFromCallout = true; // 실패해도 재시도 안 함 (반복 스팸 방지)
+        }
+        _saveTextColorLibrary(seeded);
+        return seeded;
+      }
+      var data = JSON.parse(raw);
+      if (!data || typeof data !== 'object' || !Array.isArray(data.groups)){
+        var reseeded = _textColorLibInitialSeed();
+        reseeded.migratedFromCallout = true;
+        _saveTextColorLibrary(reseeded);
+        return reseeded;
+      }
+      // 방어적 유효성 검사
+      data.groups.forEach(function(g){
+        if (!Array.isArray(g.colors)) g.colors = [];
+      });
+      // 콜아웃 이관은 아직 시도 안 한 경우 (예: 시드 직후 저장은 됐지만 플래그 유실)
+      if (!data.migratedFromCallout){
+        try {
+          var calloutGroup2 = _tclCollectCalloutPresets();
+          if (calloutGroup2 && !data.groups.some(function(g){ return g.id === 'tcl-callout-migrated'; })){
+            data.groups.push(calloutGroup2);
+          }
+          data.migratedFromCallout = true;
+          _saveTextColorLibrary(data);
+        } catch(_){
+          data.migratedFromCallout = true;
+          _saveTextColorLibrary(data);
+        }
+      }
+      return data;
+    } catch(err){
+      try { console.warn('[textColorLib] load 실패, 재시드', err); } catch(_){}
+      var fallback = _textColorLibInitialSeed();
+      fallback.migratedFromCallout = true;
+      _saveTextColorLibrary(fallback);
+      return fallback;
+    }
+  }
+
+  function _saveTextColorLibrary(data){
+    try { localStorage.setItem(TCOLOR_LIB_KEY, JSON.stringify(data)); }
+    catch(err){ try { console.warn('[textColorLib] save 실패', err); } catch(_){} }
+  }
+
+  // 색 추가 (특정 그룹에)
+  function _tclAddColorToGroup(groupId, colorPayload){
+    var lib = _loadTextColorLibrary();
+    var g = lib.groups.filter(function(x){ return x.id === groupId; })[0];
+    if (!g) return null;
+    var newColor = {
+      id: _tclUid('tcc'),
+      name: (colorPayload && colorPayload.name) || '',
+      value: (colorPayload && colorPayload.value) || '#0F3A3A',
+      isFavorite: false
+    };
+    // 중복 제거 (같은 value 는 앞으로 이동)
+    g.colors = (g.colors || []).filter(function(c){ return c.value !== newColor.value; });
+    g.colors.unshift(newColor);
+    _saveTextColorLibrary(lib);
+    return newColor;
+  }
+
+  // 미니 팝오버에서 새 색 사용 시 자동 저장할 "내 색" 사용자 그룹 찾기/만들기
+  function _tclGetOrCreateMyColorsGroup(){
+    var lib = _loadTextColorLibrary();
+    var g = lib.groups.filter(function(x){ return x.id === 'tcl-my-colors'; })[0];
+    if (g) return g;
+    // 없으면 만들어서 반환 (사용자 그룹 · 삭제 가능)
+    g = {
+      id: 'tcl-my-colors',
+      name: '내 색',
+      deletable: true,
+      isSeed: false,
+      colors: []
+    };
+    lib.groups.unshift(g); // 맨 앞에 넣어서 미니 팝오버 상단에 보이게
+    _saveTextColorLibrary(lib);
+    return g;
+  }
+
+  // "내 색" 사용자 그룹에 색 추가 (미니 팝오버 새 색 저장 시 호출)
+  function _tclAddColorToMyColors(colorValue){
+    if (!colorValue) return;
+    _tclGetOrCreateMyColorsGroup(); // 없으면 생성
+    _tclAddColorToGroup('tcl-my-colors', { value: colorValue, name: '' });
+  }
+
+  function _tclAddGroup(name){
+    var lib = _loadTextColorLibrary();
+    var newG = {
+      id: _tclUid('tclg'),
+      name: (name || '새 그룹').trim() || '새 그룹',
+      deletable: true,
+      isSeed: false,
+      colors: []
+    };
+    lib.groups.push(newG);
+    _saveTextColorLibrary(lib);
+    return newG;
+  }
+
+  function _tclUpdateColor(groupId, colorId, patch){
+    var lib = _loadTextColorLibrary();
+    var g = lib.groups.filter(function(x){ return x.id === groupId; })[0];
+    if (!g) return;
+    var c = (g.colors || []).filter(function(x){ return x.id === colorId; })[0];
+    if (!c) return;
+    if (typeof patch.name === 'string')        c.name = patch.name;
+    if (typeof patch.value === 'string')       c.value = patch.value;
+    if (typeof patch.isFavorite === 'boolean') c.isFavorite = patch.isFavorite;
+    _saveTextColorLibrary(lib);
+  }
+
+  function _tclDeleteColor(groupId, colorId){
+    var lib = _loadTextColorLibrary();
+    var g = lib.groups.filter(function(x){ return x.id === groupId; })[0];
+    if (!g) return;
+    g.colors = (g.colors || []).filter(function(c){ return c.id !== colorId; });
+    _saveTextColorLibrary(lib);
+  }
+
+  function _tclRenameGroup(groupId, newName){
+    var lib = _loadTextColorLibrary();
+    var g = lib.groups.filter(function(x){ return x.id === groupId; })[0];
+    if (!g) return;
+    g.name = (newName || '').trim() || g.name;
+    _saveTextColorLibrary(lib);
+  }
+
+  function _tclDeleteGroup(groupId){
+    var lib = _loadTextColorLibrary();
+    var g = lib.groups.filter(function(x){ return x.id === groupId; })[0];
+    if (!g || g.deletable === false) return;
+    lib.groups = lib.groups.filter(function(x){ return x.id !== groupId; });
+    _saveTextColorLibrary(lib);
+  }
+
+  // 전역 노출 (외부 다이얼로그에서도 접근 가능하게)
+  try {
+    window.__DDL_EDITOR = window.__DDL_EDITOR || {};
+    window.__DDL_EDITOR._loadTextColorLibrary = _loadTextColorLibrary;
+    window.__DDL_EDITOR._saveTextColorLibrary = _saveTextColorLibrary;
+    window.__DDL_EDITOR._tclAddColorToGroup   = _tclAddColorToGroup;
+    window.__DDL_EDITOR._tclAddColorToMyColors= _tclAddColorToMyColors;
+    window.__DDL_EDITOR._tclAddGroup          = _tclAddGroup;
+    window.__DDL_EDITOR._tclUpdateColor       = _tclUpdateColor;
+    window.__DDL_EDITOR._tclDeleteColor       = _tclDeleteColor;
+    window.__DDL_EDITOR._tclRenameGroup       = _tclRenameGroup;
+    window.__DDL_EDITOR._tclDeleteGroup       = _tclDeleteGroup;
+  } catch(_){}
+
   // 현재 선택된 텍스트에서 사용된 색 자동 감지 ("이 페이지 사용 색")
   function scanPageUsedColors(){
     var used = {};
@@ -23950,9 +24321,14 @@
     try { document.execCommand('foreColor', false, color); } catch(_){}
     _lastTextColor = color;
     updateTextColorButton();
-    // 사용자 색 저장 (팩토리 아닌 것만)
+    // p25a: 사용자 색 저장 (시드에 없는 색만)
+    //   - 하위 호환: 기존 addUserTextColor (ddl_user_text_colors, ddl.textColorGroups) 도 계속 호출
+    //   - 신규: ddl.textColorLib 안 "내 색" 사용자 그룹에도 자동 저장
     var isFactory = TC_FACTORY.some(function(f){ return f.color === color; });
-    if (!isFactory) addUserTextColor(color);
+    if (!isFactory) {
+      try { addUserTextColor(color); } catch(_){}
+      try { _tclAddColorToMyColors(color); } catch(_){}
+    }
   }
 
   function clearTextColor(){
@@ -23985,35 +24361,48 @@
   }
 
   function openTextColorMini(anchor){
-    var pageUsed = scanPageUsedColors().map(function(c){ return { color: c }; });
-    var userColors = loadUserTextColors();
+    // p25a: 새 통일 라이브러리 (ddl.textColorLib) 기반 구조로 재작성
+    //   - 시드 그룹(사이트 기본/노션 진한/노션 연한/파스텔) + 사용자 그룹("내 색" 등) 모두 노출
+    //   - 콜아웃 이관 그룹이 있으면 자동 표시
+    //   - 이 페이지에서 사용 중인 색 자동 감지 섹션 유지
+    var lib = _loadTextColorLibrary();
+    var pageUsedHex = scanPageUsedColors();
 
     var sections = [];
-    if (pageUsed.length) {
+
+    // (1) 이 페이지 사용 색 (감지된 것이 있으면만)
+    if (pageUsedHex && pageUsedHex.length) {
       sections.push({
         label: '이 페이지 사용 색',
         key: 'page',
-        items: pageUsed,
+        items: pageUsedHex.map(function(c){ return { color: c, factory: true }; }), // factory:true 로 × 숨김
         showAdd: false
       });
     }
-    sections.push({
-      label: '기본 팔레트',
-      key: 'factory',
-      items: TC_FACTORY,
-      showAdd: false
-    });
-    if (userColors.length) {
-      sections.push({
-        label: '내 색',
-        key: 'user',
-        items: userColors,
-        showAdd: true       // 마지막이므로 ＋ 카드 노출
+
+    // (2) 새 라이브러리 그룹들 (모든 그룹 · 시드+사용자)
+    lib.groups.forEach(function(g){
+      if (!g || !Array.isArray(g.colors) || g.colors.length === 0) return;
+      var items = g.colors.map(function(c){
+        return {
+          color: c.value,
+          title: c.name || c.value,
+          // 시드 그룹의 색은 개별 × 삭제 아이콘을 미노출 (그룹 관리창에서만 삭제 · 미니는 단순화)
+          factory: !!g.isSeed,
+          _cid: c.id,
+          _gid: g.id
+        };
       });
-    } else {
-      // 사용자 색이 아직 없어도 ＋ 카드는 노출되어야 함 → factory 섹션에 showAdd=true
-      sections[sections.length - 1].showAdd = true;
-    }
+      sections.push({
+        label: g.name,
+        key: 'lib-' + g.id,
+        items: items,
+        showAdd: false
+      });
+    });
+
+    // (3) 사용자 그룹이 하나도 없을 때에도 ＋ 카드는 마지막 섹션에서 노출 (createMiniPopover 로직상 자동)
+    //     사용자가 ＋ 를 눌러 색을 고르면 "내 색" 그룹이 자동 생성/추가됨.
 
     var mp = window.__DDL_EDITOR.createMiniPopover({
       anchor: anchor,
@@ -24061,10 +24450,13 @@
         input.click();
       },
       onDelete: function(item, ctx){
+        // p25a: item.factory === true 인 것 (시드 그룹 색 · 이 페이지 사용 색) 은 삭제 무시
         if (!item || !item.color || item.factory) return;
-        if (ctx.sectionKey === 'user') {
-          removeUserTextColor(item.color);
-          // 팝오버 다시 열기 (갱신)
+        // 사용자 그룹 색 삭제 → 새 라이브러리에서 제거
+        if (item._gid && item._cid) {
+          try { _tclDeleteColor(item._gid, item._cid); } catch(_){}
+          // 하위 호환: 옛 저장소도 정리
+          try { removeUserTextColor(item.color); } catch(_){}
           mp.close();
           setTimeout(function(){ openTextColorMini(anchor); }, 50);
         }
@@ -24103,6 +24495,10 @@
   //   — 저장소는 그대로 localStorage['ddl.textColorGroups']
   // ============================================================
   function openTextColorGroupManager(){
+    // p25a: 새 통일 라이브러리 (ddl.textColorLib) 기반으로 재작성
+    //   - 옛 _loadTextColorGroupLib 대신 _loadTextColorLibrary 사용
+    //   - 필드 매핑: color→value, isBuiltin→!deletable (시드 그룹도 삭제 가능)
+    //   - 콜아웃 이관 그룹도 여기서 관리 가능
     var currentGroupId = null;
     var currentView = 'all'; // 'all' | 'favorite' | 'inContent'
 
@@ -24142,7 +24538,6 @@
     newGroupBtn.addEventListener('mouseenter', function(){ newGroupBtn.style.borderColor = 'var(--point, #FF9A76)'; newGroupBtn.style.color = 'var(--point, #FF9A76)'; });
     newGroupBtn.addEventListener('mouseleave', function(){ newGroupBtn.style.borderColor = 'rgba(15,58,58,0.25)'; newGroupBtn.style.color = 'var(--color, #0F3A3A)'; });
     newGroupBtn.addEventListener('click', function(){
-      // 예쁜 이름 입력창 (브라우저 prompt() 대체)
       _openHlNamePrompt({
         title: '새 그룹',
         label: '그룹 이름',
@@ -24152,15 +24547,13 @@
           if (!name) return;
           name = String(name).trim();
           if (!name) return;
-          var lib = _loadTextColorGroupLib();
+          var lib = _loadTextColorLibrary();
           if (lib.groups.some(function(g){ return g.name === name; })){
-            _showStubToast('이미 있는 그룹 이름입니다');
+            try { _showStubToast('이미 있는 그룹 이름입니다'); } catch(_){}
             return;
           }
-          var newG = { id: _tcUid('tcg'), name: name, isBuiltin: false, colors: [] };
-          lib.groups.push(newG);
-          _saveTextColorGroupLib(lib);
-          currentGroupId = newG.id;
+          var newG = _tclAddGroup(name);
+          if (newG) currentGroupId = newG.id;
           _renderAll();
         }
       });
@@ -24197,7 +24590,7 @@
 
     function _renderLeftList(){
       leftList.innerHTML = '';
-      var lib = _loadTextColorGroupLib();
+      var lib = _loadTextColorLibrary();
       if (!currentGroupId && lib.groups[0]) currentGroupId = lib.groups[0].id;
       lib.groups.forEach(function(g){
         var item = document.createElement('button');
@@ -24229,7 +24622,7 @@
     function _renderRight(){
       rightHeader.innerHTML = '';
       rightBody.innerHTML = '';
-      var lib = _loadTextColorGroupLib();
+      var lib = _loadTextColorLibrary();
       var g = lib.groups.filter(function(x){ return x.id === currentGroupId; })[0];
       if (!g){
         rightBody.innerHTML = '<div style="padding: 40px; text-align: center; color: rgba(15,58,58,0.4); font-size: 13px;">그룹을 선택하세요</div>';
@@ -24240,38 +24633,32 @@
       var headTop = document.createElement('div');
       headTop.style.cssText = 'display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;';
 
-      // 그룹 이름 (사용자 그룹이면 클릭 시 이름 편집)
+      // 그룹 이름 (모든 그룹 이름 편집 가능 · 시드 그룹도 사용자가 원하면 이름 바꿀 수 있게)
       var gName = document.createElement('div');
-      gName.textContent = g.name;
+      gName.textContent = g.name + (g.isSeed ? '  · 기본' : '');
       gName.style.cssText = 'font-family: "Cafe24Danjunghae","Gowun Batang",serif; font-size: 18px; color: var(--color, #0F3A3A);';
-      if (!g.isBuiltin){
-        gName.style.cursor = 'pointer';
-        gName.title = '클릭해서 이름 편집';
-        gName.addEventListener('mouseenter', function(){ gName.style.color = 'var(--point, #FF9A76)'; });
-        gName.addEventListener('mouseleave', function(){ gName.style.color = 'var(--color, #0F3A3A)'; });
-        gName.addEventListener('click', function(){
-          _openHlNamePrompt({
-            title: '그룹 이름 편집',
-            label: '이름',
-            value: g.name,
-            onDone: function(newName){
-              if (!newName) return;
-              newName = String(newName).trim();
-              if (!newName || newName === g.name) return;
-              var lib2 = _loadTextColorGroupLib();
-              var gg = lib2.groups.filter(function(x){ return x.id === g.id; })[0];
-              if (gg){
-                gg.name = newName;
-                _saveTextColorGroupLib(lib2);
-                _renderAll();
-              }
-            }
-          });
+      gName.style.cursor = 'pointer';
+      gName.title = '클릭해서 이름 편집';
+      gName.addEventListener('mouseenter', function(){ gName.style.color = 'var(--point, #FF9A76)'; });
+      gName.addEventListener('mouseleave', function(){ gName.style.color = 'var(--color, #0F3A3A)'; });
+      gName.addEventListener('click', function(){
+        _openHlNamePrompt({
+          title: '그룹 이름 편집',
+          label: '이름',
+          value: g.name,
+          onDone: function(newName){
+            if (!newName) return;
+            newName = String(newName).trim();
+            if (!newName || newName === g.name) return;
+            _tclRenameGroup(g.id, newName);
+            _renderAll();
+          }
         });
-      }
+      });
       headTop.appendChild(gName);
 
-      if (!g.isBuiltin){
+      // 삭제 가능한 그룹이면 그룹 삭제 버튼 노출
+      if (g.deletable !== false){
         var delGroupBtn = document.createElement('button');
         delGroupBtn.type = 'button';
         delGroupBtn.textContent = '그룹 삭제';
@@ -24282,9 +24669,8 @@
         delGroupBtn.addEventListener('mouseleave', function(){ delGroupBtn.style.background = 'transparent'; });
         delGroupBtn.addEventListener('click', function(){
           if (!confirm('그룹 "' + g.name + '"을 삭제할까요? (그룹 안 색도 사라집니다)')) return;
-          var lib2 = _loadTextColorGroupLib();
-          lib2.groups = lib2.groups.filter(function(x){ return x.id !== g.id; });
-          _saveTextColorGroupLib(lib2);
+          _tclDeleteGroup(g.id);
+          var lib2 = _loadTextColorLibrary();
           currentGroupId = lib2.groups[0] ? lib2.groups[0].id : null;
           _renderAll();
         });
@@ -24324,7 +24710,7 @@
         if (currentView === 'favorite')  return !!c.isFavorite;
         if (currentView === 'inContent'){
           if (!usedSet) return false;
-          return !!usedSet[c.color];
+          return !!usedSet[c.value];
         }
         return true;
       });
@@ -24362,23 +24748,10 @@
       addBtn.addEventListener('mouseenter', function(){ addBtn.style.borderColor = 'var(--point, #FF9A76)'; addBtn.style.color = 'var(--point, #FF9A76)'; });
       addBtn.addEventListener('mouseleave', function(){ addBtn.style.borderColor = 'rgba(15,58,58,0.25)'; addBtn.style.color = 'var(--color, #0F3A3A)'; });
       addBtn.addEventListener('click', function(){
-        // 예쁜 색 편집 다이얼로그 (헤더용 재사용)
         _openHeaderColorEditMini(null, function(result){
           if (!result) return;
-          var lib2 = _loadTextColorGroupLib();
-          var gg = lib2.groups.filter(function(x){ return x.id === g.id; })[0];
-          if (gg){
-            // 중복 제거
-            gg.colors = (gg.colors || []).filter(function(cc){ return cc.color !== result.value; });
-            gg.colors.unshift({
-              id: _tcUid('tcc'),
-              color: result.value,
-              name: result.name || '',
-              isFavorite: false
-            });
-            _saveTextColorGroupLib(lib2);
-            _renderAll();
-          }
+          _tclAddColorToGroup(g.id, { value: result.value, name: result.name || '' });
+          _renderAll();
         });
       });
       rightBody.appendChild(addBtn);
@@ -24393,13 +24766,13 @@
       // 색 미리보기 (큰 원)
       var sw = document.createElement('div');
       sw.style.cssText = 'width: 48px; height: 48px; border-radius: 50%;'
-        + ' background: ' + c.color + '; border: 1px solid rgba(15,58,58,0.12);'
+        + ' background: ' + c.value + '; border: 1px solid rgba(15,58,58,0.12);'
         + ' box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
       card.appendChild(sw);
 
-      // 이름 (없으면 hex 값)
+      // 이름 (없으면 hex/rgba 값)
       var nm = document.createElement('div');
-      nm.textContent = c.name || c.color;
+      nm.textContent = c.name || c.value;
       nm.style.cssText = 'font-size: 11px; color: var(--color, #0F3A3A); text-align: center;'
         + ' max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
       card.appendChild(nm);
@@ -24414,12 +24787,8 @@
         + ' color: ' + (c.isFavorite ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.3)') + ';';
       favBtn.addEventListener('click', function(e){
         e.stopPropagation();
-        var lib2 = _loadTextColorGroupLib();
-        var gg = lib2.groups.filter(function(x){ return x.id === g.id; })[0];
-        if (gg){
-          var cc = gg.colors.filter(function(x){ return x.id === c.id; })[0];
-          if (cc){ cc.isFavorite = !cc.isFavorite; _saveTextColorGroupLib(lib2); _renderRight(); }
-        }
+        _tclUpdateColor(g.id, c.id, { isFavorite: !c.isFavorite });
+        _renderRight();
       });
       card.appendChild(favBtn);
 
@@ -24435,19 +24804,10 @@
       editBtn.addEventListener('mouseleave', function(){ editBtn.style.color = 'rgba(15,58,58,0.4)'; });
       editBtn.addEventListener('click', function(e){
         e.stopPropagation();
-        _openHeaderColorEditMini({ name: c.name || '', value: c.color }, function(result){
+        _openHeaderColorEditMini({ name: c.name || '', value: c.value }, function(result){
           if (!result) return;
-          var lib2 = _loadTextColorGroupLib();
-          var gg = lib2.groups.filter(function(x){ return x.id === g.id; })[0];
-          if (gg){
-            var cc = gg.colors.filter(function(x){ return x.id === c.id; })[0];
-            if (cc){
-              cc.name  = result.name;
-              cc.color = result.value;
-              _saveTextColorGroupLib(lib2);
-              _renderAll();
-            }
-          }
+          _tclUpdateColor(g.id, c.id, { name: result.name, value: result.value });
+          _renderAll();
         });
       });
       card.appendChild(editBtn);
@@ -24464,13 +24824,8 @@
       delBtn.addEventListener('mouseleave', function(){ delBtn.style.color = 'rgba(15,58,58,0.4)'; });
       delBtn.addEventListener('click', function(e){
         e.stopPropagation();
-        var lib2 = _loadTextColorGroupLib();
-        var gg = lib2.groups.filter(function(x){ return x.id === g.id; })[0];
-        if (gg){
-          gg.colors = (gg.colors || []).filter(function(cc){ return cc.id !== c.id; });
-          _saveTextColorGroupLib(lib2);
-          _renderAll();
-        }
+        _tclDeleteColor(g.id, c.id);
+        _renderAll();
       });
       card.appendChild(delBtn);
 
