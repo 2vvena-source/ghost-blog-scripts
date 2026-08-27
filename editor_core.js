@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26b
+ * 2vvena Editor Core - v2.0-β-p26c
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26b';
+  var VERSION = 'v2.0-β-p26c';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2641,7 +2641,7 @@
     '  top: 0.4em;',
     '  bottom: 0.4em;',
     '  width: 1px;',
-    '  background: rgba(15,58,58,0.1);',
+    '  background: var(--ddl-fold-divider-color, rgba(15,58,58,0.1));', /* p26c: 내부 구분선 색 변수 */
     '}',
     '.ddl-fold-block[data-fold-label-on="0"] .ddl-fold-body { padding-left: 1.2em; }',
     '.ddl-fold-block[data-fold-label-on="0"] .ddl-fold-body::before { display: none; }',
@@ -9593,12 +9593,12 @@
 
     var styleVars = '--ddl-hr-shape-fill:' + shapeFill + '; --ddl-hr-shape-stroke:' + shapeStroke + ';';
 
-    // p26b: 그라디언트 모드 → SVG 내부에 <linearGradient> 삽입 (mask 방식 사용 X)
+    // p26c: 그라디언트 모드 → SVG 내부에 <linearGradient> 삽입 · <img data:image/svg+xml> 로 렁더링
+    //   inline SVG (innerHTML) 방식은 HTML 파서가 defs 를 놓치거나 currentColor 기반 SVG 들이
+    //   제대로 렁더링 안 되는 증상이 있으므로 img 방식으로 전환.
     if (opts.colorMode === 'gradient' && opts.bg2) {
       var gid = 'ddlg' + Math.floor(Math.random() * 1e9);
       var _ang = (opts.gradientAngle != null) ? opts.gradientAngle : 90;
-      // linearGradient 방향: SVG 의 x1/y1/x2/y2 로 변환 (CSS deg 와 수직이 다름)
-      // CSS: 0deg = 아래→위, 90deg = 왜→오. SVG: gradientTransform="rotate(...)"
       var _rad = (_ang - 90) * Math.PI / 180;
       var x1 = 50 - Math.cos(_rad) * 50, y1 = 50 - Math.sin(_rad) * 50;
       var x2 = 50 + Math.cos(_rad) * 50, y2 = 50 + Math.sin(_rad) * 50;
@@ -9608,17 +9608,21 @@
       }
       stops += '<stop offset="100%" stop-color="' + opts.bg2 + '"/>';
       var gradDef = '<defs><linearGradient id="' + gid + '" x1="' + x1 + '%" y1="' + y1 + '%" x2="' + x2 + '%" y2="' + y2 + '%">' + stops + '</linearGradient></defs>';
-      // 원본 SVG 에 <defs> 삽입 및 currentColor → url(#gid) 치환
-      // <svg ...>직후에 <defs> 를 넣음
+      // 원본 SVG 에 <defs> 삽입
       var gradSvg = preset.svg.replace(/(<svg[^>]*>)/, '$1' + gradDef);
+      // currentColor + shape 변수들 치환
       gradSvg = gradSvg.replace(/currentColor/g, 'url(#' + gid + ')');
-      return '<span class="ddl-divider-svg ddl-divider-grad" style="'
-        + 'display:inline-block; vertical-align:middle; line-height:0; '
-        + 'opacity:' + opacity + '; '
-        + widthStyle
-        + ' height:' + effectiveH + 'px; '
-        + styleVars
-        + '">' + gradSvg + '</span>';
+      gradSvg = gradSvg.replace(/var\(--ddl-hr-shape-fill,[^)]*\)/g, isFilled ? shapeFillColor : '#F5F5F5');
+      gradSvg = gradSvg.replace(/var\(--ddl-hr-shape-stroke,[^)]*\)/g, 'url(#' + gid + ')');
+      // 캐싱 방지용으로 gid 가 이미 랑덤이므로 별도 서버 가치 불요
+      var dataUrlG = 'data:image/svg+xml;utf8,' + encodeURIComponent(gradSvg);
+      var wPxG = preset.widthPx || 600;
+      var hPxG = preset.heightPx * stroke;
+      return '<img class="ddl-divider-img ddl-divider-grad" src="' + dataUrlG + '" '
+        + 'width="' + wPxG + '" height="' + hPxG + '" '
+        + 'style="display:inline-block; vertical-align:middle; '
+        + 'width:' + wPxG + 'px; height:' + hPxG + 'px; opacity:' + opacity + ';" '
+        + 'alt="divider">';
     }
 
     var inner = '<span class="ddl-divider-svg" style="'
@@ -13114,6 +13118,54 @@
       caption.textContent = '현재 글자색';
       tabContent.appendChild(caption);
 
+      // p26c: 스와치 + 컴러피커 row (그룹 위에 배치) — 사용자 요청
+      (function(){
+        var _swatchRow = document.createElement('div');
+        _swatchRow.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 8px 4px 12px; margin-bottom: 8px; border-bottom: 1px solid rgba(15,58,58,0.08);';
+        var _swBtn = document.createElement('button');
+        _swBtn.type = 'button';
+        _swBtn.className = 'ep-color-swatch';
+        _swBtn.style.cssText = 'width: 44px; height: 44px; border: 1px solid rgba(15,58,58,0.2); border-radius: 4px; padding: 0; cursor: pointer; background: ' + (current.style.color || '#0F3A3A') + '; flex-shrink: 0;';
+        _swBtn.title = '클릭해서 색 선택';
+        _swatchRow.appendChild(_swBtn);
+        var _swInfo = document.createElement('div');
+        _swInfo.style.cssText = 'display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0;';
+        var _swLabel = document.createElement('div');
+        _swLabel.style.cssText = 'font-size: 11px; color: rgba(15,58,58,0.55);';
+        _swLabel.textContent = '현재 색 · 클릭해서 직접 선택';
+        _swInfo.appendChild(_swLabel);
+        var _swHex = document.createElement('div');
+        _swHex.style.cssText = 'font-family: monospace; font-size: 13px; color: rgba(15,58,58,0.85);';
+        _swHex.textContent = String(current.style.color || '#0F3A3A').toUpperCase();
+        _swInfo.appendChild(_swHex);
+        _swatchRow.appendChild(_swInfo);
+        _swBtn.addEventListener('click', function(e){
+          e.stopPropagation();
+          var _origSwCol = current.style.color || '#0F3A3A';
+          function _swApply(v){
+            if (!v) return;
+            current.style.color = v;
+            _swBtn.style.background = v;
+            _swHex.textContent = String(v).toUpperCase();
+            big.style.background = v;
+            try { if (typeof _syncHero === 'function') _syncHero(); } catch(_){}
+          }
+          try {
+            if (typeof openCustomColorPicker === 'function'){
+              openCustomColorPicker({
+                initial: _origSwCol,
+                context: 'text',
+                detectFromSelection: false,
+                onChange: _swApply,
+                onDone: _swApply,
+                onCancel: function(){ _swApply(_origSwCol); }
+              });
+            }
+          } catch(_){}
+        });
+        tabContent.appendChild(_swatchRow);
+      })();
+
       // 뷰 상태 (그룹별 렌더러가 참조)
       var colorView = renderColorTab.__view || 'all';
 
@@ -16464,6 +16516,54 @@
       caption.style.cssText = 'text-align: center; font-size: 11px; opacity: 0.55; margin-bottom: 12px;';
       caption.textContent = '현재 형광펜 색';
       tabContent.appendChild(caption);
+
+      // p26c: 스와치 + 컴러피커 row (그룹 위에 배치)
+      (function(){
+        var _swatchRow = document.createElement('div');
+        _swatchRow.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 8px 4px 12px; margin-bottom: 8px; border-bottom: 1px solid rgba(15,58,58,0.08);';
+        var _swBtn = document.createElement('button');
+        _swBtn.type = 'button';
+        _swBtn.className = 'ep-color-swatch';
+        _swBtn.style.cssText = 'width: 44px; height: 44px; border: 1px solid rgba(15,58,58,0.2); border-radius: 4px; padding: 0; cursor: pointer; background: ' + (current.spec.c1 || '#FFF176') + '; flex-shrink: 0;';
+        _swBtn.title = '클릭해서 색 선택';
+        _swatchRow.appendChild(_swBtn);
+        var _swInfo = document.createElement('div');
+        _swInfo.style.cssText = 'display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0;';
+        var _swLabel = document.createElement('div');
+        _swLabel.style.cssText = 'font-size: 11px; color: rgba(15,58,58,0.55);';
+        _swLabel.textContent = '현재 색 · 클릭해서 직접 선택';
+        _swInfo.appendChild(_swLabel);
+        var _swHex = document.createElement('div');
+        _swHex.style.cssText = 'font-family: monospace; font-size: 13px; color: rgba(15,58,58,0.85);';
+        _swHex.textContent = String(current.spec.c1 || '#FFF176').toUpperCase();
+        _swInfo.appendChild(_swHex);
+        _swatchRow.appendChild(_swInfo);
+        _swBtn.addEventListener('click', function(e){
+          e.stopPropagation();
+          var _origSwCol = current.spec.c1 || '#FFF176';
+          function _swApply(v){
+            if (!v) return;
+            current.spec.c1 = v;
+            _swBtn.style.background = v;
+            _swHex.textContent = String(v).toUpperCase();
+            big.style.background = v;
+            try { if (typeof _syncHero === 'function') _syncHero(); } catch(_){}
+          }
+          try {
+            if (typeof openCustomColorPicker === 'function'){
+              openCustomColorPicker({
+                initial: _origSwCol,
+                context: 'bg',
+                detectFromSelection: false,
+                onChange: _swApply,
+                onDone: _swApply,
+                onCancel: function(){ _swApply(_origSwCol); }
+              });
+            }
+          } catch(_){}
+        });
+        tabContent.appendChild(_swatchRow);
+      })();
 
       var colorView = renderHlColorTab.__view || 'all';
 
@@ -30386,7 +30486,19 @@
         + '</div>';
       html += '<div class="row"><div class="row-label">두께 (' + iWidth + 'px)</div>'
         + '<input type="range" id="pop-fold-divider-inner-width" min="1" max="10" step="1" value="' + iWidth + '" style="width:100%;"></div>';
-      html += '<div class="row"><div style="font-size:0.72em; opacity:0.6;">색상은 외부 테두리 색상 설정을 따릅니다.</div></div>';
+      // p26c: 내부 구분선 색 독립 지정 (스와치 · 없으면 외부 테두리 색 상속)
+      var _idc = block.getAttribute('data-fold-divider-inner-color') || '';
+      var _idcDisp = _idc || (block.getAttribute('data-fold-border-color') || '#0F3A3A');
+      html += '<div class="row"><div class="row-label">색상 (외부 테두리와 분리)</div>'
+        + '<div style="display:flex; align-items:center; gap:0.5em;">'
+        + '<button type="button" class="ep-color-swatch" data-fold-swatch="dividerInnerColor" data-cur="' + _idcDisp + '"'
+        + '   style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2); border-radius:4px; padding:0; cursor:pointer; background:' + _idcDisp + '; flex-shrink:0;"'
+        + '   title="클릭해서 색 선택"></button>'
+        + '<span style="opacity:0.7; font-size:0.85em; font-family:monospace;">' + _idcDisp.toUpperCase() + '</span>'
+        + '<button type="button" class="pop-btn" data-fold-set="dividerInnerColorReset" style="margin-left:auto; font-size:0.75em;" title="외부 테두리 색으로 되돌리기">테두리와 같이</button>'
+        + '</div>'
+        + '<div style="font-size:0.72em; opacity:0.55; margin-top:0.3em;">헤더-본문 사이 가로선과 본문 왼쪽 세로선 모두에 적용됩니다.</div>'
+        + '</div>';
     }
     return html;
   }
@@ -30537,12 +30649,14 @@
           'headBg':'data-fold-head-bg',   'bodyBg':'data-fold-body-bg',
           'headBg2':'data-fold-head-bg2', 'bodyBg2':'data-fold-body-bg2',
           'borderColor':'data-fold-border-color',
-          'headFg':'data-fold-head-fg',   'bodyFg':'data-fold-body-fg'
+          'headFg':'data-fold-head-fg',   'bodyFg':'data-fold-body-fg',
+          'dividerInnerColor':'data-fold-divider-inner-color'  // p26c
         };
         // 픽커 context (텍스트 색은 'text', 테두리는 'border', 배경류는 'bg')
         var _fsCtxMap = {
           'headBg':'bg','bodyBg':'bg','headBg2':'bg','bodyBg2':'bg',
-          'borderColor':'border','headFg':'text','bodyFg':'text'
+          'borderColor':'border','headFg':'text','bodyFg':'text',
+          'dividerInnerColor':'border'
         };
         var _fsAttr = _fsAttrMap[_fsKind];
         // kind별 기본 색 (배경류는 base 회색, 테두리는 어두운색, 글자류는 어두운색)
@@ -30967,6 +31081,12 @@
     // p20u: 본문 전용 속성 지원
     if (key === 'bodyBgGradStart') { block.setAttribute('data-fold-body-bg-gradient-start', val); _applyFoldStyles(block); return; }
     if (!block || !key) return;
+    // p26c: 내부 구분선 색 리셋 → attr 제거 · 외부 테두리 색 상속으로 되돌림
+    if (key === 'dividerInnerColorReset') {
+      block.removeAttribute('data-fold-divider-inner-color');
+      _applyFoldBorderStyles(block);
+      return;
+    }
     var map = {
       arrow: 'data-fold-arrow',
       arrowPos: 'data-fold-arrow-pos',
@@ -30981,12 +31101,13 @@
       borderColor: 'data-fold-border-color',
       bgMode: 'data-fold-bg-mode',
       pattern: 'data-fold-pattern',
-      dividerStyle: 'data-fold-divider-style'
+      dividerStyle: 'data-fold-divider-style',
+      dividerInnerColor: 'data-fold-divider-inner-color'  // p26c: 내부 구분선 색
     };
     var attr = map[key];
     if (!attr) return;
     block.setAttribute(attr, val);
-    if (key === 'borderColor') _applyFoldBorderStyles(block);
+    if (key === 'borderColor' || key === 'dividerInnerColor') _applyFoldBorderStyles(block);
     else _applyFoldStyles(block);
   }
 
@@ -31019,11 +31140,17 @@
       if (innerOn) {
         var innerEff = (innerStyle === 'bold') ? Math.max(2, innerWidth * 2) : innerWidth;
         var innerCss = (innerStyle === 'bold') ? 'solid' : innerStyle;
-        var innerRgb = _hexToRgb(c);
-        var innerRgba = innerRgb ? ('rgba(' + innerRgb.r + ',' + innerRgb.g + ',' + innerRgb.b + ',' + op + ')') : c;
+        // p26c: 내부 구분선 색 분리 → 독립 속성 data-fold-divider-inner-color 를 먼저 사용,
+        //       없으면 외부 border 색 (c) 를 상속 (기존 동작 유지)
+        var innerColorRaw = block.getAttribute('data-fold-divider-inner-color') || c;
+        var innerRgb = _hexToRgb(innerColorRaw);
+        var innerRgba = innerRgb ? ('rgba(' + innerRgb.r + ',' + innerRgb.g + ',' + innerRgb.b + ',' + op + ')') : innerColorRaw;
         head.style.borderBottom = innerEff + 'px ' + innerCss + ' ' + innerRgba;
+        // 세로 구분선 (.ddl-fold-body::before) 에 동일 색 적용 (CSS 변수)
+        block.style.setProperty('--ddl-fold-divider-color', innerRgba);
       } else {
         head.style.borderBottom = '';
+        block.style.removeProperty('--ddl-fold-divider-color');
       }
     }
 
