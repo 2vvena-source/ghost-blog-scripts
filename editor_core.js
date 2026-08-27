@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p20k
+ * 2vvena Editor Core - v2.0-β-p25q
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25p';
+  var VERSION = 'v2.0-β-p25q';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -29043,13 +29043,18 @@
     });
 
     // p21d: 정렬 3버튼 클릭 위임 (setBlockAlign 호출)
-    if (foldPopup) {
-      foldPopup.addEventListener('click', function(e){
+    // p25q: 변수명 오타 수정 — foldPopup(undefined) → foldPopupEl.
+    //       strict 모드에서 미선언 변수 참조는 ReferenceError 를 던져서
+    //       이 함수 이후 setupFoldPopupDrag/Esc/BodyListeners 가 모두 실행되지
+    //       않게 만들었음. 그 결과 접은글 편집창 body 안 버튼이 전혀 안 눌리던
+    //       v7 § 6-4 이래의 미해결 이슈를 해결.
+    if (foldPopupEl) {
+      foldPopupEl.addEventListener('click', function(e){
         var alignBtn = e.target.closest && e.target.closest('[data-fold-align]');
         if (!alignBtn) return;
         var _b = foldPopupLock || selectedFold;
         if (_b && typeof setBlockAlign === 'function') setBlockAlign(_b, alignBtn.getAttribute('data-fold-align'));
-        foldPopup.querySelectorAll('[data-fold-align]').forEach(function(b){
+        foldPopupEl.querySelectorAll('[data-fold-align]').forEach(function(b){
           b.classList.toggle('is-active', b === alignBtn);
         });
       });
