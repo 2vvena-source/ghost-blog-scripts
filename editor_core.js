@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25d';
+  var VERSION = 'v2.0-β-p25e';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -16351,37 +16351,49 @@
   }
 
 
+
   // ═══════════════════════════════════════════════════════════
-  // p25d: 커스텀 컬러 픽커 (openCustomColorPicker)
-  //   - 사이트 톤 3색 (딥그린/살구/배경) · 밑줄 인풋 · 얇은 hairline
-  //   - 폭 340px · 픽커 내부 요소 260~280px
-  //   - 큰 원 미리보기 (48px 원)
-  //   - hex 코드 입력 (편집 가능 · 밑줄만)
-  //   - 색상(Hue) · 채도(Saturation) · 명도(Lightness) 슬라이더
-  //   - 투명도 슬라이더 (5% 스텝 · 살구색 accent)
-  //   - 스포이드 (EyeDropper API · 미지원 브라우저 자동 숨김)
-  //   - 브리프/상세 토글 (기본 brief = HSL 감춤 · detail 이면 노출)
-  //   - onDone(colorValue) 로 hex or rgba() 문자열 반환
-  //   - 컨텍스트 자동 감지 옵션: options.detectFromSelection === true 이면 선택 텍스트의 color 읽어 초기값
+  // p25e: 커스텀 컬러 픽커 (openCustomColorPicker) · 이미지 사양 그대로 재작성
   //
-  //   사용법:
+  //   ★ 사용자님이 제공한 참고 이미지 3장 기준 (7zcBpk7s, wdj7etK6, i2yrjCkQ)
+  //   ★ Photoshop / Figma 스타일의 2D 사각형 픽커
+  //
+  //   [기본 모드 · 이미지 1]
+  //     ┌─────────────────────────────────┐
+  //     │                                 │
+  //     │   2D 그라디언트 사각형            │  ← 채도(가로) × 명도(세로)
+  //     │   (배경 색 = 현재 Hue)            │     흰 링 인디케이터
+  //     │                                 │
+  //     ├─────────────────────────────────┤
+  //     │  [무지개 Hue 슬라이더]           │  ← 흰 링
+  //     │  [체크무늬 + 색 Alpha 슬라이더]  │  ← 흰 링
+  //     ├─────────────────────────────────┤
+  //     │ [🎨스포이드] [HEX #____] [%불투]│
+  //     └─────────────────────────────────┘
+  //
+  //   [상세 모드 · 이미지 2 · ＋ 클릭 시 아래로 확장]
+  //     Red   ═════●═════════════ [255]
+  //     Green ═══●═══════════════ [100]
+  //     Blue  ═════●═════════════ [ 50]
+  //     ┌────┐  HEX #FF6432
+  //     │색  │  rgb(255,100,50)
+  //     └────┘
+  //
+  //   시그니처:
   //     openCustomColorPicker({
-  //       initial: '#FF9A76',             // 초기 색 (hex or rgba · 생략 시 딥그린 or 감지)
-  //       context: 'text',                // 'text' | 'bg' | 'highlight' | 'header' (미래 확장용 · 지금은 라벨만)
-  //       showAlpha: true,                // 투명도 슬라이더
-  //       showSaturation: true,           // 채도·명도 슬라이더 (기본 brief 모드에서 숨김)
-  //       showEyedropper: true,           // 자동으로 브라우저 지원 확인
-  //       detectFromSelection: true,      // 옵션 · 선택 텍스트의 인라인 color 를 초기값으로
-  //       mode: 'brief',                  // 'brief' | 'detail'
-  //       onDone: function(color){ ... }, // 확정
-  //       onCancel: function(){ ... }     // 취소 (선택적)
+  //       initial: '#FF9A76',
+  //       context: 'text' | 'bg' | 'highlight' | 'header',
+  //       detectFromSelection: true,
+  //       onDone: function(colorValue){...},
+  //       onCancel: function(){...}
   //     });
   // ═══════════════════════════════════════════════════════════
   function openCustomColorPicker(opts){
     opts = opts || {};
     var _fired = false;
 
-    // ── 유틸: 색 파싱/변환 ──
+    // ── 색 변환 유틸 ──────────────────────────────────
+    function _clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
     function _hexToRgb(hex){
       var m = String(hex || '').match(/^#([0-9a-f]{6})$/i);
       if (!m) return null;
@@ -16389,77 +16401,65 @@
       return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
     }
     function _rgbToHex(r, g, b){
-      function h(x){ x = Math.max(0, Math.min(255, Math.round(x))); var s = x.toString(16); return s.length === 1 ? '0'+s : s; }
+      function h(x){ x = _clamp(Math.round(x), 0, 255); var s = x.toString(16); return s.length === 1 ? '0'+s : s; }
       return '#' + h(r) + h(g) + h(b);
     }
-    function _rgbToHsl(r, g, b){
+    // HSV (Photoshop/Figma 방식) — 사각형 픽커는 HSV 를 씀
+    function _rgbToHsv(r, g, b){
       r /= 255; g /= 255; b /= 255;
-      var mx = Math.max(r,g,b), mn = Math.min(r,g,b);
-      var h, s, l = (mx + mn) / 2;
-      if (mx === mn){ h = s = 0; }
-      else {
-        var d = mx - mn;
-        s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      var mx = Math.max(r,g,b), mn = Math.min(r,g,b), d = mx - mn;
+      var h = 0, s = mx === 0 ? 0 : d / mx, v = mx;
+      if (d !== 0){
         switch(mx){
-          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-          case g: h = (b - r) / d + 2; break;
-          case b: h = (r - g) / d + 4; break;
+          case r: h = ((g - b) / d + (g < b ? 6 : 0)); break;
+          case g: h = ((b - r) / d + 2); break;
+          case b: h = ((r - g) / d + 4); break;
         }
-        h /= 6;
+        h *= 60;
       }
-      return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+      return { h: h, s: s * 100, v: v * 100 };
     }
-    function _hslToRgb(h, s, l){
-      h /= 360; s /= 100; l /= 100;
-      var r, g, b;
-      if (s === 0){ r = g = b = l; }
-      else {
-        function hue2rgb(p, q, t){
-          if (t < 0) t += 1;
-          if (t > 1) t -= 1;
-          if (t < 1/6) return p + (q - p) * 6 * t;
-          if (t < 1/2) return q;
-          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-          return p;
-        }
-        var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        var p = 2 * l - q;
-        r = hue2rgb(p, q, h + 1/3);
-        g = hue2rgb(p, q, h);
-        b = hue2rgb(p, q, h - 1/3);
-      }
-      return { r: r * 255, g: g * 255, b: b * 255 };
+    function _hsvToRgb(h, s, v){
+      h = ((h % 360) + 360) % 360;
+      s /= 100; v /= 100;
+      var c = v * s;
+      var x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+      var m = v - c;
+      var r=0, g=0, b=0;
+      if (h < 60){ r=c; g=x; b=0; }
+      else if (h < 120){ r=x; g=c; b=0; }
+      else if (h < 180){ r=0; g=c; b=x; }
+      else if (h < 240){ r=0; g=x; b=c; }
+      else if (h < 300){ r=x; g=0; b=c; }
+      else              { r=c; g=0; b=x; }
+      return { r: (r + m) * 255, g: (g + m) * 255, b: (b + m) * 255 };
     }
     function _parseInitial(v){
       var s = String(v || '').trim();
       if (/^#[0-9a-f]{6}$/i.test(s)){
         var rgb = _hexToRgb(s);
-        return { hex: s.toLowerCase(), r: rgb.r, g: rgb.g, b: rgb.b, alpha: 100 };
+        return { r: rgb.r, g: rgb.g, b: rgb.b, alpha: 100 };
       }
       var m = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i);
       if (m){
-        var r = parseInt(m[1],10), g = parseInt(m[2],10), b = parseInt(m[3],10);
-        var a = m[4] ? parseFloat(m[4]) : 1;
-        return { hex: _rgbToHex(r,g,b), r: r, g: g, b: b, alpha: Math.round(a * 100) };
+        return { r: parseInt(m[1],10), g: parseInt(m[2],10), b: parseInt(m[3],10), alpha: Math.round((m[4] ? parseFloat(m[4]) : 1) * 100) };
       }
-      return { hex: '#0F3A3A', r: 15, g: 58, b: 58, alpha: 100 };
+      return { r: 15, g: 58, b: 58, alpha: 100 }; // 딥그린 fallback
     }
-    function _formatOutput(state){
-      if (state.alpha >= 100) return state.hex.toUpperCase();
-      return 'rgba(' + state.r + ',' + state.g + ',' + state.b + ',' + (state.alpha/100).toFixed(2) + ')';
+    function _formatOutput(){
+      if (state.alpha >= 100) return _rgbToHex(state.r, state.g, state.b).toUpperCase();
+      return 'rgba(' + Math.round(state.r) + ',' + Math.round(state.g) + ',' + Math.round(state.b) + ',' + (state.alpha/100).toFixed(2) + ')';
     }
 
-    // ── 선택 텍스트에서 현재 색 자동 감지 (옵션) ──
+    // ── 선택된 텍스트의 현재 color 자동 감지 ───────────
     function _detectCurrentColor(){
       try {
         var sel = window.getSelection();
         if (!sel || sel.rangeCount === 0) return null;
-        var range = sel.getRangeAt(0);
-        var el = range.startContainer;
+        var el = sel.getRangeAt(0).startContainer;
         if (el && el.nodeType === 3) el = el.parentNode;
         while (el && el.nodeType === 1){
           if (el.style && el.style.color) return el.style.color;
-          // computed color 은 상속 때문에 부정확 → 인라인 style 만 참조
           if (el.classList && el.classList.contains('editor-canvas')) break;
           el = el.parentNode;
         }
@@ -16467,24 +16467,21 @@
       return null;
     }
 
-    // ── 초기 상태 결정 ──
+    // ── 초기 상태 ────────────────────────────────────
     var initialRaw = opts.initial;
     if (!initialRaw && opts.detectFromSelection){
       initialRaw = _detectCurrentColor();
     }
-    var state = _parseInitial(initialRaw || '#0F3A3A');
-    // HSL 파생
-    (function _syncHsl(){
-      var hsl = _rgbToHsl(state.r, state.g, state.b);
-      state.h = hsl.h; state.s = hsl.s; state.l = hsl.l;
-    })();
+    var init = _parseInitial(initialRaw || '#0F3A3A');
+    var hsv0 = _rgbToHsv(init.r, init.g, init.b);
+    var state = {
+      r: init.r, g: init.g, b: init.b,
+      h: hsv0.h, s: hsv0.s, v: hsv0.v,
+      alpha: init.alpha
+    };
+    var isDetailOpen = false;
 
-    var mode = (opts.mode === 'detail') ? 'detail' : 'brief';
-    var showAlpha       = opts.showAlpha !== false;
-    var showSaturation  = opts.showSaturation !== false;
-    var showEyedropper  = (opts.showEyedropper !== false) && ('EyeDropper' in window);
-
-    // ── 오버레이 & 다이얼로그 ──
+    // ── 오버레이 & 박스 ──────────────────────────────
     var overlay = document.createElement('div');
     overlay.className = 'ddl-editor-popup';
     overlay.style.cssText = 'position: fixed; inset: 0; z-index: 100020;'
@@ -16494,188 +16491,291 @@
       + ' color: var(--color, #0F3A3A);';
 
     var box = document.createElement('div');
-    box.style.cssText = 'background: #fff; border: 1px solid rgba(15,58,58,0.15); border-radius: 6px;'
-      + ' width: 340px; max-width: 92vw; padding: 20px 24px 18px;'
-      + ' box-shadow: 0 10px 30px rgba(0,0,0,0.12);';
+    box.style.cssText = 'background: #fff; border: 1px solid rgba(15,58,58,0.15); border-radius: 8px;'
+      + ' width: 300px; max-width: 92vw; padding: 16px 16px 14px;'
+      + ' box-shadow: 0 10px 30px rgba(0,0,0,0.12);'
+      + ' user-select: none;';
     ['click','mousedown','mouseup'].forEach(function(evt){
       box.addEventListener(evt, function(e){ e.stopPropagation(); });
     });
 
-    // 컨텍스트별 제목
-    var ctxLabels = {
-      'text':      '글자 색',
-      'bg':        '배경 색',
-      'highlight': '형광펜 색',
-      'header':    '헤더 색'
-    };
+    // ── 상단 라벨 (컨텍스트 · 오른쪽에 상태) ─────────
+    var ctxLabels = { 'text':'글자 색', 'bg':'배경 색', 'highlight':'형광펜 색', 'header':'헤더 색' };
     var titleText = ctxLabels[opts.context] || '색 선택';
 
-    // ── 제목 ──
-    var titleEl = document.createElement('div');
-    titleEl.textContent = titleText;
-    titleEl.style.cssText = 'font-family: "Cafe24Danjunghae","Gowun Batang","Nanum Myeongjo",serif;'
-      + ' font-size: 20px; font-weight: 400; color: var(--color, #0F3A3A);'
-      + ' padding-bottom: 10px; margin-bottom: 16px;'
-      + ' border-bottom: 1px solid rgba(15,58,58,0.1);';
-    box.appendChild(titleEl);
+    var headRow = document.createElement('div');
+    headRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;';
+    var titleLbl = document.createElement('span');
+    titleLbl.textContent = titleText;
+    titleLbl.style.cssText = 'font-size: 11px; color: rgba(15,58,58,0.55); letter-spacing: 0.06em; text-transform: uppercase;';
+    headRow.appendChild(titleLbl);
+    var normalLbl = document.createElement('span');
+    normalLbl.textContent = 'Normal';
+    normalLbl.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.4);';
+    headRow.appendChild(normalLbl);
+    box.appendChild(headRow);
 
-    // ── 상단 · 큰 원 미리보기 + hex 입력 + 스포이드 ──
-    var topRow = document.createElement('div');
-    topRow.style.cssText = 'display: flex; align-items: center; gap: 14px; margin-bottom: 18px;';
+    // ── ① 2D 채도×명도 사각형 ────────────────────────
+    // 폭 268px · 세로 160px · 라운드 6px
+    // 배경: 순수 Hue 색 위에 흰색→투명 (가로) + 투명→검정 (세로) 그라디언트 겹침
+    var svPad = document.createElement('div');
+    svPad.style.cssText = 'position: relative; width: 268px; height: 160px;'
+      + ' border-radius: 6px; overflow: hidden; cursor: crosshair;'
+      + ' border: 1px solid rgba(15,58,58,0.1);';
+    // 3층 배경 (Hue 위에 그라디언트)
+    svPad.style.background =
+      'linear-gradient(to top, #000, transparent),'
+      + 'linear-gradient(to right, #fff, transparent),'
+      + 'hsl(0, 100%, 50%)';
 
-    // 큰 원 (48px)
-    var previewCircle = document.createElement('div');
-    previewCircle.style.cssText = 'width: 48px; height: 48px; border-radius: 50%;'
-      + ' border: 1px solid rgba(15,58,58,0.15); flex-shrink: 0;'
-      + ' box-shadow: 0 1px 3px rgba(0,0,0,0.06);';
-    topRow.appendChild(previewCircle);
+    var svCursor = document.createElement('div');
+    svCursor.style.cssText = 'position: absolute; width: 14px; height: 14px; border-radius: 50%;'
+      + ' border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);'
+      + ' pointer-events: none; transform: translate(-50%, -50%);';
+    svPad.appendChild(svCursor);
+    box.appendChild(svPad);
 
-    // hex 입력 + 스포이드
-    var hexWrap = document.createElement('div');
-    hexWrap.style.cssText = 'flex: 1; display: flex; flex-direction: column; gap: 4px;';
+    // ── ② Hue 슬라이더 ────────────────────────────────
+    //   높이 12px · 무지개 · 흰 링 인디케이터
+    var hueTrack = document.createElement('div');
+    hueTrack.style.cssText = 'position: relative; width: 268px; height: 12px;'
+      + ' border-radius: 6px; margin-top: 10px; cursor: pointer;'
+      + ' background: linear-gradient(to right,'
+      +   ' hsl(0,100%,50%) 0%, hsl(60,100%,50%) 17%, hsl(120,100%,50%) 33%,'
+      +   ' hsl(180,100%,50%) 50%, hsl(240,100%,50%) 67%, hsl(300,100%,50%) 83%, hsl(360,100%,50%) 100%);'
+      + ' border: 1px solid rgba(15,58,58,0.08);';
+    var hueThumb = document.createElement('div');
+    hueThumb.style.cssText = 'position: absolute; top: 50%; width: 16px; height: 16px; border-radius: 50%;'
+      + ' border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.3);'
+      + ' transform: translate(-50%, -50%); pointer-events: none; background: transparent;';
+    hueTrack.appendChild(hueThumb);
+    box.appendChild(hueTrack);
 
-    var hexLabelRow = document.createElement('div');
-    hexLabelRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center;';
-    var hexLabel = document.createElement('span');
-    hexLabel.textContent = 'HEX';
-    hexLabel.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.5); letter-spacing: 0.06em;';
-    hexLabelRow.appendChild(hexLabel);
-    // 스포이드 버튼 (지원 시)
-    var eyedropperBtn = null;
-    if (showEyedropper){
-      eyedropperBtn = document.createElement('button');
-      eyedropperBtn.type = 'button';
-      eyedropperBtn.title = '화면에서 색 뽑기 (스포이드)';
-      eyedropperBtn.style.cssText = 'background: transparent; border: none; cursor: pointer;'
-        + ' padding: 2px 4px; color: rgba(15,58,58,0.5); border-radius: 4px;'
-        + ' display: inline-flex; align-items: center; font-size: 11px; gap: 4px;';
-      // 스포이드 SVG 아이콘
-      eyedropperBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 6l6 6-9 9H4v-6z"/><path d="M14 5l3-3 4 4-3 3z"/></svg><span>스포이드</span>';
-      eyedropperBtn.addEventListener('mouseenter', function(){ eyedropperBtn.style.color = 'var(--point, #FF9A76)'; });
-      eyedropperBtn.addEventListener('mouseleave', function(){ eyedropperBtn.style.color = 'rgba(15,58,58,0.5)'; });
+    // ── ③ Alpha 슬라이더 ─────────────────────────────
+    //   체크무늬 배경 + 현재 색 그라디언트 오버레이
+    var alphaTrack = document.createElement('div');
+    alphaTrack.style.cssText = 'position: relative; width: 268px; height: 12px;'
+      + ' border-radius: 6px; margin-top: 8px; cursor: pointer;'
+      + ' background-image: linear-gradient(45deg, rgba(15,58,58,0.15) 25%, transparent 25%),'
+      +   ' linear-gradient(-45deg, rgba(15,58,58,0.15) 25%, transparent 25%),'
+      +   ' linear-gradient(45deg, transparent 75%, rgba(15,58,58,0.15) 75%),'
+      +   ' linear-gradient(-45deg, transparent 75%, rgba(15,58,58,0.15) 75%);'
+      + ' background-size: 8px 8px;'
+      + ' background-position: 0 0, 0 4px, 4px -4px, -4px 0px;'
+      + ' border: 1px solid rgba(15,58,58,0.08); overflow: hidden;';
+    var alphaOverlay = document.createElement('div');
+    alphaOverlay.style.cssText = 'position: absolute; inset: 0; pointer-events: none;';
+    alphaTrack.appendChild(alphaOverlay);
+    var alphaThumb = document.createElement('div');
+    alphaThumb.style.cssText = 'position: absolute; top: 50%; width: 16px; height: 16px; border-radius: 50%;'
+      + ' border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.3);'
+      + ' transform: translate(-50%, -50%); pointer-events: none; background: transparent;';
+    alphaTrack.appendChild(alphaThumb);
+    box.appendChild(alphaTrack);
+
+    // ── ④ 하단 입력 줄 (스포이드 · HEX · Alpha%) ─────
+    var inputRow = document.createElement('div');
+    inputRow.style.cssText = 'display: flex; align-items: center; gap: 6px; margin-top: 12px;';
+
+    // 스포이드 (EyeDropper API 지원 시)
+    var supportsEyedropper = ('EyeDropper' in window);
+    var eyedropperBtn = document.createElement('button');
+    eyedropperBtn.type = 'button';
+    eyedropperBtn.title = supportsEyedropper ? '화면에서 색 뽑기 (스포이드)' : '이 브라우저는 스포이드 미지원';
+    eyedropperBtn.style.cssText = 'width: 30px; height: 30px; flex-shrink: 0;'
+      + ' border: 1px solid rgba(15,58,58,0.15); background: #F5F5F5;'
+      + ' border-radius: 5px; cursor: pointer; padding: 0;'
+      + ' display: inline-flex; align-items: center; justify-content: center;'
+      + ' color: rgba(15,58,58,0.65);';
+    eyedropperBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 6l6 6-9 9H4v-6z"/><path d="M14 5l3-3 4 4-3 3z"/></svg>';
+    if (!supportsEyedropper){
+      eyedropperBtn.style.opacity = '0.35';
+      eyedropperBtn.style.cursor  = 'not-allowed';
+    } else {
+      eyedropperBtn.addEventListener('mouseenter', function(){ eyedropperBtn.style.borderColor = 'var(--point, #FF9A76)'; eyedropperBtn.style.color = 'var(--point, #FF9A76)'; });
+      eyedropperBtn.addEventListener('mouseleave', function(){ eyedropperBtn.style.borderColor = 'rgba(15,58,58,0.15)'; eyedropperBtn.style.color = 'rgba(15,58,58,0.65)'; });
       eyedropperBtn.addEventListener('click', function(){
         try {
           var ed = new window.EyeDropper();
-          ed.open().then(function(r){
-            if (r && r.sRGBHex){
-              _setFromHex(r.sRGBHex);
-            }
-          }).catch(function(){});
+          ed.open().then(function(r){ if (r && r.sRGBHex) _setFromHex(r.sRGBHex); }).catch(function(){});
         } catch(_){}
       });
-      hexLabelRow.appendChild(eyedropperBtn);
     }
-    hexWrap.appendChild(hexLabelRow);
+    inputRow.appendChild(eyedropperBtn);
 
+    // HEX 입력 (박스형 · 이미지처럼 회색 배경 라운드)
     var hexInput = document.createElement('input');
     hexInput.type = 'text';
-    hexInput.value = state.hex.toUpperCase();
-    hexInput.style.cssText = 'width: 100%; box-sizing: border-box; padding: 4px 0 6px;'
-      + ' border: none; border-bottom: 1px solid rgba(15,58,58,0.15);'
-      + ' font-family: "SF Mono","Menlo","Consolas",monospace; font-size: 14px; color: var(--color, #0F3A3A);'
-      + ' outline: none; background: transparent; letter-spacing: 0.02em;'
-      + ' transition: border-color 120ms ease;';
-    hexInput.addEventListener('focus', function(){ hexInput.style.borderBottomColor = 'var(--point, #FF9A76)'; });
-    hexInput.addEventListener('blur',  function(){
-      hexInput.style.borderBottomColor = 'rgba(15,58,58,0.15)';
-      _normalizeHexInput();
+    hexInput.value = '#' + _rgbToHex(state.r, state.g, state.b).slice(1).toUpperCase();
+    hexInput.style.cssText = 'flex: 1; height: 30px; box-sizing: border-box;'
+      + ' background: #F5F5F5; border: 1px solid transparent; border-radius: 5px;'
+      + ' padding: 0 10px; font-family: "SF Mono","Menlo","Consolas",monospace;'
+      + ' font-size: 12px; color: var(--color, #0F3A3A); outline: none;'
+      + ' letter-spacing: 0.02em; transition: border-color 120ms ease, background 120ms ease;';
+    hexInput.addEventListener('focus', function(){ hexInput.style.borderColor = 'var(--point, #FF9A76)'; hexInput.style.background = '#fff'; });
+    hexInput.addEventListener('blur', function(){
+      hexInput.style.borderColor = 'transparent'; hexInput.style.background = '#F5F5F5';
+      var v = hexInput.value.trim();
+      if (v && v[0] !== '#') v = '#' + v;
+      if (/^#[0-9a-fA-F]{6}$/.test(v)){ _setFromHex(v); }
+      else { hexInput.value = '#' + _rgbToHex(state.r, state.g, state.b).slice(1).toUpperCase(); }
     });
     hexInput.addEventListener('input', function(){
       var v = hexInput.value.trim();
       if (v && v[0] !== '#') v = '#' + v;
-      if (/^#[0-9a-fA-F]{6}$/.test(v)){
-        _setFromHex(v);
-      }
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) _setFromHex(v);
     });
-    function _normalizeHexInput(){
-      var v = hexInput.value.trim();
-      if (v && v[0] !== '#') v = '#' + v;
-      if (/^#[0-9a-fA-F]{6}$/.test(v)){
-        hexInput.value = v.toUpperCase();
-      } else {
-        hexInput.value = state.hex.toUpperCase();
-      }
-    }
-    hexWrap.appendChild(hexInput);
-    topRow.appendChild(hexWrap);
-    box.appendChild(topRow);
+    inputRow.appendChild(hexInput);
 
-    // ── 색상(Hue) 슬라이더 ──
-    //   무지개 그라디언트를 배경으로. accent 는 살구.
-    var hueRow = _makeSliderRow('색상 (H)', 0, 360, 1, state.h, '°', function(v){
-      state.h = v;
-      var rgb = _hslToRgb(state.h, state.s, state.l);
-      state.r = Math.round(rgb.r); state.g = Math.round(rgb.g); state.b = Math.round(rgb.b);
-      state.hex = _rgbToHex(state.r, state.g, state.b);
+    // Alpha % 인풋
+    var alphaInput = document.createElement('input');
+    alphaInput.type = 'text';
+    alphaInput.value = state.alpha + '%';
+    alphaInput.style.cssText = 'width: 52px; height: 30px; box-sizing: border-box;'
+      + ' background: #F5F5F5; border: 1px solid transparent; border-radius: 5px;'
+      + ' padding: 0 8px; font-family: inherit; font-size: 12px;'
+      + ' color: var(--color, #0F3A3A); outline: none; text-align: center;'
+      + ' flex-shrink: 0; transition: border-color 120ms ease, background 120ms ease;';
+    alphaInput.addEventListener('focus', function(){ alphaInput.style.borderColor = 'var(--point, #FF9A76)'; alphaInput.style.background = '#fff'; });
+    alphaInput.addEventListener('blur', function(){
+      alphaInput.style.borderColor = 'transparent'; alphaInput.style.background = '#F5F5F5';
+      var v = parseInt(alphaInput.value.replace(/[^\d]/g, ''), 10);
+      if (isNaN(v)) v = state.alpha;
+      state.alpha = _clamp(v, 0, 100);
+      alphaInput.value = state.alpha + '%';
       _renderAll();
     });
-    // 배경 그라디언트를 무지개로
-    hueRow.slider.style.background = 'linear-gradient(to right,'
-      + '#f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%)';
-    box.appendChild(hueRow.wrap);
-
-    // ── 채도(S) & 명도(L) 슬라이더 (brief 에서는 감춤) ──
-    var satRow = _makeSliderRow('채도 (S)', 0, 100, 1, state.s, '%', function(v){
-      state.s = v;
-      var rgb = _hslToRgb(state.h, state.s, state.l);
-      state.r = Math.round(rgb.r); state.g = Math.round(rgb.g); state.b = Math.round(rgb.b);
-      state.hex = _rgbToHex(state.r, state.g, state.b);
-      _renderAll();
+    alphaInput.addEventListener('keydown', function(e){
+      if (e.key === 'Enter'){ e.preventDefault(); alphaInput.blur(); }
     });
-    var lightRow = _makeSliderRow('명도 (L)', 0, 100, 1, state.l, '%', function(v){
-      state.l = v;
-      var rgb = _hslToRgb(state.h, state.s, state.l);
-      state.r = Math.round(rgb.r); state.g = Math.round(rgb.g); state.b = Math.round(rgb.b);
-      state.hex = _rgbToHex(state.r, state.g, state.b);
-      _renderAll();
-    });
-    box.appendChild(satRow.wrap);
-    box.appendChild(lightRow.wrap);
-    // brief 모드에서 채도·명도 숨김
-    if (mode === 'brief'){
-      satRow.wrap.style.display = 'none';
-      lightRow.wrap.style.display = 'none';
-    }
+    inputRow.appendChild(alphaInput);
+    box.appendChild(inputRow);
 
-    // ── 투명도(A) 슬라이더 ──
-    var alphaRow = null;
-    if (showAlpha){
-      alphaRow = _makeSliderRow('투명도 (A)', 0, 100, 5, state.alpha, '%', function(v){
-        state.alpha = v;
-        _renderAll();
-      });
-      box.appendChild(alphaRow.wrap);
-    }
-
-    // ── 상세 모드 토글 ──
+    // ── ⑤ 상세 모드 토글 (＋/－) ─────────────────────
     var toggleRow = document.createElement('div');
-    toggleRow.style.cssText = 'display: flex; justify-content: center; margin: 8px 0 14px;';
+    toggleRow.style.cssText = 'display: flex; justify-content: center; margin-top: 10px;';
     var toggleBtn = document.createElement('button');
     toggleBtn.type = 'button';
-    toggleBtn.textContent = mode === 'brief' ? '＋ 상세 옵션 (채도·명도)' : '－ 간단히 보기';
+    toggleBtn.textContent = '＋ RGB 상세 입력';
     toggleBtn.style.cssText = 'background: transparent; border: none; cursor: pointer;'
-      + ' font-size: 11px; color: rgba(15,58,58,0.6); padding: 4px 8px; border-radius: 4px; font-family: inherit;';
+      + ' font-size: 11px; color: rgba(15,58,58,0.55); padding: 4px 8px; border-radius: 4px; font-family: inherit;';
     toggleBtn.addEventListener('mouseenter', function(){ toggleBtn.style.color = 'var(--point, #FF9A76)'; });
-    toggleBtn.addEventListener('mouseleave', function(){ toggleBtn.style.color = 'rgba(15,58,58,0.6)'; });
+    toggleBtn.addEventListener('mouseleave', function(){ toggleBtn.style.color = 'rgba(15,58,58,0.55)'; });
     toggleBtn.addEventListener('click', function(){
-      mode = (mode === 'brief') ? 'detail' : 'brief';
-      if (mode === 'detail'){
-        satRow.wrap.style.display   = '';
-        lightRow.wrap.style.display = '';
-        toggleBtn.textContent = '－ 간단히 보기';
-      } else {
-        satRow.wrap.style.display   = 'none';
-        lightRow.wrap.style.display = 'none';
-        toggleBtn.textContent = '＋ 상세 옵션 (채도·명도)';
-      }
+      isDetailOpen = !isDetailOpen;
+      detailWrap.style.display = isDetailOpen ? '' : 'none';
+      toggleBtn.textContent = isDetailOpen ? '－ 간단히 보기' : '＋ RGB 상세 입력';
     });
     toggleRow.appendChild(toggleBtn);
     box.appendChild(toggleRow);
 
-    // ── 하단 · 취소 · 확인 ──
-    var btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;';
+    // ── ⑥ 상세 (RGB 3채널 슬라이더 + 큰 미리보기) ──
+    var detailWrap = document.createElement('div');
+    detailWrap.style.cssText = 'display: none; margin-top: 8px; padding-top: 10px;'
+      + ' border-top: 1px solid rgba(15,58,58,0.08);';
 
+    // RGB 3채널 · 각 줄 = 라벨 · 슬라이더 · 값
+    function _makeChannelRow(channelName, min, max, getVal, setVal, trackFn){
+      var row = document.createElement('div');
+      row.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 8px;';
+
+      var lbl = document.createElement('span');
+      lbl.textContent = channelName;
+      lbl.style.cssText = 'width: 40px; font-size: 11px; color: rgba(15,58,58,0.6);';
+      row.appendChild(lbl);
+
+      var slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = min; slider.max = max; slider.step = 1;
+      slider.value = getVal();
+      slider.style.cssText = 'flex: 1; height: 4px; accent-color: var(--point, #FF9A76);';
+      slider.addEventListener('input', function(){
+        setVal(parseInt(slider.value, 10));
+        // HSV 재계산
+        var hsv = _rgbToHsv(state.r, state.g, state.b);
+        state.h = hsv.h; state.s = hsv.s; state.v = hsv.v;
+        _renderAll();
+      });
+      row.appendChild(slider);
+
+      var valInput = document.createElement('input');
+      valInput.type = 'text';
+      valInput.value = getVal();
+      valInput.style.cssText = 'width: 42px; height: 24px; box-sizing: border-box;'
+        + ' background: #F5F5F5; border: 1px solid transparent; border-radius: 4px;'
+        + ' padding: 0 6px; font-family: inherit; font-size: 11px;'
+        + ' color: var(--color, #0F3A3A); outline: none; text-align: center;';
+      valInput.addEventListener('focus', function(){ valInput.style.borderColor = 'var(--point, #FF9A76)'; valInput.style.background = '#fff'; });
+      valInput.addEventListener('blur', function(){
+        valInput.style.borderColor = 'transparent'; valInput.style.background = '#F5F5F5';
+        var v = parseInt(valInput.value.replace(/[^\d]/g, ''), 10);
+        if (isNaN(v)) v = getVal();
+        setVal(_clamp(v, min, max));
+        var hsv = _rgbToHsv(state.r, state.g, state.b);
+        state.h = hsv.h; state.s = hsv.s; state.v = hsv.v;
+        _renderAll();
+      });
+      valInput.addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); valInput.blur(); } });
+      row.appendChild(valInput);
+
+      return { row: row, slider: slider, input: valInput, trackFn: trackFn };
+    }
+
+    var rRow = _makeChannelRow('Red',   0, 255,
+      function(){ return Math.round(state.r); },
+      function(v){ state.r = v; },
+      function(){ return 'linear-gradient(to right, rgb(0,'+Math.round(state.g)+','+Math.round(state.b)+'), rgb(255,'+Math.round(state.g)+','+Math.round(state.b)+'))'; }
+    );
+    var gRow = _makeChannelRow('Green', 0, 255,
+      function(){ return Math.round(state.g); },
+      function(v){ state.g = v; },
+      function(){ return 'linear-gradient(to right, rgb('+Math.round(state.r)+',0,'+Math.round(state.b)+'), rgb('+Math.round(state.r)+',255,'+Math.round(state.b)+'))'; }
+    );
+    var bRow = _makeChannelRow('Blue',  0, 255,
+      function(){ return Math.round(state.b); },
+      function(v){ state.b = v; },
+      function(){ return 'linear-gradient(to right, rgb('+Math.round(state.r)+','+Math.round(state.g)+',0), rgb('+Math.round(state.r)+','+Math.round(state.g)+',255))'; }
+    );
+    detailWrap.appendChild(rRow.row);
+    detailWrap.appendChild(gRow.row);
+    detailWrap.appendChild(bRow.row);
+
+    // 하단 · 큰 사각형 미리보기 + rgb() 필드
+    var previewRow = document.createElement('div');
+    previewRow.style.cssText = 'display: flex; align-items: center; gap: 10px; margin-top: 6px;';
+
+    var previewBox = document.createElement('div');
+    previewBox.style.cssText = 'width: 60px; height: 60px; border-radius: 8px; flex-shrink: 0;'
+      + ' border: 1px solid rgba(15,58,58,0.12); box-shadow: 0 1px 3px rgba(0,0,0,0.05);'
+      + ' background-image: linear-gradient(45deg, rgba(15,58,58,0.12) 25%, transparent 25%),'
+      +   ' linear-gradient(-45deg, rgba(15,58,58,0.12) 25%, transparent 25%),'
+      +   ' linear-gradient(45deg, transparent 75%, rgba(15,58,58,0.12) 75%),'
+      +   ' linear-gradient(-45deg, transparent 75%, rgba(15,58,58,0.12) 75%);'
+      + ' background-size: 10px 10px;'
+      + ' background-position: 0 0, 0 5px, 5px -5px, -5px 0px;'
+      + ' position: relative;';
+    var previewInner = document.createElement('div');
+    previewInner.style.cssText = 'position: absolute; inset: 0; border-radius: 7px;';
+    previewBox.appendChild(previewInner);
+    previewRow.appendChild(previewBox);
+
+    var previewTexts = document.createElement('div');
+    previewTexts.style.cssText = 'flex: 1; display: flex; flex-direction: column; gap: 4px;';
+    var hexBig = document.createElement('div');
+    hexBig.style.cssText = 'font-family: "SF Mono","Menlo",monospace; font-size: 12px; color: var(--color, #0F3A3A);';
+    var rgbBig = document.createElement('div');
+    rgbBig.style.cssText = 'font-family: "SF Mono","Menlo",monospace; font-size: 11px; color: rgba(15,58,58,0.6);';
+    previewTexts.appendChild(hexBig);
+    previewTexts.appendChild(rgbBig);
+    previewRow.appendChild(previewTexts);
+
+    detailWrap.appendChild(previewRow);
+    box.appendChild(detailWrap);
+
+    // ── ⑦ 하단 · 취소 · 적용 ─────────────────────────
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;'
+      + ' padding-top: 10px; border-top: 1px solid rgba(15,58,58,0.08);';
     var cancelBtn = document.createElement('button');
     cancelBtn.type = 'button';
     cancelBtn.textContent = '취소';
@@ -16686,7 +16786,6 @@
     cancelBtn.addEventListener('mouseleave', function(){ cancelBtn.style.borderColor = 'rgba(15,58,58,0.15)'; });
     cancelBtn.addEventListener('click', function(){ _fire(null); });
     btnRow.appendChild(cancelBtn);
-
     var okBtn = document.createElement('button');
     okBtn.type = 'button';
     okBtn.textContent = '적용';
@@ -16695,106 +16794,119 @@
       + ' font-family: inherit; font-size: 12px; font-weight: 500;';
     okBtn.addEventListener('mouseenter', function(){ okBtn.style.filter = 'brightness(0.95)'; });
     okBtn.addEventListener('mouseleave', function(){ okBtn.style.filter = 'none'; });
-    okBtn.addEventListener('click', function(){ _fire(_formatOutput(state)); });
+    okBtn.addEventListener('click', function(){ _fire(_formatOutput()); });
     btnRow.appendChild(okBtn);
-
     box.appendChild(btnRow);
+
     overlay.appendChild(box);
 
-    // ── 유틸: 슬라이더 만들기 (라벨 + [-] [슬라이더] [+] + 값 표시) ──
-    function _makeSliderRow(labelText, min, max, step, value, unit, onChange){
-      var wrap = document.createElement('div');
-      wrap.style.cssText = 'margin-bottom: 10px;';
-
-      var head = document.createElement('div');
-      head.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;';
-      var l = document.createElement('span');
-      l.textContent = labelText;
-      l.style.cssText = 'font-size: 10px; color: rgba(15,58,58,0.5); letter-spacing: 0.06em;';
-      head.appendChild(l);
-      var val = document.createElement('span');
-      val.textContent = value + unit;
-      val.style.cssText = 'font-size: 11px; color: var(--color, #0F3A3A); font-variant-numeric: tabular-nums;';
-      head.appendChild(val);
-      wrap.appendChild(head);
-
-      var row = document.createElement('div');
-      row.style.cssText = 'display: flex; align-items: center; gap: 6px;';
-
-      var minus = document.createElement('button');
-      minus.type = 'button';
-      minus.textContent = '−';
-      minus.style.cssText = 'width: 22px; height: 22px; border: 1px solid rgba(15,58,58,0.15);'
-        + ' background: transparent; color: var(--color, #0F3A3A); border-radius: 3px;'
-        + ' cursor: pointer; font-size: 12px; line-height: 1; padding: 0;';
-      minus.addEventListener('click', function(){
-        var v = Math.max(min, parseInt(slider.value,10) - step);
-        slider.value = v; val.textContent = v + unit; if (typeof onChange === 'function') onChange(v);
-      });
-      row.appendChild(minus);
-
-      var slider = document.createElement('input');
-      slider.type = 'range';
-      slider.min = min; slider.max = max; slider.step = step; slider.value = value;
-      slider.style.cssText = 'flex: 1; accent-color: var(--point, #FF9A76); height: 4px;';
-      slider.addEventListener('input', function(){
-        var v = parseInt(slider.value, 10);
-        val.textContent = v + unit;
-        if (typeof onChange === 'function') onChange(v);
-      });
-      row.appendChild(slider);
-
-      var plus = document.createElement('button');
-      plus.type = 'button';
-      plus.textContent = '＋';
-      plus.style.cssText = minus.style.cssText;
-      plus.addEventListener('click', function(){
-        var v = Math.min(max, parseInt(slider.value,10) + step);
-        slider.value = v; val.textContent = v + unit; if (typeof onChange === 'function') onChange(v);
-      });
-      row.appendChild(plus);
-
-      wrap.appendChild(row);
-      return { wrap: wrap, slider: slider, val: val };
-    }
-
-    // ── 렌더 (프리뷰 + hex 입력 + 슬라이더 값 동기화) ──
+    // ── 렌더 (모든 UI 를 state 로부터 동기화) ─────────
     function _renderAll(){
-      // 미리보기 원 (알파 반영)
-      var bg = (state.alpha >= 100) ? state.hex : 'rgba(' + state.r + ',' + state.g + ',' + state.b + ',' + (state.alpha/100).toFixed(2) + ')';
-      previewCircle.style.background = bg;
-      // hex 입력
+      // 2D 사각형 배경 (현재 Hue 로)
+      svPad.style.background =
+        'linear-gradient(to top, #000, transparent),'
+        + 'linear-gradient(to right, #fff, transparent),'
+        + 'hsl(' + Math.round(state.h) + ', 100%, 50%)';
+      // 2D 커서 위치 (s = x, v = y-inverted)
+      svCursor.style.left = (state.s / 100 * 268) + 'px';
+      svCursor.style.top  = ((100 - state.v) / 100 * 160) + 'px';
+      // Hue thumb
+      hueThumb.style.left = (state.h / 360 * 268) + 'px';
+      // Alpha 오버레이 (현재 RGB 로 좌 투명 → 우 불투명)
+      var curRgb = 'rgb(' + Math.round(state.r) + ',' + Math.round(state.g) + ',' + Math.round(state.b) + ')';
+      alphaOverlay.style.background = 'linear-gradient(to right, rgba(' + Math.round(state.r) + ',' + Math.round(state.g) + ',' + Math.round(state.b) + ',0), ' + curRgb + ')';
+      alphaThumb.style.left = (state.alpha / 100 * 268) + 'px';
+      // HEX 인풋
       if (document.activeElement !== hexInput){
-        hexInput.value = state.hex.toUpperCase();
+        hexInput.value = ('#' + _rgbToHex(state.r, state.g, state.b).slice(1)).toUpperCase();
       }
-      // 슬라이더 위치 (내부 setter 로 이벤트 안 튀게)
-      hueRow.slider.value = state.h;   hueRow.val.textContent   = state.h + '°';
-      satRow.slider.value = state.s;   satRow.val.textContent   = state.s + '%';
-      lightRow.slider.value = state.l; lightRow.val.textContent = state.l + '%';
-      if (alphaRow){
-        alphaRow.slider.value = state.alpha;
-        alphaRow.val.textContent = state.alpha + '%';
+      // Alpha 인풋
+      if (document.activeElement !== alphaInput){
+        alphaInput.value = state.alpha + '%';
       }
+      // RGB 상세 슬라이더·값
+      [rRow, gRow, bRow].forEach(function(ro){
+        var v = ro.slider === rRow.slider ? Math.round(state.r) :
+                ro.slider === gRow.slider ? Math.round(state.g) : Math.round(state.b);
+        if (document.activeElement !== ro.slider) ro.slider.value = v;
+        if (document.activeElement !== ro.input)  ro.input.value = v;
+        // 슬라이더 트랙 (accent-color 만 있고 그라디언트 배경 반영은 브라우저별)
+        ro.slider.style.background = ro.trackFn();
+      });
+      // 큰 미리보기
+      var outAlpha = state.alpha / 100;
+      previewInner.style.background = (state.alpha >= 100)
+        ? _rgbToHex(state.r, state.g, state.b)
+        : 'rgba(' + Math.round(state.r) + ',' + Math.round(state.g) + ',' + Math.round(state.b) + ',' + outAlpha.toFixed(2) + ')';
+      hexBig.textContent = 'HEX ' + ('#' + _rgbToHex(state.r, state.g, state.b).slice(1)).toUpperCase();
+      rgbBig.textContent = 'rgb(' + Math.round(state.r) + ', ' + Math.round(state.g) + ', ' + Math.round(state.b) + ')';
     }
 
-    // 외부 조작 헬퍼 (스포이드/hex 인풋에서 호출)
-    function _setFromHex(newHex){
-      var s = String(newHex || '').trim();
+    // hex → state
+    function _setFromHex(hex){
+      var s = String(hex || '').trim().toLowerCase();
       if (!/^#[0-9a-f]{6}$/i.test(s)) return;
-      s = s.toLowerCase();
-      state.hex = s;
       var rgb = _hexToRgb(s);
       state.r = rgb.r; state.g = rgb.g; state.b = rgb.b;
-      var hsl = _rgbToHsl(rgb.r, rgb.g, rgb.b);
-      state.h = hsl.h; state.s = hsl.s; state.l = hsl.l;
+      var hsv = _rgbToHsv(rgb.r, rgb.g, rgb.b);
+      state.h = hsv.h; state.s = hsv.s; state.v = hsv.v;
       _renderAll();
     }
 
-    // ── ESC/Enter 핸들러 ──
+    // ── 드래그 헬퍼 ──────────────────────────────────
+    function _makeDragHandler(el, onMove){
+      function _fromEvent(e){
+        var rect = el.getBoundingClientRect();
+        var x = _clamp(((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width, 0, 1);
+        var y = _clamp(((e.touches ? e.touches[0].clientY : e.clientY) - rect.top) / rect.height, 0, 1);
+        onMove(x, y);
+      }
+      function _down(e){
+        e.preventDefault();
+        _fromEvent(e);
+        document.addEventListener('mousemove', _fromEvent, true);
+        document.addEventListener('touchmove', _fromEvent, { passive: false });
+        document.addEventListener('mouseup',   _up, true);
+        document.addEventListener('touchend',  _up, true);
+      }
+      function _up(){
+        document.removeEventListener('mousemove', _fromEvent, true);
+        document.removeEventListener('touchmove', _fromEvent);
+        document.removeEventListener('mouseup',   _up, true);
+        document.removeEventListener('touchend',  _up, true);
+      }
+      el.addEventListener('mousedown',  _down);
+      el.addEventListener('touchstart', _down, { passive: false });
+    }
+
+    _makeDragHandler(svPad, function(x, y){
+      state.s = x * 100;
+      state.v = (1 - y) * 100;
+      var rgb = _hsvToRgb(state.h, state.s, state.v);
+      state.r = rgb.r; state.g = rgb.g; state.b = rgb.b;
+      _renderAll();
+    });
+    _makeDragHandler(hueTrack, function(x){
+      state.h = x * 360;
+      var rgb = _hsvToRgb(state.h, state.s, state.v);
+      state.r = rgb.r; state.g = rgb.g; state.b = rgb.b;
+      _renderAll();
+    });
+    _makeDragHandler(alphaTrack, function(x){
+      state.alpha = Math.round(x * 100);
+      _renderAll();
+    });
+
+    // ── 키보드 ────────────────────────────────────────
     function _onKey(e){
       if (e.key === 'Escape'){ e.stopPropagation(); _fire(null); }
-      else if (e.key === 'Enter' && document.activeElement !== hexInput){
-        e.stopPropagation(); _fire(_formatOutput(state));
+      else if (e.key === 'Enter'){
+        // 인풋에서 Enter 는 blur 로만 처리
+        var t = document.activeElement;
+        if (t === hexInput || t === alphaInput) return;
+        if (rRow.input === t || gRow.input === t || bRow.input === t) return;
+        e.stopPropagation();
+        _fire(_formatOutput());
       }
     }
     document.addEventListener('keydown', _onKey);
@@ -16811,16 +16923,11 @@
       }
     }
 
-    // ── 오버레이 밖 클릭 = 취소 ──
+    // 오버레이 밖 클릭 = 취소
     overlay.addEventListener('click', function(){ _fire(null); });
 
-    // 최초 렌더
-    _renderAll();
-
     document.body.appendChild(overlay);
-
-    // hex 입력에 자동 포커스 (편집 편의)
-    setTimeout(function(){ try { hexInput.focus(); hexInput.select(); } catch(_){} }, 50);
+    _renderAll();
   }
 
   try {
@@ -23012,7 +23119,7 @@
         '<div class="ddl-set-hub">' +
           _card('header',     '헤더 스타일',        'H1–H6 / 기본(P) / 사용자 그룹 — 툴바 H▸ 연동')  +
           _card('font-library','📚 폰트 라이브러리',  '편집기 전역에서 사용할 폰트 등록 · 사이트 반영') +
-          _card('inline',     '인라인 서식 프리셋', '툴바 ⭐서식 버튼 — 색/배경/굵기 조합', '열기 ›')  +
+          /* p25e: 인라인 서식 프리셋 카드 제거 (사용자 요청 · 기능이 다른 서식창들로 대체됨) */
           _card('highlight',  '형광펜',              '마커 / 끝흐림 / 페인트 3종 + 색 그룹')  +
           _card('code',       '인라인 코드 스타일', '툴바 <> 버튼이 적용하는 스타일 세트') +
         '</div>' +
