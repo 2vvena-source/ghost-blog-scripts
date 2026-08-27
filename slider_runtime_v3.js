@@ -1,17 +1,22 @@
 /*!
- * 2vvena Editor - 이미지 슬라이드 사이트 런타임 v3 (p26w)
+ * 2vvena Editor - 이미지 슬라이드 사이트 런타임 v4 (p26y)
  * Ghost 관리자 → Settings → Code injection → Site Footer 에 <script>...</script> 로 삽입.
+ * 또는 GitHub jsDelivr: <script defer src="...slider_runtime_v3.js"></script>
  *
- * v3 변경:
- *   - CSS 인라인 강제 (element.style) 로 편집기 인라인이 sanitizer 에 잘려도 복원
- *   - 페이드/줌: 아이템에 position:absolute, is-current 만 opacity:1 을 매 프레임 강제
- *   - 도트/버튼: 없으면 자동 생성 (편집기가 저장 시 누락한 경우 대비)
- *   - 이벤트 위임 유지
+ * v4 변경 (p26y):
+ *   - data-ddl-anim 병행 지원 (Ghost sanitizer 가 data-anim 을 쟬러도 동작)
+ *   - zoom 모드에서 img transform 을 JS 가 직접 조작 (CSS 셀렉터 머치지 안해도 동작)
+ *   - 진입 시 slider.getAttribute('data-anim') ⇒ 'data-ddl-anim' 폴백
+ *
+ * v3 변경 (p26w):
+ *   - CSS 인라인 강제
+ *   - 도트/버튼 자동 생성
+ *   - 이벤트 위임
  */
 (function(){
-  if (window.__DDL_SLIDER_RUNTIME_V3__) return;
+  if (window.__DDL_SLIDER_RUNTIME_V4__) return;
+  window.__DDL_SLIDER_RUNTIME_V4__ = true;
   window.__DDL_SLIDER_RUNTIME_V3__ = true;
-  // v2 마커도 세팅 (호환)
   window.__DDL_SLIDER_RUNTIME_V2__ = true;
 
   // ─── 1. CSS 주입 (기본 안전망) ───
@@ -20,21 +25,21 @@
     var css = ''
       + '.ep-slider-block { position: relative; overflow: hidden; display: block; }'
       + '.ep-slider-block .ddl-slider-viewport { position: relative; width: 100%; overflow: hidden; }'
-      + '.ep-slider-block[data-anim="slide"] .ddl-slider-track { display: flex; transition: transform var(--ddl-slider-duration, 400ms) ease; }'
-      + '.ep-slider-block[data-anim="slide"] .ddl-slider-item { flex: 0 0 100%; width: 100%; height: 100%; position: relative; }'
-      + '.ep-slider-block[data-anim="fade"] .ddl-slider-track,'
-      + '.ep-slider-block[data-anim="zoom"] .ddl-slider-track { display: block !important; transition: none !important; transform: none !important; }'
-      + '.ep-slider-block[data-anim="fade"] .ddl-slider-item,'
-      + '.ep-slider-block[data-anim="zoom"] .ddl-slider-item {'
+      + '.ep-slider-block[data-anim="slide"] .ddl-slider-track, .ep-slider-block[data-ddl-anim="slide"] .ddl-slider-track { display: flex; transition: transform var(--ddl-slider-duration, 400ms) ease; }'
+      + '.ep-slider-block[data-anim="slide"] .ddl-slider-item, .ep-slider-block[data-ddl-anim="slide"] .ddl-slider-item { flex: 0 0 100%; width: 100%; height: 100%; position: relative; }'
+      + '.ep-slider-block[data-anim="fade"] .ddl-slider-track, .ep-slider-block[data-anim="zoom"] .ddl-slider-track,'
+      + '.ep-slider-block[data-ddl-anim="fade"] .ddl-slider-track, .ep-slider-block[data-ddl-anim="zoom"] .ddl-slider-track { display: block !important; transition: none !important; transform: none !important; }'
+      + '.ep-slider-block[data-anim="fade"] .ddl-slider-item, .ep-slider-block[data-anim="zoom"] .ddl-slider-item,'
+      + '.ep-slider-block[data-ddl-anim="fade"] .ddl-slider-item, .ep-slider-block[data-ddl-anim="zoom"] .ddl-slider-item {'
       + '  position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;'
       + '  width: 100% !important; height: 100% !important;'
       + '  opacity: 0 !important; transition: opacity var(--ddl-slider-duration, 500ms) ease !important;'
       + '  pointer-events: none !important; z-index: 0 !important;'
       + '}'
-      + '.ep-slider-block[data-anim="fade"] .ddl-slider-item.is-current,'
-      + '.ep-slider-block[data-anim="zoom"] .ddl-slider-item.is-current { opacity: 1 !important; pointer-events: auto !important; z-index: 1 !important; }'
-      + '.ep-slider-block[data-anim="zoom"] .ddl-slider-item img { transition: transform var(--ddl-slider-duration, 700ms) ease; transform: scale(1.06); }'
-      + '.ep-slider-block[data-anim="zoom"] .ddl-slider-item.is-current img { transform: scale(1.0); }'
+      + '.ep-slider-block[data-anim="fade"] .ddl-slider-item.is-current, .ep-slider-block[data-anim="zoom"] .ddl-slider-item.is-current,'
+      + '.ep-slider-block[data-ddl-anim="fade"] .ddl-slider-item.is-current, .ep-slider-block[data-ddl-anim="zoom"] .ddl-slider-item.is-current { opacity: 1 !important; pointer-events: auto !important; z-index: 1 !important; }'
+      + '.ep-slider-block[data-anim="zoom"] .ddl-slider-item img, .ep-slider-block[data-ddl-anim="zoom"] .ddl-slider-item img { transition: transform var(--ddl-slider-duration, 700ms) ease !important; transform: scale(1.06); }'
+      + '.ep-slider-block[data-anim="zoom"] .ddl-slider-item.is-current img, .ep-slider-block[data-ddl-anim="zoom"] .ddl-slider-item.is-current img { transform: scale(1.0); }'
       + '.ep-slider-block .ddl-slider-item img { width: 100%; height: 100%; object-fit: cover; display: block; }'
       + '.ep-slider-block .ddl-slider-btn {'
       + '  position: absolute !important; top: 50% !important; transform: translateY(-50%) !important;'
@@ -142,11 +147,16 @@
       if (n === 0) return;
       if (state.current < 0) state.current = 0;
       if (state.current >= n) state.current = n - 1;
-      var anim = slider.getAttribute('data-anim') || 'slide';
+      // p26y: data-anim 이 sanitizer 에 잘렸을 가능성 → data-ddl-anim 폴백
+      var anim = slider.getAttribute('data-anim') || slider.getAttribute('data-ddl-anim') || 'slide';
+      // p26y: 둘 다 세팅 (CSS 셀렉터 모두 매칭하도록)
+      slider.setAttribute('data-anim', anim);
+      slider.setAttribute('data-ddl-anim', anim);
       if (anim === 'slide' && track){
         track.style.transform = 'translateX(' + (-100 * state.current) + '%)';
       }
       items.forEach(function(it, i){
+        var im = it.querySelector('img');
         if (i === state.current){
           it.classList.add('is-current');
           if (anim === 'fade' || anim === 'zoom'){
@@ -154,12 +164,22 @@
             it.style.setProperty('z-index', '1', 'important');
             it.style.setProperty('pointer-events', 'auto', 'important');
           }
+          // p26y: zoom 상태에서 현재 이미지를 scale(1.0) 으로 직접 설정
+          if (anim === 'zoom' && im){
+            im.style.setProperty('transition', 'transform var(--ddl-slider-duration, 700ms) ease', 'important');
+            im.style.setProperty('transform', 'scale(1.0)', 'important');
+          }
         } else {
           it.classList.remove('is-current');
           if (anim === 'fade' || anim === 'zoom'){
             it.style.setProperty('opacity', '0', 'important');
             it.style.setProperty('z-index', '0', 'important');
             it.style.setProperty('pointer-events', 'none', 'important');
+          }
+          // p26y: zoom 상태에서 비활성 이미지는 scale(1.06)
+          if (anim === 'zoom' && im){
+            im.style.setProperty('transition', 'transform var(--ddl-slider-duration, 700ms) ease', 'important');
+            im.style.setProperty('transform', 'scale(1.06)', 'important');
           }
         }
       });
