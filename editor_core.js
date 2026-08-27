@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26u';
+  var VERSION = 'v2.0-β-p26v';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2785,7 +2785,8 @@
     '  width: 100%;',
     '  height: 100%;',
     '  display: flex;',
-    '  transition: transform 400ms ease;',
+    /* p26v: 넘김 애니메이션 duration 을 변수화 (기본 400ms) */
+    '  transition: transform var(--ddl-slider-duration, 400ms) ease;',
     '  will-change: transform;',
     '}',
     '.ddl-slider-item {',
@@ -2827,7 +2828,8 @@
     '  width: 100% !important;',
     '  height: 100% !important;',
     '  opacity: 0;',
-    '  transition: opacity 500ms ease;',
+    /* p26v: fade duration 도 변수화 (기본 500ms) */
+    '  transition: opacity var(--ddl-slider-duration, 500ms) ease;',
     '  pointer-events: none;',
     '  z-index: 0;',
     '}',
@@ -2839,7 +2841,8 @@
     '}',
     /* p26u: 줌 애니메이션 — fade 위에 추가로 마이마이 확대 */
     '.ep-slider-block[data-anim="zoom"] .ddl-slider-item img {',
-    '  transition: transform 700ms ease;',
+    /* p26v: zoom duration 도 변수화 (기본 700ms) */
+    '  transition: transform var(--ddl-slider-duration, 700ms) ease;',
     '  transform: scale(1.06);',
     '}',
     '.ep-slider-block[data-anim="zoom"] .ddl-slider-item.is-current img {',
@@ -19538,7 +19541,7 @@
             if (err) { alert('업로드 실패: ' + err.message); return; }
             var url = res && res.url;
             if (!url) { alert('업로드는 됐으나 URL 을 못 받았습니다.'); return; }
-            // p26u: 공용 크롭 대화창 자동 호출
+            // p26u+p26v: 공용 크롭 대화창 자동 호출 + 구분선 실제 비율 감지 (길게 맞는 데 많있 → aspect 무한 대신 건너미 자유로)
             var _applyDivImg = function(finalUrl){
               var opts2 = readDividerOpts(selectedDivider);
               opts2.source = 'image';
@@ -19546,8 +19549,13 @@
               applyDividerOpts(selectedDivider, opts2);
               renderDividerPopupBody('preset');
             };
+            var _divAspect = null;
+            try {
+              var _dvr = selectedDivider.getBoundingClientRect();
+              if (_dvr.width > 4 && _dvr.height > 4) _divAspect = _dvr.width / _dvr.height;
+            } catch(_){}
             if (window.__DDL_EDITOR && window.__DDL_EDITOR.openImageCropDialog) {
-              window.__DDL_EDITOR.openImageCropDialog(url, { aspect: null }, function(cropped){
+              window.__DDL_EDITOR.openImageCropDialog(url, { aspect: _divAspect }, function(cropped){
                 _applyDivImg(cropped || url);
               });
             } else {
@@ -20803,7 +20811,7 @@
             if (err) { alert('업로드 실패: ' + err.message); return; }
             var url = res && res.url;
             if (!url) { alert('URL 못 받음'); return; }
-            // p26u: 공용 크롭 대화창 자동 호출
+            // p26u+p26v: 공용 크롭 대화창 자동 호출 + 버튼 블록 비율 감지
             var _applyBtnImg = function(finalUrl){
               var opts2 = readButtonOpts(selectedButton);
               opts2.bgMode = 'image';
@@ -20811,8 +20819,13 @@
               writeButtonOpts(selectedButton, opts2);
               renderButtonPopupBody('bg');
             };
+            var _btnAspect = null;
+            try {
+              var _br = selectedButton.getBoundingClientRect();
+              if (_br.width > 4 && _br.height > 4) _btnAspect = _br.width / _br.height;
+            } catch(_){}
             if (window.__DDL_EDITOR && window.__DDL_EDITOR.openImageCropDialog) {
-              window.__DDL_EDITOR.openImageCropDialog(url, { aspect: null }, function(cropped){
+              window.__DDL_EDITOR.openImageCropDialog(url, { aspect: _btnAspect }, function(cropped){
                 _applyBtnImg(cropped || url);
               });
             } else {
@@ -31598,6 +31611,7 @@
     slider.setAttribute('data-anim', 'slide');
     slider.setAttribute('data-ddl-autoplay', '0');
     slider.setAttribute('data-ddl-interval', '3500');
+    slider.setAttribute('data-ddl-duration', '400'); // p26v: 넘김 속도 (밀리초)
     slider.setAttribute('contenteditable', 'false');
 
     var viewport = document.createElement('div');
@@ -31858,8 +31872,12 @@
             + '<button class="pop-btn' + (auto ? ' is-active' : '') + '" data-slide-act="autoplay-on">켜기</button>'
             + '<button class="pop-btn' + (!auto ? ' is-active' : '') + '" data-slide-act="autoplay-off">끄기</button>'
             + '</div>';
-      html += '<div class="row"><div class="row-label">재생 간격 (' + (interval/1000).toFixed(1) + '초)</div>'
+      html += '<div class="row"><div class="row-label">재생 간격 (' + (interval/1000).toFixed(1) + '초 · 이미지가 머무르는 시간)</div>'
             + '<input type="range" id="pop-slide-interval" min="1000" max="10000" step="500" value="' + interval + '" style="width:100%;"></div>';
+      // p26v: 넘김 애니메이션 duration 슬라이더 (200ms ~ 2000ms)
+      var duration = parseInt(s.getAttribute('data-ddl-duration') || (anim === 'zoom' ? '700' : (anim === 'fade' ? '500' : '400')), 10);
+      html += '<div class="row"><div class="row-label">넘김 속도 (' + (duration/1000).toFixed(2) + '초 · 스르르 넘어가는 시간)</div>'
+            + '<input type="range" id="pop-slide-duration" min="200" max="2000" step="50" value="' + duration + '" style="width:100%;"></div>';
       html += '<div class="row"><div class="row-label">넘김 애니메이션</div>'
             + '<button class="pop-btn' + (anim === 'slide' ? ' is-active' : '') + '" data-slide-act="anim-slide">슬라이드</button>'
             + '<button class="pop-btn' + (anim === 'fade' ? ' is-active' : '') + '" data-slide-act="anim-fade">페이드</button>'
@@ -31914,8 +31932,14 @@
       if (t.id === 'pop-slide-interval') {
         slidePopupTarget.setAttribute('data-ddl-interval', String(t.value));
         var lbl = t.parentNode.querySelector('.row-label');
-        if (lbl) lbl.textContent = '재생 간격 (' + (parseInt(t.value,10)/1000).toFixed(1) + '초)';
+        if (lbl) lbl.textContent = '재생 간격 (' + (parseInt(t.value,10)/1000).toFixed(1) + '초 · 이미지가 머무르는 시간)';
         if (slidePopupTarget._sliderStartAutoplay) slidePopupTarget._sliderStartAutoplay();
+      } else if (t.id === 'pop-slide-duration') {
+        // p26v: 넘김 속도 (CSS 변수 재지정)
+        slidePopupTarget.setAttribute('data-ddl-duration', String(t.value));
+        slidePopupTarget.style.setProperty('--ddl-slider-duration', t.value + 'ms');
+        var lblD = t.parentNode.querySelector('.row-label');
+        if (lblD) lblD.textContent = '넘김 속도 (' + (parseInt(t.value,10)/1000).toFixed(2) + '초 · 스르르 넘어가는 시간)';
       } else if (t.id === 'pop-slide-width') {
         var block = slidePopupTarget.closest('.editor-block');
         if (block) {
@@ -32178,19 +32202,32 @@
       vp.style.setProperty('aspect-ratio', aspVal, 'important');
       vp.style.setProperty('background', 'rgba(15,58,58,0.06)', 'important');
     }
+    // p26v: 넘김 속도 CSS 변수를 블록에 인라인으로 저장 (사이트 CSS 없이도 적용)
+    var _dur = parseInt(slider.getAttribute('data-ddl-duration') || '400', 10);
+    if (isNaN(_dur) || _dur < 100) _dur = 400;
+    slider.style.setProperty('--ddl-slider-duration', _dur + 'ms');
+
+    // p26v: 애니메이션 모드 변수로 저장
+    var _anim = slider.getAttribute('data-anim') || 'slide';
+
     var track = slider.querySelector(':scope > .ddl-slider-viewport > .ddl-slider-track');
     if (track) {
       track.style.setProperty('position', 'relative', 'important');
       track.style.setProperty('width', '100%', 'important');
       track.style.setProperty('height', '100%', 'important');
-      track.style.setProperty('display', 'flex', 'important');
-      track.style.setProperty('transition', 'transform 400ms ease', 'important');
+      if (_anim === 'slide') {
+        track.style.setProperty('display', 'flex', 'important');
+        track.style.setProperty('transition', 'transform ' + _dur + 'ms ease', 'important');
+        track.style.setProperty('transform', 'translateX(0)', 'important');
+      } else {
+        // p26v: fade/zoom — 사이트 CSS 없이도 동작하도록 인라인 강제
+        track.style.setProperty('display', 'block', 'important');
+        track.style.setProperty('transition', 'none', 'important');
+        track.style.setProperty('transform', 'none', 'important');
+      }
     }
-    slider.querySelectorAll('.ddl-slider-item').forEach(function(it){
-      it.style.setProperty('flex', '0 0 100%', 'important');
-      it.style.setProperty('width', '100%', 'important');
-      it.style.setProperty('height', '100%', 'important');
-      it.style.setProperty('position', 'relative', 'important');
+    var _items = slider.querySelectorAll('.ddl-slider-item');
+    _items.forEach(function(it, idx){
       it.style.setProperty('overflow', 'hidden', 'important');
       var im = it.querySelector('img');
       if (im) {
@@ -32199,9 +32236,85 @@
         im.style.setProperty('object-fit', 'cover', 'important');
         im.style.setProperty('display', 'block', 'important');
       }
+      if (_anim === 'slide') {
+        it.style.setProperty('flex', '0 0 100%', 'important');
+        it.style.setProperty('width', '100%', 'important');
+        it.style.setProperty('height', '100%', 'important');
+        it.style.setProperty('position', 'relative', 'important');
+        it.style.setProperty('opacity', '1', 'important');
+      } else {
+        // p26v: fade/zoom — 겹치게 절대위치 · 첫 이미지만 opacity 1
+        it.style.setProperty('position', 'absolute', 'important');
+        it.style.setProperty('top', '0', 'important');
+        it.style.setProperty('left', '0', 'important');
+        it.style.setProperty('right', '0', 'important');
+        it.style.setProperty('bottom', '0', 'important');
+        it.style.setProperty('width', '100%', 'important');
+        it.style.setProperty('height', '100%', 'important');
+        it.style.setProperty('transition', 'opacity ' + _dur + 'ms ease', 'important');
+        if (it.classList && it.classList.contains('is-current')) {
+          it.style.setProperty('opacity', '1', 'important');
+          it.style.setProperty('pointer-events', 'auto', 'important');
+          it.style.setProperty('z-index', '1', 'important');
+        } else {
+          it.style.setProperty('opacity', idx === 0 ? '1' : '0', 'important');
+          if (idx === 0) it.classList.add('is-current');
+          it.style.setProperty('pointer-events', idx === 0 ? 'auto' : 'none', 'important');
+          it.style.setProperty('z-index', idx === 0 ? '1' : '0', 'important');
+        }
+        if (_anim === 'zoom' && im) {
+          im.style.setProperty('transition', 'transform ' + _dur + 'ms ease', 'important');
+          if (it.classList.contains('is-current')) {
+            im.style.setProperty('transform', 'scale(1.0)', 'important');
+          } else {
+            im.style.setProperty('transform', 'scale(1.06)', 'important');
+          }
+        }
+      }
     });
-    // 좌우 버튼·도트: 저장 시 그대로 유지 (사이트 스크립트가 클릭 처리)
-    // 인라인 스타일 최소한 (기본 CSS로 커버되지 않을 상황 대비)
+    // p26v: 좌우 버튼 인라인 강제 — 사이트 테마 CSS 간섭 당해도 살아남게
+    slider.querySelectorAll('.ddl-slider-btn').forEach(function(btn){
+      btn.style.setProperty('position', 'absolute', 'important');
+      btn.style.setProperty('top', '50%', 'important');
+      btn.style.setProperty('transform', 'translateY(-50%)', 'important');
+      btn.style.setProperty('z-index', '5', 'important');
+      btn.style.setProperty('pointer-events', 'auto', 'important');
+      btn.style.setProperty('cursor', 'pointer', 'important');
+      btn.style.setProperty('width', '36px', 'important');
+      btn.style.setProperty('height', '36px', 'important');
+      btn.style.setProperty('border', 'none', 'important');
+      btn.style.setProperty('border-radius', '50%', 'important');
+      btn.style.setProperty('background', 'rgba(15,58,58,0.6)', 'important');
+      btn.style.setProperty('color', '#F5F5F5', 'important');
+      btn.style.setProperty('font-size', '20px', 'important');
+      btn.style.setProperty('line-height', '1', 'important');
+      btn.style.setProperty('display', 'flex', 'important');
+      btn.style.setProperty('align-items', 'center', 'important');
+      btn.style.setProperty('justify-content', 'center', 'important');
+      if (btn.classList.contains('ddl-slider-prev')) btn.style.setProperty('left', '10px', 'important');
+      if (btn.classList.contains('ddl-slider-next')) btn.style.setProperty('right', '10px', 'important');
+    });
+    // p26v: 도트 인라인 강제
+    var _dots = slider.querySelector(':scope > .ddl-slider-viewport > .ddl-slider-dots');
+    if (_dots) {
+      _dots.style.setProperty('position', 'absolute', 'important');
+      _dots.style.setProperty('bottom', '10px', 'important');
+      _dots.style.setProperty('left', '50%', 'important');
+      _dots.style.setProperty('transform', 'translateX(-50%)', 'important');
+      _dots.style.setProperty('display', 'flex', 'important');
+      _dots.style.setProperty('gap', '6px', 'important');
+      _dots.style.setProperty('z-index', '5', 'important');
+      _dots.style.setProperty('pointer-events', 'auto', 'important');
+      _dots.querySelectorAll('.ddl-slider-dot').forEach(function(d){
+        d.style.setProperty('width', '8px', 'important');
+        d.style.setProperty('height', '8px', 'important');
+        d.style.setProperty('border-radius', '50%', 'important');
+        d.style.setProperty('border', 'none', 'important');
+        d.style.setProperty('background', d.classList.contains('is-current') ? '#F5F5F5' : 'rgba(245,245,245,0.4)', 'important');
+        d.style.setProperty('cursor', 'pointer', 'important');
+        d.style.setProperty('padding', '0', 'important');
+      });
+    }
   }
 
   // ─── 편집기 재진입 시 hydration ───
@@ -33141,15 +33254,24 @@
         var act = bgAction.getAttribute('data-fold-bg-action');
         if (act === 'upload-head-image' || act === 'upload-body-image') {
           _foldPickImage(function(dataUrl){
-            // p26u: 공용 크롭 대화창 자동 호출 - 사용자님 요청("모든 이미지 삽입 지점에 크롭")
+            // p26u+p26v: 공용 크롭 대화창 자동 호출 + 대상 블록 비율 자동 감지
             var _applyImg = function(finalUrl){
               var attr = act === 'upload-head-image' ? 'data-fold-head-bg-image' : 'data-fold-body-bg-image';
               block.setAttribute(attr, finalUrl);
               _applyFoldStyles(block);
               renderFoldPopupBody();
             };
+            // p26v: 헤더/본문의 실제 사이즈를 잰서 aspect 산출
+            var _aspect = null;
+            try {
+              var _target = block.querySelector(':scope > .' + (act === 'upload-head-image' ? 'ddl-fold-head' : 'ddl-fold-body'));
+              if (_target) {
+                var _r = _target.getBoundingClientRect();
+                if (_r.width > 4 && _r.height > 4) _aspect = _r.width / _r.height;
+              }
+            } catch(_){}
             if (window.__DDL_EDITOR && window.__DDL_EDITOR.openImageCropDialog) {
-              window.__DDL_EDITOR.openImageCropDialog(dataUrl, { aspect: null }, function(cropped){
+              window.__DDL_EDITOR.openImageCropDialog(dataUrl, { aspect: _aspect }, function(cropped){
                 _applyImg(cropped || dataUrl);
               });
             } else {
