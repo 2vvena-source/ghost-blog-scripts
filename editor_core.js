@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26c
+ * 2vvena Editor Core - v2.0-β-p26d
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26c';
+  var VERSION = 'v2.0-β-p26d';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -13110,7 +13110,44 @@
       var big = document.createElement('div');
       big.style.cssText = 'width: 64px; height: 64px; border-radius: 50%; margin: 4px auto 8px;'
         + ' background: ' + current_color + '; border: 1px solid rgba(15,58,58,0.15);'
-        + ' box-shadow: 0 1px 3px rgba(0,0,0,0.06);';
+        + ' box-shadow: 0 1px 3px rgba(0,0,0,0.06);'
+        + ' cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease;';
+      big.title = '클릭해서 색 선택';
+      big.addEventListener('mouseenter', function(){ big.style.transform = 'scale(1.04)'; big.style.boxShadow = '0 2px 6px rgba(0,0,0,0.12)'; });
+      big.addEventListener('mouseleave', function(){ big.style.transform = ''; big.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)'; });
+      // p26d: 미리보기 원 클릭 → 커스텀 픽커 (스와치와 동일 동작, 진입점 2개)
+      big.addEventListener('click', function(e){
+        e.stopPropagation();
+        var _origBigCol = current.style.color || '#0F3A3A';
+        function _bigApply(v){
+          if (!v) return;
+          current.style.color = v;
+          big.style.background = v;
+          try { if (typeof _syncHero === 'function') _syncHero(); } catch(_){}
+          // 스와치·hex 라벨도 함께 갱신 (있으면)
+          try {
+            var _bsw = tabContent.querySelector('.ep-color-swatch');
+            if (_bsw) _bsw.style.background = v;
+            var _hexEl = tabContent.querySelector('[data-color-swatch-hex], .ep-color-swatch + div + div, div[style*="monospace"]');
+            // hex span 을 정확히 잡기 어려우므로 모든 monospace div 순회
+            tabContent.querySelectorAll('div').forEach(function(el){
+              if (el.style && el.style.fontFamily === 'monospace') el.textContent = String(v).toUpperCase();
+            });
+          } catch(_){}
+        }
+        try {
+          if (typeof openCustomColorPicker === 'function'){
+            openCustomColorPicker({
+              initial: _origBigCol,
+              context: 'text',
+              detectFromSelection: false,
+              onChange: _bigApply,
+              onDone: _bigApply,
+              onCancel: function(){ _bigApply(_origBigCol); }
+            });
+          }
+        } catch(_){}
+      });
       tabContent.appendChild(big);
 
       var caption = document.createElement('div');
@@ -16509,7 +16546,41 @@
       var big = document.createElement('div');
       big.style.cssText = 'width: 64px; height: 64px; border-radius: 50%; margin: 4px auto 8px;'
         + ' background: ' + (current.spec.c1 || '#FFF176') + '; border: 1px solid rgba(15,58,58,0.15);'
-        + ' box-shadow: 0 1px 3px rgba(0,0,0,0.06);';
+        + ' box-shadow: 0 1px 3px rgba(0,0,0,0.06);'
+        + ' cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease;';
+      big.title = '클릭해서 색 선택';
+      big.addEventListener('mouseenter', function(){ big.style.transform = 'scale(1.04)'; big.style.boxShadow = '0 2px 6px rgba(0,0,0,0.12)'; });
+      big.addEventListener('mouseleave', function(){ big.style.transform = ''; big.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)'; });
+      // p26d: 미리보기 원 클릭 → 커스텀 픽커 (스와치와 동일 동작, 진입점 2개)
+      big.addEventListener('click', function(e){
+        e.stopPropagation();
+        var _origBigCol = current.spec.c1 || '#FFF176';
+        function _bigApply(v){
+          if (!v) return;
+          current.spec.c1 = v;
+          big.style.background = v;
+          try { if (typeof _syncHero === 'function') _syncHero(); } catch(_){}
+          try {
+            var _bsw = tabContent.querySelector('.ep-color-swatch');
+            if (_bsw) _bsw.style.background = v;
+            tabContent.querySelectorAll('div').forEach(function(el){
+              if (el.style && el.style.fontFamily === 'monospace') el.textContent = String(v).toUpperCase();
+            });
+          } catch(_){}
+        }
+        try {
+          if (typeof openCustomColorPicker === 'function'){
+            openCustomColorPicker({
+              initial: _origBigCol,
+              context: 'bg',
+              detectFromSelection: false,
+              onChange: _bigApply,
+              onDone: _bigApply,
+              onCancel: function(){ _bigApply(_origBigCol); }
+            });
+          }
+        } catch(_){}
+      });
       tabContent.appendChild(big);
 
       var caption = document.createElement('div');
@@ -19140,7 +19211,9 @@
       pattern: block.getAttribute('data-btn-pattern') || 'dot',   // dot|stripe|check|zigzag
       patternSize: parseInt(block.getAttribute('data-btn-pattern-size') || '10', 10),
       bgImage: block.getAttribute('data-btn-bg-image') || '',
-      bgImageFit: block.getAttribute('data-btn-bg-image-fit') || 'cover'  // cover|contain
+      bgImageFit: block.getAttribute('data-btn-bg-image-fit') || 'cover',  // cover|contain
+      // p26d: 버튼 배경 투명도 (0~100, 기본 100)
+      bgOpacity: parseInt(block.getAttribute('data-btn-bg-opacity') || '100', 10)
     };
   }
 
@@ -19362,6 +19435,7 @@
     if (opts.patternSize != null) block.setAttribute('data-btn-pattern-size', String(opts.patternSize));
     if (opts.bgImage != null) block.setAttribute('data-btn-bg-image', opts.bgImage);
     if (opts.bgImageFit != null) block.setAttribute('data-btn-bg-image-fit', opts.bgImageFit);
+    if (opts.bgOpacity != null) block.setAttribute('data-btn-bg-opacity', String(opts.bgOpacity));  // p26d
     applyButtonStyles(block);
   }
 
@@ -19425,6 +19499,14 @@
     }
     a.style.setProperty('border-radius', opts.radius + 'px', 'important');
     a.style.setProperty('border', 'none', 'important');
+
+    // p26d: 버튼 배경 투명도 반영
+    var _bOp = (opts.bgOpacity != null) ? Math.max(0, Math.min(100, opts.bgOpacity)) : 100;
+    if (_bOp < 100) {
+      a.style.setProperty('opacity', String(_bOp / 100), 'important');
+    } else {
+      a.style.removeProperty('opacity');
+    }
 
     // 폰트/크기/굵기/텍스트정렬
     a.style.setProperty('font-family', opts.fontFamily || 'inherit', 'important');
@@ -19644,6 +19726,13 @@
             + '</div></div>';
         }
       }
+      // p26d: 배경 투명도 (모든 배경 모드 공용 · 마지막에 배치)
+      var _bo = (opts.bgOpacity != null) ? opts.bgOpacity : 100;
+      html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;">'
+        + '<div class="row-label">배경 투명도 (' + _bo + '%)</div>'
+        + '<input type="range" data-btn-set="bgOpacity" min="0" max="100" step="5" value="' + _bo + '" style="width:100%;">'
+        + '<div style="font-size:0.72em; opacity:0.55; margin-top:0.2em;">100% = 불투명, 0% = 완전 투명. 단색/그라데이션/패턴/이미지 모두 적용됩니다.</div>'
+        + '</div>';
     }
     else if (tab === 'shape') {
       html += '<div class="row"><div class="row-label">모서리 (' + opts.radius + 'px)</div>'
@@ -20021,11 +20110,22 @@
       else if (setKey === 'fontSize') opts.fontSize = parseFloat(t.value);
       else if (setKey === 'gradientAngle') opts.gradientAngle = parseInt(t.value, 10);
       else if (setKey === 'patternSize') opts.patternSize = parseInt(t.value, 10);
+      else if (setKey === 'bgOpacity') opts.bgOpacity = parseInt(t.value, 10);  // p26d
       writeButtonOpts(selectedButton, opts);
       // 슬라이더 값 라벨 갱신
       if (setKey === 'radius' || setKey === 'widthPct') renderButtonPopupBody('shape');
       else if (setKey === 'fontSize') renderButtonPopupBody('text');
-      else if (setKey === 'gradientAngle' || setKey === 'patternSize') renderButtonPopupBody('bg');
+      else if (setKey === 'gradientAngle' || setKey === 'patternSize' || setKey === 'bgOpacity') {
+        // 라벨만 바로 갱신 (전체 리렌더링 하면 슬라이더 focus 놓침)
+        try {
+          var _lbl = t.parentNode && t.parentNode.querySelector('.row-label');
+          if (_lbl) {
+            if (setKey === 'gradientAngle') _lbl.textContent = '방향 (' + opts.gradientAngle + '°)';
+            else if (setKey === 'patternSize') _lbl.textContent = '패턴 크기 (' + opts.patternSize + 'px)';
+            else if (setKey === 'bgOpacity') _lbl.textContent = '배경 투명도 (' + opts.bgOpacity + '%)';
+          }
+        } catch(_){}
+      }
     });
 
     // p17b: select 변경 (fontFamily)
