@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26a
+ * 2vvena Editor Core - v2.0-β-p26b
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26a';
+  var VERSION = 'v2.0-β-p26b';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2631,7 +2631,9 @@
     '  position: relative;',
     '  line-height: 1.65;',
     '  word-break: break-word;',
+    '  outline: none;', /* p26b: contenteditable focus 시 임의 사각 테두리 버그 방지 */
     '}',
+    '.ddl-fold-body:focus, .ddl-fold-body:focus-visible { outline: none !important; box-shadow: none !important; }',
     '.ddl-fold-body::before {',
     '  content: "";',
     '  position: absolute;',
@@ -9591,22 +9593,32 @@
 
     var styleVars = '--ddl-hr-shape-fill:' + shapeFill + '; --ddl-hr-shape-stroke:' + shapeStroke + ';';
 
-    // p26a: 그라디언트 모드 → CSS mask 로 SVG 를 복면하고 배경에 linear-gradient
+    // p26b: 그라디언트 모드 → SVG 내부에 <linearGradient> 삽입 (mask 방식 사용 X)
     if (opts.colorMode === 'gradient' && opts.bg2) {
-      var gradCss = _makeGradientCss(color, opts.bg2, opts.gradientAngle, opts.gradientMid);
-      // SVG 를 data:image 로 만들어 mask-image 로 쓰기 (currentColor → black 으로 치환)
-      var svgForMask = preset.svg
-        .replace(/currentColor/g, '#000')
-        .replace(/var\(--ddl-hr-shape-fill,[^)]*\)/g, '#000')
-        .replace(/var\(--ddl-hr-shape-stroke,[^)]*\)/g, '#000');
-      var svgUrl = 'url("data:image/svg+xml;utf8,' + encodeURIComponent(svgForMask) + '")';
-      var maskCss = '-webkit-mask:' + svgUrl + ' no-repeat center/100% 100%; '
-                  + 'mask:' + svgUrl + ' no-repeat center/100% 100%; '
-                  + 'background:' + gradCss + ';';
+      var gid = 'ddlg' + Math.floor(Math.random() * 1e9);
+      var _ang = (opts.gradientAngle != null) ? opts.gradientAngle : 90;
+      // linearGradient 방향: SVG 의 x1/y1/x2/y2 로 변환 (CSS deg 와 수직이 다름)
+      // CSS: 0deg = 아래→위, 90deg = 왜→오. SVG: gradientTransform="rotate(...)"
+      var _rad = (_ang - 90) * Math.PI / 180;
+      var x1 = 50 - Math.cos(_rad) * 50, y1 = 50 - Math.sin(_rad) * 50;
+      var x2 = 50 + Math.cos(_rad) * 50, y2 = 50 + Math.sin(_rad) * 50;
+      var stops = '<stop offset="0%" stop-color="' + color + '"/>';
+      if (opts.gradientMid) {
+        stops += '<stop offset="50%" stop-color="' + opts.gradientMid + '"/>';
+      }
+      stops += '<stop offset="100%" stop-color="' + opts.bg2 + '"/>';
+      var gradDef = '<defs><linearGradient id="' + gid + '" x1="' + x1 + '%" y1="' + y1 + '%" x2="' + x2 + '%" y2="' + y2 + '%">' + stops + '</linearGradient></defs>';
+      // 원본 SVG 에 <defs> 삽입 및 currentColor → url(#gid) 치환
+      // <svg ...>직후에 <defs> 를 넣음
+      var gradSvg = preset.svg.replace(/(<svg[^>]*>)/, '$1' + gradDef);
+      gradSvg = gradSvg.replace(/currentColor/g, 'url(#' + gid + ')');
       return '<span class="ddl-divider-svg ddl-divider-grad" style="'
-        + 'display:inline-block; vertical-align:middle; line-height:0; opacity:' + opacity + '; '
+        + 'display:inline-block; vertical-align:middle; line-height:0; '
+        + 'opacity:' + opacity + '; '
         + widthStyle
-        + ' height:' + effectiveH + 'px; ' + maskCss + '"></span>';
+        + ' height:' + effectiveH + 'px; '
+        + styleVars
+        + '">' + gradSvg + '</span>';
     }
 
     var inner = '<span class="ddl-divider-svg" style="'
@@ -9644,23 +9656,29 @@
     // 저장용은 var(--base) 못 씀 (컨텍스트 없음). 명시 색으로 hardcode.
     var shapeFill = isFilled ? shapeFillColor : '#F5F5F5';
 
-    // p26a: 그라디언트 모드 → <span> + CSS mask 로 저장
+    // p26b: 그라디언트 모드 → SVG 내부에 <linearGradient> 삽입 (저장용도 img 로 나가게 수정)
     if (opts.colorMode === 'gradient' && opts.bg2) {
-      var gradCssS = _makeGradientCss(color, opts.bg2, opts.gradientAngle, opts.gradientMid);
-      var svgForMaskS = preset.svg
-        .replace(/currentColor/g, '#000')
-        .replace(/var\(--ddl-hr-shape-fill,[^)]*\)/g, '#000')
-        .replace(/var\(--ddl-hr-shape-stroke,[^)]*\)/g, '#000');
-      var svgUrlS = 'url("data:image/svg+xml;utf8,' + encodeURIComponent(svgForMaskS) + '")';
-      var wPxS = preset.widthPx || 600;
-      var hPxS = preset.heightPx * stroke;
-      return '<span class="ddl-divider-svg ddl-divider-grad" style="'
-        + 'display:inline-block; vertical-align:middle; line-height:0; '
-        + 'width:' + wPxS + 'px; height:' + hPxS + 'px; opacity:' + opacity + '; '
-        + '-webkit-mask:' + svgUrlS + ' no-repeat center/100% 100%; '
-        + 'mask:' + svgUrlS + ' no-repeat center/100% 100%; '
-        + 'background:' + gradCssS + ';'
-        + '"></span>';
+      var gidS = 'ddlg' + Math.floor(Math.random() * 1e9);
+      var _angS = (opts.gradientAngle != null) ? opts.gradientAngle : 90;
+      var _radS = (_angS - 90) * Math.PI / 180;
+      var x1S = 50 - Math.cos(_radS) * 50, y1S = 50 - Math.sin(_radS) * 50;
+      var x2S = 50 + Math.cos(_radS) * 50, y2S = 50 + Math.sin(_radS) * 50;
+      var stopsS = '<stop offset="0%" stop-color="' + color + '"/>';
+      if (opts.gradientMid) stopsS += '<stop offset="50%" stop-color="' + opts.gradientMid + '"/>';
+      stopsS += '<stop offset="100%" stop-color="' + opts.bg2 + '"/>';
+      var gradDefS = '<defs><linearGradient id="' + gidS + '" x1="' + x1S + '%" y1="' + y1S + '%" x2="' + x2S + '%" y2="' + y2S + '%">' + stopsS + '</linearGradient></defs>';
+      var svgForSaveG = preset.svg.replace(/(<svg[^>]*>)/, '$1' + gradDefS);
+      svgForSaveG = svgForSaveG.replace(/currentColor/g, 'url(#' + gidS + ')');
+      svgForSaveG = svgForSaveG.replace(/var\(--ddl-hr-shape-fill,[^)]*\)/g, shapeFill);
+      svgForSaveG = svgForSaveG.replace(/var\(--ddl-hr-shape-stroke,[^)]*\)/g, shapeStroke);
+      var wPxSg = preset.widthPx || 600;
+      var hPxSg = preset.heightPx * stroke;
+      var dataUrlG = 'data:image/svg+xml;utf8,' + encodeURIComponent(svgForSaveG);
+      return '<img class="ddl-divider-img ddl-divider-grad" src="' + dataUrlG + '" '
+        + 'width="' + wPxSg + '" height="' + hPxSg + '" '
+        + 'style="display:inline-block; vertical-align:middle; '
+        + 'width:' + wPxSg + 'px; height:' + hPxSg + 'px; opacity:' + opacity + ';" '
+        + 'alt="구분선">';
     }
 
     var svgStr = preset.svg;
