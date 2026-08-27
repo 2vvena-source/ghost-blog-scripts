@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26q
+ * 2vvena Editor Core - v2.0-β-p26r
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26q';
+  var VERSION = 'v2.0-β-p26r';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -31791,8 +31791,11 @@
 
   // ─── 슬라이더 블록 클릭 → 편집 팝업 열기 ───
   function setupSliderClickHandler(){
+    // p26r: contentEl 준비 대기 (스크립트 로드 시점엔 아직 null 일 수 있음)
+    if (!contentEl) { setTimeout(setupSliderClickHandler, 100); return; }
+    if (contentEl._sliderClickInstalled) return;
+    contentEl._sliderClickInstalled = true;
     contentEl.addEventListener('click', function(e){
-      // 슬라이더 자체 상호작용 (화살표/도트) 은 스킵
       if (e.target.closest('.ddl-slider-btn') || e.target.closest('.ddl-slider-dot')) return;
       if (e.target.closest('.ddl-slider-resizer')) return;
       var slider = e.target.closest && e.target.closest('.ep-slider-block');
@@ -31805,57 +31808,63 @@
       if (e.target.closest('.ep-slider-block')) return;
       if (e.target.closest('#ep-slide-popup')) return;
       if (e.target.closest('.ep-crop-popup')) return;
+      if (!contentEl) return;
       contentEl.querySelectorAll('.ep-slider-block.is-selected').forEach(function(x){ x.classList.remove('is-selected'); });
     });
   }
-  setupSliderClickHandler();
+  // p26r: 즉시 호출 대신 지연 실행 (contentEl 초기화 대기)
+  setTimeout(setupSliderClickHandler, 150);
 
-  // ─── 리사이즈 핸들 (우측 하단) ───
+  // ─── 리사이즈 핸들 (우측 하단) · p26r: body 준비 대기 ───
   (function(){
     var st = null;
-    document.body.addEventListener('mousedown', function(e){
-      var h = e.target.closest && e.target.closest('.ddl-slider-resizer');
-      if (!h) return;
-      var slider = h.closest('.ep-slider-block');
-      var block = slider ? slider.closest('.editor-block') : null;
-      if (!block) return;
-      var rect = block.getBoundingClientRect();
-      st = { block: block, slider: slider, startX: e.clientX, startY: e.clientY, startW: rect.width, startH: slider.querySelector('.ddl-slider-viewport').getBoundingClientRect().height };
-      e.preventDefault(); e.stopPropagation();
-      document.body.style.cursor = 'nwse-resize';
-      document.body.style.userSelect = 'none';
-    }, true);
-    document.body.addEventListener('mousemove', function(e){
-      if (!st) return;
-      var dx = e.clientX - st.startX;
-      var dy = e.clientY - st.startY;
-      // 폭 조절 (블록 폭 %)
-      var parentRect = st.block.parentNode.getBoundingClientRect();
-      var newW = st.startW + dx;
-      if (newW < 100) newW = 100;
-      if (newW > parentRect.width) newW = parentRect.width;
-      var pct = Math.round((newW / parentRect.width) * 100);
-      if (pct < 20) pct = 20;
-      if (pct > 100) pct = 100;
-      st.block.setAttribute('data-width-pct', String(pct));
-      st.block.style.setProperty('width', pct + '%', 'important');
-      st.block.style.setProperty('max-width', pct + '%', 'important');
-      // 화면비 조절 (viewport aspect-ratio 직접 조절)
-      var newH = st.startH + dy;
-      if (newH < 80) newH = 80;
-      var vp = st.slider.querySelector('.ddl-slider-viewport');
-      if (vp) {
-        var ratio = newW / newH;
-        vp.style.setProperty('aspect-ratio', ratio.toFixed(4), 'important');
-        st.slider.setAttribute('data-ddl-aspect', ratio.toFixed(4));
-      }
-    }, true);
-    document.body.addEventListener('mouseup', function(){
-      if (!st) return;
-      st = null;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    }, true);
+    function _installSliderResizer(){
+      if (!document.body) { setTimeout(_installSliderResizer, 60); return; }
+      if (document.body._sliderResizerInstalled) return;
+      document.body._sliderResizerInstalled = true;
+      document.body.addEventListener('mousedown', function(e){
+        var h = e.target.closest && e.target.closest('.ddl-slider-resizer');
+        if (!h) return;
+        var slider = h.closest('.ep-slider-block');
+        var block = slider ? slider.closest('.editor-block') : null;
+        if (!block) return;
+        var rect = block.getBoundingClientRect();
+        st = { block: block, slider: slider, startX: e.clientX, startY: e.clientY, startW: rect.width, startH: slider.querySelector('.ddl-slider-viewport').getBoundingClientRect().height };
+        e.preventDefault(); e.stopPropagation();
+        document.body.style.cursor = 'nwse-resize';
+        document.body.style.userSelect = 'none';
+      }, true);
+      document.body.addEventListener('mousemove', function(e){
+        if (!st) return;
+        var dx = e.clientX - st.startX;
+        var dy = e.clientY - st.startY;
+        var parentRect = st.block.parentNode.getBoundingClientRect();
+        var newW = st.startW + dx;
+        if (newW < 100) newW = 100;
+        if (newW > parentRect.width) newW = parentRect.width;
+        var pct = Math.round((newW / parentRect.width) * 100);
+        if (pct < 20) pct = 20;
+        if (pct > 100) pct = 100;
+        st.block.setAttribute('data-width-pct', String(pct));
+        st.block.style.setProperty('width', pct + '%', 'important');
+        st.block.style.setProperty('max-width', pct + '%', 'important');
+        var newH = st.startH + dy;
+        if (newH < 80) newH = 80;
+        var vp = st.slider.querySelector('.ddl-slider-viewport');
+        if (vp) {
+          var ratio = newW / newH;
+          vp.style.setProperty('aspect-ratio', ratio.toFixed(4), 'important');
+          st.slider.setAttribute('data-ddl-aspect', ratio.toFixed(4));
+        }
+      }, true);
+      document.body.addEventListener('mouseup', function(){
+        if (!st) return;
+        st = null;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }, true);
+    }
+    _installSliderResizer();
   })();
 
   // ─── 저장용 enhance: 편집기 잔재 제거 + 인라인 스타일 심기 + 런타임용 data 유지 ───
