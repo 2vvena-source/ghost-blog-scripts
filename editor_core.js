@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26m
+ * 2vvena Editor Core - v2.0-β-p26n
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26m';
+  var VERSION = 'v2.0-β-p26n';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -3546,6 +3546,46 @@
       if (!target) return;
       var block = target.closest('.editor-block');
       if (!block) return;
+
+      // p26n: 다단 컬럼 안에서 Tab 키로 다음 컬럼 이동 (Shift+Tab 은 이전 컬럼).
+      //   커서가 다단 컬럼(.ddl-column) 안이면 → 인접 컬럼의 첫 <p> 로 포커스 이동.
+      //   마지막 컬럼에서 Tab 을 누르면 아무 것도 안 함 (다단 밖으로 나가지는 않음).
+      if (e.key === 'Tab') {
+        var _col = target.classList && target.classList.contains('ddl-column')
+                    ? target
+                    : (target.closest ? target.closest('.ddl-column') : null);
+        if (_col) {
+          e.preventDefault();
+          var _wrap = _col.parentNode;
+          if (_wrap && _wrap.classList && _wrap.classList.contains('ddl-columns-block')) {
+            var _cols = Array.prototype.filter.call(_wrap.children, function(c){
+              return c.classList && c.classList.contains('ddl-column');
+            });
+            var _idx = _cols.indexOf(_col);
+            var _next = e.shiftKey ? _cols[_idx - 1] : _cols[_idx + 1];
+            if (_next) {
+              try {
+                // 다음 컬럼의 첫 편집 가능 위치(첫 <p>) 로 커서 이동
+                var _firstP = _next.querySelector(':scope > p') || _next.firstElementChild || _next;
+                var _r = document.createRange();
+                // 첫 <p> 안 텍스트 위치로. 비어있으면 그냥 첫 위치.
+                var _tn = _firstP.firstChild;
+                if (_tn && _tn.nodeType === 3) {
+                  _r.setStart(_tn, 0);
+                } else {
+                  _r.setStart(_firstP, 0);
+                }
+                _r.collapse(true);
+                var _s = window.getSelection();
+                _s.removeAllRanges();
+                _s.addRange(_r);
+                _next.focus({ preventScroll: false });
+              } catch(_){}
+            }
+          }
+          return;
+        }
+      }
 
       // p20n: 백스페이스 방어 정밀화 — 커서가 첫 위치에 있으면 블록 삭제 원천 차단
       if (e.key === 'Backspace') {
