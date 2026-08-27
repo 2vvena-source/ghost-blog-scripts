@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26h
+ * 2vvena Editor Core - v2.0-β-p26i
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26h';
+  var VERSION = 'v2.0-β-p26i';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2707,7 +2707,21 @@
     /* p26h: 리사이저 자체 hover 시 배경도 살짝 표시 (히트 영역 시각화) */
     '.ddl-column-resizer:hover { background: rgba(255,154,118,0.05); }',
     '.ddl-column-resizer:hover::before { background: var(--point, #FF9A76) !important; }',
-    '.ddl-column-resizer.is-dragging::before { background: var(--point, #FF9A76) !important; }',
+    '.ddl-column-resizer.is-dragging::before { background: var(--point, #FF9A76) !important; width: 3px !important; }',
+    /* p26i: 드래그 중 리사이저 자체를 살짝 놓게 */
+    '.ddl-column-resizer.is-dragging { background: rgba(255,154,118,0.10); }',
+    /* p26i: 스냅 플래시 애니메이션 */
+    '@keyframes ddlColSnapFlash {',
+    '  0%   { opacity: 0; transform: scaleX(1); }',
+    '  30%  { opacity: 1; transform: scaleX(1.8); }',
+    '  100% { opacity: 0; transform: scaleX(1); }',
+    '}',
+    /* p26i: 리사이즈 툴팁 페이드인 */
+    '.ddl-col-resize-tip {',
+    '  opacity: 1;',
+    '  transition: opacity 200ms ease, background 120ms ease;',
+    '  box-shadow: 0 2px 8px rgba(0,0,0,0.15);',
+    '}',
     /* 편집기 안 표시 마커 (저장 시 ep- 접두사 제거) */
     '.ep-columns-block { position: relative; }',
     '.ep-columns-block.is-selected { outline: 1px dashed rgba(255,154,118,0.4); outline-offset: -2px; }',
@@ -30404,6 +30418,58 @@
       e.stopPropagation();
     }
 
+    // p26i: 자기장 스냅 지점 (10% 단위) + 드래그 속도 감지
+    var SNAP_STEP = 10; // 10% 단위
+    var SNAP_MAGNET_PCT = 2.5; // 스냅 지점 ±2.5% 내에서 자석 효과
+
+    function _snapPct(pct){
+      // 가장 가까운 10% 지점 이름
+      var nearest = Math.round(pct / SNAP_STEP) * SNAP_STEP;
+      if (Math.abs(pct - nearest) <= SNAP_MAGNET_PCT) return nearest;
+      return pct;
+    }
+
+    function _showResizeTooltip(handle, lpct, rpct, snapped){
+      var tip = handle._colTip;
+      if (!tip){
+        tip = document.createElement('div');
+        tip.className = 'ddl-col-resize-tip';
+        tip.style.cssText = 'position:absolute; top:-28px; left:50%; transform:translateX(-50%); background:#0F3A3A; color:#fff; font-size:11px; padding:3px 8px; border-radius:4px; white-space:nowrap; pointer-events:none; z-index:9999; font-family:-apple-system,BlinkMacSystemFont,sans-serif; font-weight:500; transition:background 120ms ease;';
+        handle.style.position = 'relative';
+        handle.appendChild(tip);
+        handle._colTip = tip;
+      }
+      tip.textContent = Math.round(lpct) + '% / ' + Math.round(rpct) + '%';
+      tip.style.background = snapped ? '#FF9A76' : '#0F3A3A';
+    }
+
+    function _hideResizeTooltip(handle){
+      if (handle._colTip){
+        var t = handle._colTip;
+        t.style.opacity = '0';
+        setTimeout(function(){ if (t.parentNode) t.parentNode.removeChild(t); }, 200);
+        handle._colTip = null;
+      }
+    }
+
+    function _flashSnapIndicator(handle){
+      // 스냅 순간 에페메럴 플래시 (80ms)
+      if (handle._snapFlashing) return;
+      handle._snapFlashing = true;
+      var before = handle.querySelector('.ddl-col-snap-flash');
+      if (!before){
+        before = document.createElement('div');
+        before.className = 'ddl-col-snap-flash';
+        before.style.cssText = 'position:absolute; inset:0; background:rgba(255,154,118,0.35); pointer-events:none; border-radius:2px; animation:ddlColSnapFlash 200ms ease-out; z-index:1;';
+        handle.style.position = 'relative';
+        handle.appendChild(before);
+      }
+      setTimeout(function(){
+        if (before && before.parentNode) before.parentNode.removeChild(before);
+        handle._snapFlashing = false;
+      }, 200);
+    }
+
     function _colMove(e){
       if (!_colResizeState) return;
       var s = _colResizeState;
@@ -30413,20 +30479,52 @@
       // 최소 폭 40px
       if (newLW < 40) { newLW = 40; newRW = s.totalW - 40; }
       if (newRW < 40) { newRW = 40; newLW = s.totalW - 40; }
-      // flex-basis 로 지정 (%)
-      var lpct = (newLW / s.totalW) * 100;
-      var rpct = (newRW / s.totalW) * 100;
-      // 다른 컬럼들의 flex 값은 유지하고, 이 둘의 비율만 조정
+      var rawLpct = (newLW / s.totalW) * 100;
+      var rawRpct = (newRW / s.totalW) * 100;
+      // 자기장 스냅 적용
+      var lpct = _snapPct(rawLpct);
+      var rpct = 100 - lpct;
+      var isSnapped = (lpct !== rawLpct);
+      // 스냅이 발생한 순간 플래시
+      if (isSnapped && s.lastSnappedPct !== lpct){
+        s.lastSnappedPct = lpct;
+        _flashSnapIndicator(s.handle);
+      } else if (!isSnapped){
+        s.lastSnappedPct = null;
+      }
+      // 드래그 중에는 transition 없이 직접 적용 (손가락 따라가기)
+      s.left.style.transition = 'none';
+      s.right.style.transition = 'none';
       s.left.style.flex  = lpct.toFixed(2) + ' 0 0';
       s.right.style.flex = rpct.toFixed(2) + ' 0 0';
+      // 실시간 툴팁
+      _showResizeTooltip(s.handle, lpct, rpct, isSnapped);
     }
 
     function _colEnd(e){
       if (!_colResizeState) return;
       var s = _colResizeState;
+      // 놓는 순간 최종 스냅 + 오버슈 애니메이션
+      var curLW = s.left.getBoundingClientRect().width;
+      var curLpct = (curLW / s.totalW) * 100;
+      var finalLpct = _snapPct(curLpct);
+      var finalRpct = 100 - finalLpct;
+      // 놓을 때 오버슈 cubic-bezier (노션식 “찰칵”)
+      s.left.style.transition  = 'flex 180ms cubic-bezier(0.2, 0.9, 0.3, 1.15)';
+      s.right.style.transition = 'flex 180ms cubic-bezier(0.2, 0.9, 0.3, 1.15)';
+      s.left.style.flex  = finalLpct.toFixed(2) + ' 0 0';
+      s.right.style.flex = finalRpct.toFixed(2) + ' 0 0';
+      // transition 왕료 후 이름서 이후 리사이즈에는 영향 X
+      setTimeout(function(){
+        try {
+          s.left.style.transition = '';
+          s.right.style.transition = '';
+        } catch(_){}
+      }, 220);
       s.handle.classList.remove('is-dragging');
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      _hideResizeTooltip(s.handle);
       // 최종 flex 값들을 block 의 data-column-flex 에 저장
       var cols = Array.prototype.filter.call(s.wrap.children, function(c){ return c.classList.contains('ddl-column'); });
       var flexVals = cols.map(function(c){
@@ -30434,6 +30532,11 @@
         var fv = parseFloat(v);
         return isNaN(fv) ? 1 : fv;
       });
+      // 스냅된 값으로 갱신
+      var leftIdx = cols.indexOf(s.left);
+      var rightIdx = cols.indexOf(s.right);
+      if (leftIdx >= 0) flexVals[leftIdx] = finalLpct;
+      if (rightIdx >= 0) flexVals[rightIdx] = finalRpct;
       s.block.setAttribute('data-column-flex', flexVals.map(function(v){ return v.toFixed(2); }).join(','));
       _colResizeState = null;
     }
