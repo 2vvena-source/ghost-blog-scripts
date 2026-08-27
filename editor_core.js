@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p25x
+ * 2vvena Editor Core - v2.0-β-p25z
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25x';
+  var VERSION = 'v2.0-β-p25z';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -4541,10 +4541,18 @@
     html += '</div></div>';
 
     var cur = toHex(currentColor || '#0F3A3A');
+    // p25z: 커스텀 스와치 버튼 + hidden native input (기존 change handler 호환용)
+    // 스와치 클릭 → openCustomColorPicker → onChange 시 native input.value 갱신 + input 이벤트 dispatch
+    // 이렇게 하면 콜아웃/버튼/구분선의 개별 data-color-picker handler 를 건드리지 않아도 됨
     html += '<div class="row"><div class="row-label">직접 색상</div>'
-      + '<div class="ep-color-row">'
-      + '  <input type="color" data-color-picker="' + target + '" data-color-ns="' + escapeAttr(ns) + '" value="' + cur + '">'
-      + '  <span style="opacity:0.55; font-size:0.78em;">직접 선택</span>'
+      + '<div class="ep-color-row" style="display:flex; align-items:center; gap:0.5em;">'
+      + '  <button type="button" class="ep-color-swatch" data-color-swatch="' + target + '" data-color-ns="' + escapeAttr(ns) + '" data-cur="' + cur + '"'
+      + '          style="width:44px; height:44px; border:1px solid rgba(15,58,58,0.2);'
+      + '                 border-radius:4px; padding:0; cursor:pointer;'
+      + '                 background:' + cur + '; flex-shrink:0;"'
+      + '          title="클릭해서 색 선택"></button>'
+      + '  <input type="color" data-color-picker="' + target + '" data-color-ns="' + escapeAttr(ns) + '" value="' + cur + '" style="display:none;">'
+      + '  <span class="ep-color-swatch-hex" data-color-swatch-hex="' + escapeAttr(ns) + '" style="opacity:0.7; font-size:0.85em; font-family:monospace;">' + cur.toUpperCase() + '</span>'
       + '</div></div>';
 
     html += '<div class="row"><button class="pop-btn" data-color-save="' + target + '" data-color-ns="' + escapeAttr(ns) + '">현재 색상을 프리셋으로 저장</button></div>';
@@ -11293,7 +11301,46 @@
         } catch(_){}
         return;
       }
-      // TODO: list-expand / size-more / typeface-cycle / size-cycle / line-height / custom-color
+      // p25z: 폰트 박스 클릭 → openFontPicker 팭어버 (라이브러리 미니 팭어버)
+      if (cmd === 'typeface-cycle'){
+        e.preventDefault(); e.stopPropagation();
+        try { if (typeof saveRange === 'function') saveRange(); } catch(_){}
+        try {
+          if (window.__DDL_EDITOR && window.__DDL_EDITOR.openFontPicker){
+            // 현재 버튼에 저장된 fontFamily 값(없으면 '' 으로 진입)
+            var _curFF = btn.getAttribute('data-cur-font') || '';
+            window.__DDL_EDITOR.openFontPicker(btn, _curFF, function(value, font){
+              // 선택한 폰트를 현재 selection 에 적용
+              try { if (typeof restoreRange === 'function') restoreRange(); } catch(_){}
+              try {
+                var sel = window.getSelection();
+                if (sel && sel.rangeCount > 0){
+                  var range = sel.getRangeAt(0);
+                  if (!range.collapsed){
+                    // execCommand fontName 대신 span 로 감싸기 (fontName 은 복합 font-family 불가)
+                    var span = document.createElement('span');
+                    span.style.fontFamily = value;
+                    try {
+                      range.surroundContents(span);
+                    } catch(_e){
+                      // 설정이 여러 노드를 걸칠 때는 extractContents 으로 대체
+                      var frag = range.extractContents();
+                      span.appendChild(frag);
+                      range.insertNode(span);
+                    }
+                  }
+                }
+              } catch(_e2){ try { console.warn('[typeface-cycle apply]', _e2); } catch(_){} }
+              // 버튼 라벨 업데이트
+              var _lbl = (font && (font.name || font.cssName)) || value.split(',')[0].replace(/["']/g, '').trim() || 'Font';
+              btn.textContent = _lbl;
+              btn.setAttribute('data-cur-font', value);
+            });
+          }
+        } catch(err){ try { console.warn('[typeface-cycle]', err); } catch(_){} }
+        return;
+      }
+      // TODO: list-expand / size-more / size-cycle / line-height / custom-color
       // → 다음 라운드에서 createBlockPopup 으로 확장 메뉴 구현 예정
     });
 
@@ -16988,6 +17035,57 @@
   //       onCancel: function(){...}
   //     });
   // ═══════════════════════════════════════════════════════════
+  // p25z: renderColorSection 스와치 전역 위임 핸들러 (구분선/콜아웃/버튼 모두 해당)
+  //   스와치 클릭 → openCustomColorPicker → onChange/onDone/onCancel 마다
+  //   hidden native input.value 갱신 + input/change 이벤트 dispatch
+  //   (기존 data-color-picker handler 들이 그대로 발동)
+  (function(){
+    function _attach(){
+      if (!document.body) { setTimeout(_attach, 30); return; }
+      if (document.body._colorSwatchDelegated) return;
+      document.body._colorSwatchDelegated = true;
+      document.body.addEventListener('click', function(e){
+        var sw = e.target && e.target.closest && e.target.closest('[data-color-swatch]');
+        if (!sw) return;
+        var row = sw.parentNode;
+        if (!row) return;
+        var ns = sw.getAttribute('data-color-ns') || sw.getAttribute('data-color-swatch');
+        var hidden = row.querySelector('input[type="color"][data-color-picker][data-color-ns="' + ns + '"]');
+        if (!hidden) hidden = row.querySelector('input[type="color"][data-color-picker]');
+        if (!hidden) return;
+        var hexSpan = row.querySelector('[data-color-swatch-hex="' + ns + '"]');
+        var _orig = hidden.value || sw.getAttribute('data-cur') || '#0F3A3A';
+        var _ctx = sw.getAttribute('data-color-swatch') || 'text';
+        function _apply(colorValue){
+          if (!colorValue) return;
+          hidden.value = colorValue;
+          sw.style.background = colorValue;
+          sw.setAttribute('data-cur', colorValue);
+          if (hexSpan) hexSpan.textContent = String(colorValue).toUpperCase();
+          try {
+            hidden.dispatchEvent(new Event('input',  { bubbles: true }));
+            hidden.dispatchEvent(new Event('change', { bubbles: true }));
+          } catch(_){}
+        }
+        try {
+          if (typeof openCustomColorPicker === 'function'){
+            openCustomColorPicker({
+              initial: _orig,
+              context: _ctx,
+              detectFromSelection: false,
+              onChange: _apply,
+              onDone:   _apply,
+              onCancel: function(){ _apply(_orig); }
+            });
+          }
+        } catch(err){ try { console.warn('[color-swatch]', err); } catch(_){} }
+        e.preventDefault();
+        e.stopPropagation();
+      }, true); // capture=true → 외부클릭 handler 보다 먼저 동작
+    }
+    _attach();
+  })();
+
   function openCustomColorPicker(opts){
     opts = opts || {};
     var _fired = false;
