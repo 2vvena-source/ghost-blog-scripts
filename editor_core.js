@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26v';
+  var VERSION = 'v2.0-β-p26w';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -32202,6 +32202,64 @@
       vp.style.setProperty('aspect-ratio', aspVal, 'important');
       vp.style.setProperty('background', 'rgba(15,58,58,0.06)', 'important');
     }
+
+    // p26w: 빈 슬라이드(is-empty) 자동 제거 — 사이트에 불필요
+    if (vp) {
+      var _track_pre = vp.querySelector('.ddl-slider-track');
+      if (_track_pre) {
+        _track_pre.querySelectorAll('.ddl-slider-item.is-empty').forEach(function(em){
+          if (em.parentNode) em.parentNode.removeChild(em);
+        });
+      }
+    }
+
+    // p26w: 좌우 버튼·도트를 저장 시점에 무조건 재생성 (편집기 누락/sanitizer 슬림 방지)
+    if (vp) {
+      var _itemsCount = vp.querySelectorAll('.ddl-slider-item').length;
+      // 이미지 하나이면 버튼/도트 안 만들어도 됨
+      if (_itemsCount >= 2) {
+        // 좌쪽 버튼
+        var _prev = vp.querySelector(':scope > .ddl-slider-prev');
+        if (!_prev) {
+          _prev = document.createElement('button');
+          _prev.type = 'button';
+          _prev.className = 'ddl-slider-btn ddl-slider-prev';
+          _prev.setAttribute('aria-label', 'Previous');
+          _prev.textContent = '‹';
+          vp.appendChild(_prev);
+        }
+        // 우쪽 버튼
+        var _next = vp.querySelector(':scope > .ddl-slider-next');
+        if (!_next) {
+          _next = document.createElement('button');
+          _next.type = 'button';
+          _next.className = 'ddl-slider-btn ddl-slider-next';
+          _next.setAttribute('aria-label', 'Next');
+          _next.textContent = '›';
+          vp.appendChild(_next);
+        }
+        // 도트박스
+        var _dotsBox = vp.querySelector(':scope > .ddl-slider-dots');
+        if (!_dotsBox) {
+          _dotsBox = document.createElement('div');
+          _dotsBox.className = 'ddl-slider-dots';
+          vp.appendChild(_dotsBox);
+        }
+        // 도트 개수 맞추기
+        var _existDots = _dotsBox.querySelectorAll('.ddl-slider-dot');
+        if (_existDots.length !== _itemsCount) {
+          _dotsBox.innerHTML = '';
+          for (var _di = 0; _di < _itemsCount; _di++) {
+            var _dot = document.createElement('button');
+            _dot.type = 'button';
+            _dot.className = 'ddl-slider-dot' + (_di === 0 ? ' is-current' : '');
+            _dot.setAttribute('aria-label', 'Slide ' + (_di + 1));
+            _dot.setAttribute('data-ddl-slide-idx', String(_di));
+            _dotsBox.appendChild(_dot);
+          }
+        }
+      }
+    }
     // p26v: 넘김 속도 CSS 변수를 블록에 인라인으로 저장 (사이트 CSS 없이도 적용)
     var _dur = parseInt(slider.getAttribute('data-ddl-duration') || '400', 10);
     if (isNaN(_dur) || _dur < 100) _dur = 400;
@@ -32272,8 +32330,9 @@
         }
       }
     });
-    // p26v: 좌우 버튼 인라인 강제 — 사이트 테마 CSS 간섭 당해도 살아남게
+    // p26v+w: 좌우 버튼 인라인 강제 — 사이트 테마 CSS 간섭 당해도 살아남게
     slider.querySelectorAll('.ddl-slider-btn').forEach(function(btn){
+      btn.removeAttribute('contenteditable');
       btn.style.setProperty('position', 'absolute', 'important');
       btn.style.setProperty('top', '50%', 'important');
       btn.style.setProperty('transform', 'translateY(-50%)', 'important');
@@ -32291,28 +32350,34 @@
       btn.style.setProperty('display', 'flex', 'important');
       btn.style.setProperty('align-items', 'center', 'important');
       btn.style.setProperty('justify-content', 'center', 'important');
+      btn.style.setProperty('padding', '0', 'important');
+      btn.style.setProperty('font-family', 'inherit', 'important');
       if (btn.classList.contains('ddl-slider-prev')) btn.style.setProperty('left', '10px', 'important');
       if (btn.classList.contains('ddl-slider-next')) btn.style.setProperty('right', '10px', 'important');
     });
-    // p26v: 도트 인라인 강제
+    // p26v+w: 도트(하단 원모양 페이지 표시) 인라인 강제
     var _dots = slider.querySelector(':scope > .ddl-slider-viewport > .ddl-slider-dots');
     if (_dots) {
+      _dots.removeAttribute('contenteditable');
       _dots.style.setProperty('position', 'absolute', 'important');
-      _dots.style.setProperty('bottom', '10px', 'important');
+      _dots.style.setProperty('bottom', '12px', 'important');
       _dots.style.setProperty('left', '50%', 'important');
       _dots.style.setProperty('transform', 'translateX(-50%)', 'important');
       _dots.style.setProperty('display', 'flex', 'important');
-      _dots.style.setProperty('gap', '6px', 'important');
+      _dots.style.setProperty('gap', '7px', 'important');
       _dots.style.setProperty('z-index', '5', 'important');
       _dots.style.setProperty('pointer-events', 'auto', 'important');
       _dots.querySelectorAll('.ddl-slider-dot').forEach(function(d){
-        d.style.setProperty('width', '8px', 'important');
-        d.style.setProperty('height', '8px', 'important');
+        d.removeAttribute('contenteditable');
+        d.style.setProperty('width', '9px', 'important');
+        d.style.setProperty('height', '9px', 'important');
         d.style.setProperty('border-radius', '50%', 'important');
         d.style.setProperty('border', 'none', 'important');
-        d.style.setProperty('background', d.classList.contains('is-current') ? '#F5F5F5' : 'rgba(245,245,245,0.4)', 'important');
+        d.style.setProperty('background', d.classList.contains('is-current') ? '#F5F5F5' : 'rgba(245,245,245,0.45)', 'important');
         d.style.setProperty('cursor', 'pointer', 'important');
         d.style.setProperty('padding', '0', 'important');
+        d.style.setProperty('box-shadow', '0 1px 3px rgba(0,0,0,0.35)', 'important');
+        d.style.setProperty('transition', 'background 200ms ease', 'important');
       });
     }
   }
