@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26r
+ * 2vvena Editor Core - v2.0-β-p26s
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26r';
+  var VERSION = 'v2.0-β-p26s';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -21552,9 +21552,16 @@
       var hasBulletList = !!(b.getAttribute('data-bullet-style')) ||
                           !!(b.querySelector && b.querySelector(':scope > ul, :scope > ol'));
       if (hasBulletList) innerEls = [b]; // 블록 자체를 통째로 저장 (콜아웃 방식)
-      var isCustom = (blockType === 'callout' || hasCalloutBox || blockType === 'image' || hasImageFig || blockType === 'divider' || hasDivider || blockType === 'button' || hasButton || blockType === 'fold' || hasFoldBlock || hasBulletList || isColumnsBlock);
+      // p26s: 슬라이더 블록 감지 - blockType='slider' 또는 자식에 .ep-slider-block 존재
+      var hasSlider = (blockType === 'slider') || !!(b.querySelector && b.querySelector('.ep-slider-block'));
+      if (hasSlider) innerEls = [b]; // 슬라이더도 블록 자체를 통째로 저장
+      var isCustom = (blockType === 'callout' || hasCalloutBox || blockType === 'image' || hasImageFig || blockType === 'divider' || hasDivider || blockType === 'button' || hasButton || blockType === 'fold' || hasFoldBlock || hasBulletList || isColumnsBlock || hasSlider);
       // p26h: 다단 wrapper 는 통째로 저장
       if (isColumnsBlock) innerEls = [b];
+      // p26s: 슬라이더 data-block-type 자동 교정
+      if (hasSlider && blockType !== 'slider') {
+        b.setAttribute('data-block-type', 'slider');
+      }
       // p13f: 감지 시 data-block-type 자동 교정
       if (hasCalloutBox && blockType !== 'callout') {
         log('[collectPostData] 콜아웃 감지, data-block-type 교정:', blockType, '→ callout');
