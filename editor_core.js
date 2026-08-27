@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25j';
+  var VERSION = 'v2.0-β-p25k';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -25181,9 +25181,15 @@
         } catch(_){}
         return null;
       }
+      // p25k 핵심 변경:
+      //   “서을렉션이 실재하는데 그 안에 색 span 이 없음” = 검은색 기본 텍스트임 → 사이트 기본색(#0F3A3A) 로 리셋.
+      //   _lastTextColor 폴백은 selection 자체가 없을 때만 사용 (예: 툴바만 클릭하고 아무런 텍스트도 안 고른 상황).
+      //   이전(p25j)에는 둘을 구분 안 해서 “검은 텍스트 선택 → 이전 적용색이 그대로 뜨는” Q2 버그가 있었음.
+      var _hasAnyRange = false;
       // (1) savedRange (툴바 A 클릭 이전 백업) — p25j: 3단계 폴백 (startContainer → commonAncestor → findFirst)
       try {
         if (typeof savedRange !== 'undefined' && savedRange && savedRange.startContainer){
+          _hasAnyRange = true;
           var c1 = _walkUpForColor(savedRange.startContainer)
                 || _walkUpForColor(savedRange.commonAncestorContainer)
                 || _findFirstColoredInRange(savedRange);
@@ -25194,6 +25200,7 @@
       try {
         var sel = window.getSelection();
         if (sel && sel.rangeCount > 0){
+          _hasAnyRange = true;
           var rng = sel.getRangeAt(0);
           var c2 = _walkUpForColor(rng.startContainer)
                 || _walkUpForColor(rng.commonAncestorContainer)
@@ -25201,7 +25208,10 @@
           if (c2) return c2;
         }
       } catch(_){}
-      // (3) 마지막 적용 색
+      // p25k: range 는 있었는데 색 span 을 전혀 못 찾은 경우
+      //        → 설정된 색이 없는 거니 사이트 기본색으로 리셋 (Q2 수정 핵심)
+      if (_hasAnyRange) return '#0F3A3A';
+      // (3) selection 자체가 없음 → 마지막 적용 색 또는 사이트 기본색
       return (typeof _lastTextColor === 'string' && _lastTextColor) ? _lastTextColor : '#0F3A3A';
     }
     var _currentColor = _detectCurrentColorForMini();
