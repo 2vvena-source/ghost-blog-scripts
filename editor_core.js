@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26o
+ * 2vvena Editor Core - v2.0-β-p26p
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26o';
+  var VERSION = 'v2.0-β-p26p';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -8885,6 +8885,239 @@
     cropTargetBox = null;
   }
 
+  // p26p: 공용 이미지 크롭 대화창
+  //   기존 openCropPopup 은 콜아웃 배경 이미지 전용이라, 다른 이미지 업로드 지점에서도
+  //   재사용 가능하도록 아예 별도 함수로 신규 추가.
+  //   사용법: openImageCropDialog(srcUrl, { aspect: 16/9 or null }, function(dataUrl){ ... });
+  //     - aspect 가 null 이면 자유 비율 (모서리 드래그 시 X/Y 독립)
+  //     - callback 은 크롭 결과 dataURL 을 받음 (취소 시 null)
+  //   이미지 블록·헤더 배너·제품 블록·이미지 슬라이드 등에서 공용으로 사용.
+  var _publicCropEl = null;
+  function openImageCropDialog(imgSrc, options, cb){
+    if (!imgSrc) { if (cb) cb(null); return; }
+    options = options || {};
+    var aspect = (options.aspect === null || options.aspect === undefined) ? null : parseFloat(options.aspect);
+    // 다른 크롭 팝업이 열려있으면 닫음
+    if (_publicCropEl && _publicCropEl.parentNode) _publicCropEl.parentNode.removeChild(_publicCropEl);
+    _publicCropEl = null;
+
+    var popup = document.createElement('div');
+    popup.className = 'ep-crop-popup ep-crop-popup-public';
+    popup.style.left = '50%';
+    popup.style.top = '50%';
+    popup.style.transform = 'translate(-50%,-50%)';
+    popup.innerHTML = ''
+      + '<div class="ep-popup-header" style="cursor:default;">'
+      + '  <span>이미지 크롭</span>'
+      + '  <button type="button" class="ep-popup-close" data-crop2-action="cancel">×</button>'
+      + '</div>'
+      + '<div class="ep-crop-stage" id="ep-crop2-stage">'
+      + '  <img class="ep-crop-img" id="ep-crop2-img" alt="">'
+      + '  <div class="ep-crop-selection" id="ep-crop2-sel">'
+      + '    <div class="ep-crop-handle" data-corner="nw"></div>'
+      + '    <div class="ep-crop-handle" data-corner="ne"></div>'
+      + '    <div class="ep-crop-handle" data-corner="sw"></div>'
+      + '    <div class="ep-crop-handle" data-corner="se"></div>'
+      + '  </div>'
+      + '</div>'
+      + '<div class="ep-crop-toolbar">'
+      + '  <div class="ep-crop-hint">'
+      + (aspect === null
+          ? '자유 비율. 틀 안 드래그 = 이동, 모서리 드래그 = 크기 조절.'
+          : '비율 고정 (' + aspect.toFixed(2) + ':1). 틀 안 드래그 = 이동, 모서리 드래그 = 크기 조절.')
+      + '  </div>'
+      + '  <div class="ep-crop-btns">'
+      + '    <button type="button" class="ep-crop-btn" data-crop2-action="cancel">취소</button>'
+      + '    <button type="button" class="ep-crop-btn is-primary" data-crop2-action="apply">확인</button>'
+      + '  </div>'
+      + '</div>';
+    document.body.appendChild(popup);
+    _publicCropEl = popup;
+
+    var imgEl = popup.querySelector('#ep-crop2-img');
+    var stageEl = popup.querySelector('#ep-crop2-stage');
+    var selEl = popup.querySelector('#ep-crop2-sel');
+
+    var displayW = 0, displayH = 0, curAspect = 1;
+
+    function cleanup(){
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      if (_publicCropEl && _publicCropEl.parentNode) _publicCropEl.parentNode.removeChild(_publicCropEl);
+      _publicCropEl = null;
+    }
+
+    function getSel(){
+      return {
+        x: parseFloat(selEl.style.left) || 0,
+        y: parseFloat(selEl.style.top) || 0,
+        w: parseFloat(selEl.style.width) || 0,
+        h: parseFloat(selEl.style.height) || 0
+      };
+    }
+    function setSel(x, y, w, h){
+      selEl.style.left = x + 'px';
+      selEl.style.top = y + 'px';
+      selEl.style.width = w + 'px';
+      selEl.style.height = h + 'px';
+    }
+    function clampSel(x, y, w, h){
+      if (w < 20) w = 20;
+      if (h < 20) h = 20;
+      if (x < 0) x = 0;
+      if (y < 0) y = 0;
+      if (x + w > displayW) x = displayW - w;
+      if (y + h > displayH) y = displayH - h;
+      if (x < 0) { x = 0; w = displayW; }
+      if (y < 0) { y = 0; h = displayH; }
+      return { x: x, y: y, w: w, h: h };
+    }
+
+    imgEl.onload = function(){
+      var iw = imgEl.naturalWidth, ih = imgEl.naturalHeight;
+      // 스테이지 계산
+      var maxW = Math.min(window.innerWidth * 0.86, 520);
+      var maxH = Math.min(window.innerHeight * 0.62, 460);
+      var imgAspect = iw / ih;
+      if (maxW / imgAspect <= maxH) {
+        displayW = maxW; displayH = maxW / imgAspect;
+      } else {
+        displayH = maxH; displayW = maxH * imgAspect;
+      }
+      stageEl.style.width = displayW + 'px';
+      stageEl.style.height = displayH + 'px';
+      imgEl.style.width = displayW + 'px';
+      imgEl.style.height = displayH + 'px';
+      // 초기 선택: 80% 중앙
+      var initAspect = (aspect !== null) ? aspect : imgAspect;
+      curAspect = initAspect;
+      var sw, sh;
+      if (aspect !== null) {
+        if (displayW / initAspect <= displayH) { sw = displayW * 0.9; sh = sw / initAspect; }
+        else { sh = displayH * 0.9; sw = sh * initAspect; }
+      } else {
+        sw = displayW * 0.9; sh = displayH * 0.9;
+      }
+      setSel((displayW - sw) / 2, (displayH - sh) / 2, sw, sh);
+    };
+    imgEl.src = imgSrc;
+
+    var dragging = null;
+    function onDown(e){
+      var handle = e.target.closest('.ep-crop-handle');
+      var inSel = e.target === selEl || (e.target.parentNode === selEl && !handle);
+      if (handle) {
+        dragging = { mode: 'resize', corner: handle.getAttribute('data-corner'), startX: e.clientX, startY: e.clientY, orig: getSel() };
+        e.preventDefault();
+        return;
+      }
+      if (inSel) {
+        dragging = { mode: 'move', startX: e.clientX, startY: e.clientY, orig: getSel() };
+        e.preventDefault();
+      }
+    }
+    function onMove(e){
+      if (!dragging) return;
+      var dx = e.clientX - dragging.startX;
+      var dy = e.clientY - dragging.startY;
+      var o = dragging.orig;
+      if (dragging.mode === 'move') {
+        var c = clampSel(o.x + dx, o.y + dy, o.w, o.h);
+        setSel(c.x, c.y, c.w, c.h);
+      } else {
+        var nx = o.x, ny = o.y, nw = o.w, nh = o.h;
+        var cor = dragging.corner;
+        if (aspect === null) {
+          // 자유 비율: X/Y 독립
+          if (cor === 'nw') { nx = o.x + dx; ny = o.y + dy; nw = o.w - dx; nh = o.h - dy; }
+          else if (cor === 'ne') { ny = o.y + dy; nw = o.w + dx; nh = o.h - dy; }
+          else if (cor === 'sw') { nx = o.x + dx; nw = o.w - dx; nh = o.h + dy; }
+          else if (cor === 'se') { nw = o.w + dx; nh = o.h + dy; }
+        } else {
+          // 비율 고정: dominant delta 사용
+          var absX = Math.abs(dx), absY = Math.abs(dy);
+          var useDx = absX * (1 / aspect) > absY;
+          var deltaW, deltaH;
+          if (useDx) {
+            deltaW = (cor === 'nw' || cor === 'sw') ? -dx : dx;
+            deltaH = deltaW / aspect;
+          } else {
+            deltaH = (cor === 'nw' || cor === 'ne') ? -dy : dy;
+            deltaW = deltaH * aspect;
+          }
+          nw = o.w + deltaW;
+          nh = o.h + deltaH;
+          if (nw < 30) { nw = 30; nh = nw / aspect; }
+          if (nh < 30) { nh = 30; nw = nh * aspect; }
+          if (cor === 'nw') { nx = o.x + (o.w - nw); ny = o.y + (o.h - nh); }
+          else if (cor === 'ne') { ny = o.y + (o.h - nh); }
+          else if (cor === 'sw') { nx = o.x + (o.w - nw); }
+        }
+        var c2 = clampSel(nx, ny, nw, nh);
+        setSel(c2.x, c2.y, c2.w, c2.h);
+      }
+    }
+    function onUp(){ dragging = null; }
+    stageEl.addEventListener('mousedown', onDown);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+
+    // 확인·취소
+    popup.addEventListener('click', function(e){
+      var btn = e.target.closest('[data-crop2-action]');
+      if (!btn) return;
+      var act = btn.getAttribute('data-crop2-action');
+      if (act === 'cancel') {
+        cleanup();
+        if (cb) cb(null);
+      } else if (act === 'apply') {
+        var sel = getSel();
+        var rx = sel.x / displayW;
+        var ry = sel.y / displayH;
+        var rw = sel.w / displayW;
+        var rh = sel.h / displayH;
+        var img2 = new Image();
+        img2.crossOrigin = 'anonymous';
+        img2.onload = function(){
+          var iw = img2.naturalWidth, ih = img2.naturalHeight;
+          var cx = rx * iw, cy = ry * ih, cw = rw * iw, ch = rh * ih;
+          var canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(cw));
+          canvas.height = Math.max(1, Math.round(ch));
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img2, cx, cy, cw, ch, 0, 0, canvas.width, canvas.height);
+          var dataUrl;
+          try {
+            dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          } catch(err) {
+            // CORS 문제 등
+            dataUrl = null;
+          }
+          cleanup();
+          if (cb) cb(dataUrl);
+        };
+        img2.onerror = function(){
+          cleanup();
+          if (cb) cb(null);
+        };
+        img2.src = imgSrc;
+      }
+    });
+
+    // ESC 로 취소
+    var _keyHandler = function(e){
+      if (e.key === 'Escape' && _publicCropEl === popup) {
+        document.removeEventListener('keydown', _keyHandler);
+        cleanup();
+        if (cb) cb(null);
+      }
+    };
+    document.addEventListener('keydown', _keyHandler);
+  }
+  // 공용 노출
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.openImageCropDialog = openImageCropDialog; } catch(_){}
+
+
   function openCropPopup(box){
     if (!box) return;
     var origSrc = box.getAttribute('data-bg-image-orig') || box.getAttribute('data-bg-image');
@@ -9320,6 +9553,28 @@
       ['data-saturate','data-opacity','data-rotate','data-flip-h','data-flip-v','data-clip-path','data-trim-t','data-trim-r','data-trim-b','data-trim-l'].forEach(function(a){
         imgPopupTarget.removeAttribute(a);
       });
+    } else if (act === 'align-left') {
+      imgPopupTarget.setAttribute('data-align', 'left');
+      renderImagePopupBody();
+    } else if (act === 'align-center') {
+      imgPopupTarget.setAttribute('data-align', 'center');
+      renderImagePopupBody();
+    } else if (act === 'align-right') {
+      imgPopupTarget.setAttribute('data-align', 'right');
+      renderImagePopupBody();
+    } else if (act === 'open-crop') {
+      // p26p: 공용 크롭 대화창 사용 (이미지 자체 소스 크롭)
+      var _img = imgPopupTarget.querySelector('img');
+      if (_img && window.__DDL_EDITOR && window.__DDL_EDITOR.openImageCropDialog) {
+        var _origSrc = _img.getAttribute('data-orig-src') || _img.src;
+        if (!_img.getAttribute('data-orig-src')) _img.setAttribute('data-orig-src', _origSrc);
+        window.__DDL_EDITOR.openImageCropDialog(_origSrc, { aspect: null }, function(croppedDataUrl){
+          if (croppedDataUrl) {
+            _img.src = croppedDataUrl;
+            applyImageLive();
+          }
+        });
+      }
     }
     applyImageLive();
   }
@@ -9603,11 +9858,22 @@
         + '<input type="range" id="pop-img-saturate" min="0" max="200" step="5" value="' + sat + '" style="width:100%;"></div>';
       html += '<div class="row"><div class="row-label">불투명도 (' + opa + '%)</div>'
         + '<input type="range" id="pop-img-opacity" min="0" max="100" step="5" value="' + opa + '" style="width:100%;"></div>';
+      // p26p: 이미지 정렬 (블록 안 이미지 위치 · 왼쪽/가운데/오른쪽)
+      var _curAlign = imgPopupTarget.getAttribute('data-align') || 'center';
+      html += '<div class="row"><div class="row-label">정렬</div>'
+        + '<button class="pop-btn' + (_curAlign==='left'?' is-active':'') + '" data-img-act="align-left">왼쪽</button>'
+        + '<button class="pop-btn' + (_curAlign==='center'?' is-active':'') + '" data-img-act="align-center">가운데</button>'
+        + '<button class="pop-btn' + (_curAlign==='right'?' is-active':'') + '" data-img-act="align-right">오른쪽</button>'
+        + '</div>';
       html += '<div class="row"><div class="row-label">회전·반전</div>'
         + '<button class="pop-btn" data-img-act="rotate-ccw">↶ 좌 90°</button>'
         + '<button class="pop-btn" data-img-act="rotate-cw">우 90° ↷</button>'
         + '<button class="pop-btn" data-img-act="flip-h">좌우 반전</button>'
         + '<button class="pop-btn" data-img-act="flip-v">상하 반전</button>'
+        + '</div>';
+      // p26p: 크롭 (공용 크롭 대화창 호출) - 트리밍보다 편함
+      html += '<div class="row"><div class="row-label">크롭</div>'
+        + '<button class="pop-btn" data-img-act="open-crop" style="width:100%;">이미지 크롭 열기</button>'
         + '</div>';
       html += '<div class="row"><button class="pop-btn" data-img-act="reset" style="width:100%;">모든 편집 초기화</button></div>';
     } else if (imgPopupTab === 'trim') {
@@ -28686,6 +28952,64 @@
         }
         return null;
       }
+      // p26p: 커서가 다단 컬럼 안이면 ← / → 로 인접 컬럼으로 이동
+      //   원래는 다단 밖 최상위 블록으로 튀는 로직이라 다단 컬럼 여러 개를
+      //   자연스럽게 넘나들 수 없었음. Tab 과 동일하게 인접 컬럼 이동 추가.
+      var _colHost = editable.classList && editable.classList.contains('ddl-column')
+                      ? editable
+                      : (editable.closest ? editable.closest('.ddl-column') : null);
+      if (_colHost) {
+        var _colWrap = _colHost.parentNode;
+        if (_colWrap && _colWrap.classList && _colWrap.classList.contains('ddl-columns-block')) {
+          var _colSiblings = Array.prototype.filter.call(_colWrap.children, function(c){
+            return c.classList && c.classList.contains('ddl-column');
+          });
+          var _myIdx = _colSiblings.indexOf(_colHost);
+          if (e.key === 'ArrowLeft' && isAtStart && _myIdx > 0) {
+            e.preventDefault();
+            var _lc = _colSiblings[_myIdx - 1];
+            try {
+              var _lp = _lc.querySelector(':scope > p:last-child') || _lc.lastElementChild;
+              var _r = document.createRange();
+              if (_lp) {
+                _r.selectNodeContents(_lp);
+              } else {
+                _r.selectNodeContents(_lc);
+              }
+              _r.collapse(false); // 끝으로
+              var _s = window.getSelection();
+              _s.removeAllRanges();
+              _s.addRange(_r);
+            } catch(_){}
+            return;
+          }
+          if (e.key === 'ArrowRight' && isAtEnd && _myIdx < _colSiblings.length - 1) {
+            e.preventDefault();
+            var _nc = _colSiblings[_myIdx + 1];
+            try {
+              var _np = _nc.querySelector(':scope > p') || _nc.firstElementChild;
+              if (!_np) {
+                _np = document.createElement('p');
+                _np.innerHTML = '<br>';
+                _nc.appendChild(_np);
+              }
+              var _r2 = document.createRange();
+              var _tn = _np.firstChild;
+              if (_tn && _tn.nodeType === 3) {
+                _r2.setStart(_tn, 0);
+              } else {
+                _r2.setStart(_np, 0);
+              }
+              _r2.collapse(true);
+              var _s2 = window.getSelection();
+              _s2.removeAllRanges();
+              _s2.addRange(_r2);
+            } catch(_){}
+            return;
+          }
+        }
+      }
+
       if (e.key === 'ArrowLeft') {
         if (!isAtStart) return; // 중간이면 기본 동작
         var prev = _findNextEditableSibling(idx, 'left');
@@ -28771,7 +29095,21 @@
     // targetX: 가로 위치 유지 (null이면 무시)
     function moveCaretToBlock(targetBlock, pos, targetX){
       if (!targetBlock) return;
-      var target = targetBlock.querySelector('[contenteditable="true"]');
+      // p26p: 다단 wrapper 를 target 으로 받으면 첫/마지막 컬럼으로 리매핑.
+      //   원인: 다단 wrapper 자체는 contenteditable=false 이고 그 안 컬럼들이 나란히 배치돼있어
+      //         querySelector 나 caretRangeFromPoint 가 임의 컬럼을 잡으면 우측 끝으로 튀는 문제 발생.
+      //   해결: 진입 시 pos=='start' → 첫 컬럼, pos=='end' → 마지막 컬럼으로 명시 진입.
+      if (targetBlock.classList && targetBlock.classList.contains('ep-columns-block')) {
+        var _wrap = targetBlock.querySelector(':scope > .ddl-columns-block');
+        if (_wrap) {
+          var _cs = Array.prototype.filter.call(_wrap.children, function(c){
+            return c.classList && c.classList.contains('ddl-column');
+          });
+          var _pickCol = (pos === 'end') ? _cs[_cs.length - 1] : _cs[0];
+          if (_pickCol) targetBlock = _pickCol;
+        }
+      }
+      var target = targetBlock.querySelector('[contenteditable="true"]') || (targetBlock.getAttribute && targetBlock.getAttribute('contenteditable') === 'true' ? targetBlock : null);
       if (!target) return;
       target.focus();
 
