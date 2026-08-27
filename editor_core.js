@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25b';
+  var VERSION = 'v2.0-β-p25c';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -24500,13 +24500,17 @@
         + ' padding: 6px; border-radius: 5px; cursor: pointer;'
         + ' background: #fff; border: 1px solid rgba(15,58,58,0.12);';
 
-      // 미리보기: "가나다 ABC" 텍스트에 해당 색을 적용
+      // p25c: 미리보기 = 모서리 둥근 정사각형 색 아이콘 (사용자 요구)
+      //   ★ p25b 에서 실수로 "가나다 ABC" 텍스트로 바꿨던 것을 복구
       var prev = document.createElement('div');
-      prev.style.cssText = 'text-align: center; font-size: 14px; line-height: 1.4; padding: 4px 2px;'
-        + ' font-family: "Pretendard Variable","Pretendard",sans-serif; font-weight: 600;'
-        + ' color: ' + color.value + ';'
-        + ' overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
-      prev.textContent = '가나다 ABC';
+      prev.style.cssText = 'display: flex; justify-content: center; align-items: center;'
+        + ' padding: 4px 0 2px;';
+      var swatch = document.createElement('span');
+      swatch.style.cssText = 'display: block; width: 36px; height: 36px;'
+        + ' border-radius: 6px; background: ' + color.value + ';'
+        + ' border: 1px solid rgba(15,58,58,0.12);'
+        + ' box-shadow: 0 1px 2px rgba(0,0,0,0.04);';
+      prev.appendChild(swatch);
       card.appendChild(prev);
 
       // 이름 (없으면 hex/rgba 값 앞부분만)
@@ -24609,23 +24613,31 @@
     footer.style.cssText = 'border-top: 1px solid rgba(15,58,58,0.06); padding: 8px 10px;'
       + ' display: flex; justify-content: space-between; align-items: center;';
 
-    // 좌측: 이 그룹 관리 (회색 · 화살표)
-    var mgBtn = document.createElement('button');
-    mgBtn.type = 'button';
-    mgBtn.innerHTML = '이 그룹 관리 →';
-    mgBtn.style.cssText = 'background: transparent; border: none; cursor: pointer;'
+    // p25c: 좌측 = 모든 색 보기 (N) → (형광펜 미니와 동일)
+    //   ★ 사용자 요청: 미니는 그룹당 3개만 대표 노출이니, 하단에서 전체 큰 창 진입 가능해야 함
+    //   ★ 그룹 관리(설정)는 ⚙ 기어에 있음 — 역할 분리
+    var totalCount = 0;
+    lib.groups.forEach(function(g){
+      if (!g || g.showInToolbar === false) return;
+      totalCount += (g.colors || []).length;
+    });
+    var moreBtn = document.createElement('button');
+    moreBtn.type = 'button';
+    moreBtn.innerHTML = '모든 색 보기 <span style="opacity:0.6;">(' + totalCount + ')</span> →';
+    moreBtn.title = '모든 그룹의 모든 색을 한 번에 보기';
+    moreBtn.style.cssText = 'background: transparent; border: none; cursor: pointer;'
       + ' font-size: 11px; color: var(--color, #0F3A3A); padding: 4px 6px; border-radius: 4px; font-family: inherit;';
-    mgBtn.addEventListener('mouseenter', function(){ mgBtn.style.background = 'rgba(15,58,58,0.04)'; });
-    mgBtn.addEventListener('mouseleave', function(){ mgBtn.style.background = 'transparent'; });
-    mgBtn.addEventListener('mousedown', function(e){ e.preventDefault(); });
-    mgBtn.addEventListener('click', function(e){
+    moreBtn.addEventListener('mouseenter', function(){ moreBtn.style.background = 'rgba(15,58,58,0.04)'; });
+    moreBtn.addEventListener('mouseleave', function(){ moreBtn.style.background = 'transparent'; });
+    moreBtn.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    moreBtn.addEventListener('click', function(e){
       e.preventDefault(); e.stopPropagation();
       pop.remove();
       try {
-        if (typeof openTextColorGroupManager === 'function') openTextColorGroupManager();
-      } catch(err){ try { console.warn('[tc-manager]', err); } catch(_){} }
+        if (typeof openTextColorGallery === 'function') openTextColorGallery();
+      } catch(err){ try { console.warn('[tc-gallery]', err); } catch(_){} }
     });
-    footer.appendChild(mgBtn);
+    footer.appendChild(moreBtn);
 
     // 우측: 색깔 지우기 (살구색)
     var clearBtn = document.createElement('button');
@@ -24678,6 +24690,226 @@
   } catch(_){}
 
   // ============================================================
+
+  // ═══════════════════════════════════════════════════════════
+  // p25c: 글자색 프리셋 갤러리 (모든 색 한 화면에서 보기)
+  //   - 형광펜 openHighlighterPresetGallery 와 동일 구조
+  //   - 사용자 요청: 미니 팝오버가 그룹당 3개만 대표 노출하니, 하단 "모든 색 보기" 로 여기 진입
+  //   - createBlockPopup 팩토리 · width 760px · draggable · 상단 3탭 + [프리셋 관리 →] · 스크롤 본문
+  //   - 카드: 큰 정사각형 색 아이콘 + 이름 + ★ (미니 팝오버와 동일 톤)
+  //   - 카드 클릭 = 즉시 색 적용 후 창 닫기
+  //   - showInToolbar === false 그룹도 여기서는 다 노출 (설정 무관하게 전체 열람)
+  // ═══════════════════════════════════════════════════════════
+  function openTextColorGallery(){
+    var filter = 'all'; // 'all' | 'fav' | 'used'
+
+    var popup = window.__DDL_EDITOR.createBlockPopup({
+      title: '글자색 모두 보기',
+      width: '760px',
+      draggable: true,
+      tabs: []
+    });
+    popup.show();
+
+    var body = popup.getBody('__single') || popup.body;
+    if (!body) return;
+    body.style.padding = '0';
+
+    // ── 상단 필터 탭바 + [그룹 관리 →] ─────────────────
+    var topbar = document.createElement('div');
+    topbar.style.cssText = 'display: flex; justify-content: space-between; align-items: center;'
+      + ' padding: 10px 14px; border-bottom: 1px solid rgba(15,58,58,0.08); background: #fff;';
+
+    var tabs = document.createElement('div');
+    tabs.style.cssText = 'display: inline-flex; gap: 4px;';
+    var tabButtons = {};
+    [
+      { key: 'all',  label: '전체' },
+      { key: 'fav',  label: '★ 즐겨찾기' },
+      { key: 'used', label: '현재 페이지' }
+    ].forEach(function(td){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = td.label;
+      b.style.cssText = 'padding: 5px 14px; font-size: 12px; cursor: pointer;'
+        + ' background: transparent; border: none; border-radius: 4px;'
+        + ' color: rgba(15,58,58,0.55); font-family: inherit;';
+      if (filter === td.key){
+        b.style.background = 'rgba(255,154,118,0.15)';
+        b.style.color = 'var(--point, #FF9A76)';
+        b.style.fontWeight = '600';
+      }
+      b.addEventListener('click', function(){
+        filter = td.key;
+        Object.keys(tabButtons).forEach(function(k){
+          var tb = tabButtons[k];
+          var active = k === filter;
+          tb.style.background = active ? 'rgba(255,154,118,0.15)' : 'transparent';
+          tb.style.color      = active ? 'var(--point, #FF9A76)' : 'rgba(15,58,58,0.55)';
+          tb.style.fontWeight = active ? '600' : '400';
+        });
+        _render();
+      });
+      tabButtons[td.key] = b;
+      tabs.appendChild(b);
+    });
+    topbar.appendChild(tabs);
+
+    // 우측: 그룹 관리 진입 링크
+    var mgBtn = document.createElement('button');
+    mgBtn.type = 'button';
+    mgBtn.textContent = '그룹 관리 →';
+    mgBtn.style.cssText = 'background: transparent; border: none; cursor: pointer;'
+      + ' font-size: 11px; color: var(--point, #FF9A76); padding: 4px 8px; border-radius: 4px; font-family: inherit;';
+    mgBtn.addEventListener('mouseenter', function(){ mgBtn.style.background = 'rgba(255,154,118,0.08)'; });
+    mgBtn.addEventListener('mouseleave', function(){ mgBtn.style.background = 'transparent'; });
+    mgBtn.addEventListener('click', function(){
+      try { popup.close(); } catch(_){}
+      try {
+        if (typeof openTextColorGroupManager === 'function') openTextColorGroupManager();
+      } catch(_){}
+    });
+    topbar.appendChild(mgBtn);
+
+    body.appendChild(topbar);
+
+    // ── 스크롤 영역 (본문) ────────────────────────────
+    var scroll = document.createElement('div');
+    scroll.className = 'ddl-scroll-invisible';
+    scroll.style.cssText = 'padding: 14px 18px; max-height: 68vh; overflow-y: auto; background: #F5F5F5;';
+    body.appendChild(scroll);
+
+    // "현재 페이지" 필터용 · 현재 문서에서 사용 중인 색 hex/rgba 수집
+    function _collectUsedTextColors(){
+      var used = {};
+      try {
+        if (typeof contentEl !== 'undefined' && contentEl){
+          contentEl.querySelectorAll('[style*="color"]').forEach(function(el){
+            var c = el.style && el.style.color;
+            if (!c) return;
+            used[c.trim().toLowerCase()] = true;
+            var m = c.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+            if (m){
+              var toHex = function(n){ n = parseInt(n,10); var h = n.toString(16); return h.length < 2 ? '0'+h : h; };
+              used['#' + toHex(m[1]) + toHex(m[2]) + toHex(m[3])] = true;
+            }
+          });
+        }
+      } catch(_){}
+      return used;
+    }
+
+    function _makeGalleryCard(group, color){
+      var card = document.createElement('button');
+      card.type = 'button';
+      card.style.cssText = 'position: relative; display: flex; flex-direction: column; gap: 6px;'
+        + ' padding: 10px 8px; border-radius: 6px; cursor: pointer;'
+        + ' background: #fff; border: 1px solid rgba(15,58,58,0.12);'
+        + ' text-align: center; font-family: inherit; transition: border-color 120ms, background 120ms;';
+
+      // 정사각형 색 아이콘 (미니 팝오버와 동일 · 조금 더 크게)
+      var prev = document.createElement('div');
+      prev.style.cssText = 'display: flex; justify-content: center; align-items: center; padding: 6px 0 4px;';
+      var swatch = document.createElement('span');
+      swatch.style.cssText = 'display: block; width: 48px; height: 48px;'
+        + ' border-radius: 8px; background: ' + color.value + ';'
+        + ' border: 1px solid rgba(15,58,58,0.12);'
+        + ' box-shadow: 0 1px 2px rgba(0,0,0,0.04);';
+      prev.appendChild(swatch);
+      card.appendChild(prev);
+
+      // 이름
+      var lbl = document.createElement('div');
+      lbl.textContent = color.name || color.value;
+      lbl.style.cssText = 'font-size: 11px; color: var(--color, #0F3A3A);'
+        + ' overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+      card.appendChild(lbl);
+
+      // 즐겨찾기 표시 (읽기 전용 · 관리창에서 편집)
+      if (color.isFavorite){
+        var favMark = document.createElement('span');
+        favMark.textContent = '★';
+        favMark.style.cssText = 'position: absolute; top: 4px; right: 6px; font-size: 10px; color: var(--point, #FF9A76);';
+        card.appendChild(favMark);
+      }
+
+      card.addEventListener('mouseenter', function(){ card.style.borderColor = 'var(--point, #FF9A76)'; card.style.background = 'rgba(255,154,118,0.04)'; });
+      card.addEventListener('mouseleave', function(){ card.style.borderColor = 'rgba(15,58,58,0.12)'; card.style.background = '#fff'; });
+      (function(cv){
+        card.addEventListener('click', function(){
+          try { applyTextColor(cv); } catch(_){}
+          try { popup.close(); } catch(_){}
+        });
+      })(color.value);
+
+      return card;
+    }
+
+    function _render(){
+      scroll.innerHTML = '';
+      var lib = _loadTextColorLibrary(); // 매번 새로 (관리창에서 편집 후 되돌아오면 반영)
+      var usedSet = filter === 'used' ? _collectUsedTextColors() : null;
+
+      function _passView(c){
+        if (filter === 'fav')  return !!c.isFavorite;
+        if (filter === 'used'){
+          if (!usedSet) return false;
+          var v = (c.value || '').trim().toLowerCase();
+          return !!usedSet[v];
+        }
+        return true;
+      }
+
+      var anyRendered = false;
+      // ★ 갤러리는 showInToolbar 무시하고 모든 그룹 노출 (전체 열람 목적)
+      lib.groups.forEach(function(group){
+        var visible = (group.colors || []).filter(_passView);
+        if (visible.length === 0) return;
+
+        var section = document.createElement('div');
+        section.style.cssText = 'margin-bottom: 18px;';
+
+        var head = document.createElement('div');
+        head.style.cssText = 'font-size: 12px; color: rgba(15,58,58,0.55); letter-spacing: 0.04em;'
+          + ' margin-bottom: 8px; padding: 0 2px; display: flex; align-items: center; gap: 8px;';
+        var hName = document.createElement('span');
+        hName.textContent = group.name;
+        hName.style.cssText = 'font-weight: 600; color: var(--color, #0F3A3A);';
+        head.appendChild(hName);
+        var hCount = document.createElement('span');
+        hCount.textContent = '· ' + visible.length + '개';
+        head.appendChild(hCount);
+        // showInToolbar === false 인 그룹은 "미니 숨김" 뱃지
+        if (group.showInToolbar === false){
+          var hHidden = document.createElement('span');
+          hHidden.textContent = '· 미니 숨김';
+          hHidden.style.cssText = 'opacity: 0.6;';
+          head.appendChild(hHidden);
+        }
+        section.appendChild(head);
+
+        var grid = document.createElement('div');
+        grid.style.cssText = 'display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;';
+        visible.forEach(function(c){ grid.appendChild(_makeGalleryCard(group, c)); });
+        section.appendChild(grid);
+        scroll.appendChild(section);
+        anyRendered = true;
+      });
+
+      if (!anyRendered){
+        var em = document.createElement('div');
+        em.style.cssText = 'padding: 40px; text-align: center; color: rgba(15,58,58,0.45); font-size: 13px;';
+        if (filter === 'fav')       em.textContent = '★ 즐겨찾기한 색이 아직 없어요.';
+        else if (filter === 'used') em.textContent = '현재 페이지 사용 중인 색이 없어요. (카드 클릭으로 적용해보세요)';
+        else                        em.textContent = '등록된 색이 없어요.';
+        scroll.appendChild(em);
+      }
+    }
+
+    _render();
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.openTextColorGallery = openTextColorGallery; } catch(_){}
+
   // p24i: 글자색 그룹 관리창 · 전면 재작성
   //   — 헤더/형광펜 관리창과 동일 골격 (createBlockPopup + 2컬럼 + 뷰 스위처)
   //   — 색 추가/편집: _openHeaderColorEditMini 재사용 (예쁜 다이얼로그)
