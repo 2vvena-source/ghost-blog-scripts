@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26e
+ * 2vvena Editor Core - v2.0-β-p26f
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26e';
+  var VERSION = 'v2.0-β-p26f';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -2648,6 +2648,72 @@
     '.ddl-fold-block.is-fold-closed .ddl-fold-body { display: none; }',
 
     /* ═══════════════════════════════════════════════════════════ */
+    /* p26f: 다단 블록 (Notion-style columns) - 2/3/4단 */
+    /*   외부: .ddl-columns-block (flex 컨테이너)                    */
+    /*   컬럼: .ddl-column (data-block-container='true' → 재귀 삽입) */
+    /*   리사이저: .ddl-column-resizer (컬럼 사이 세로선 + 드래그)   */
+    /*   완전 투명 · 노션과 동일한 UX                                */
+    /* ═══════════════════════════════════════════════════════════ */
+    '.ddl-columns-block {',
+    '  display: flex;',
+    '  gap: 8px;',
+    '  align-items: stretch;',
+    '  width: 100%;',
+    '  margin: 0.6em 0;',
+    '  position: relative;',
+    '  box-sizing: border-box;',
+    '}',
+    '.ddl-column {',
+    '  flex: 1 1 0;',
+    '  min-width: 40px;',
+    '  min-height: 40px;',
+    '  padding: 2px 4px;',
+    '  box-sizing: border-box;',
+    '  position: relative;',
+    '  /* 편집기에서만 얇은 점선 (저장 시 제거) */',
+    '  outline: 1px dashed transparent;',
+    '  outline-offset: -1px;',
+    '  transition: outline-color 120ms ease;',
+    '}',
+    '.ep-columns-block:hover > .ddl-column { outline-color: rgba(15,58,58,0.08); }',
+    '.ep-columns-block > .ddl-column.is-column-hover { outline-color: rgba(255,154,118,0.35); }',
+    '.ddl-column > *:first-child { margin-top: 0; }',
+    '.ddl-column > *:last-child  { margin-bottom: 0; }',
+    /* 컬럼 리사이저 (컬럼 사이 세로 손잡이) */
+    '.ddl-column-resizer {',
+    '  flex: 0 0 6px;',
+    '  align-self: stretch;',
+    '  cursor: col-resize;',
+    '  position: relative;',
+    '  background: transparent;',
+    '  transition: background 120ms ease;',
+    '  user-select: none;',
+    '}',
+    '.ddl-column-resizer::before {',
+    '  content: "";',
+    '  position: absolute;',
+    '  top: 0; bottom: 0; left: 50%;',
+    '  width: 2px;',
+    '  transform: translateX(-50%);',
+    '  background: transparent;',
+    '  transition: background 120ms ease;',
+    '  border-radius: 1px;',
+    '}',
+    '.ep-columns-block:hover > .ddl-column-resizer::before { background: rgba(15,58,58,0.12); }',
+    '.ddl-column-resizer:hover::before { background: var(--point, #FF9A76) !important; }',
+    '.ddl-column-resizer.is-dragging::before { background: var(--point, #FF9A76) !important; }',
+    /* 편집기 안 표시 마커 (저장 시 ep- 접두사 제거) */
+    '.ep-columns-block { position: relative; }',
+    '.ep-columns-block.is-selected { outline: 1px dashed rgba(255,154,118,0.4); outline-offset: -2px; }',
+    /* 모바일 대응 - 사용자 선택: 다단 유지 (좁아짐). 극한 좁을 때만 세로. */
+    '@media (max-width: 480px) {',
+    '  .ddl-columns-block { flex-wrap: wrap; gap: 4px; }',
+    '  .ddl-columns-block > .ddl-column { flex-basis: 100% !important; }',
+    '  .ddl-columns-block > .ddl-column-resizer { display: none; }',
+    '}',
+
+
+    /* ═══════════════════════════════════════════════════════════ */
     /* p22a: createMiniPopover 팩토리 전용 CSS                       */
     /*   PRESET_EDITOR_DESIGN_SPEC v2 §Z 준수:                       */
     /*     스와치 34x34px · gap 8px · radius 6px                     */
@@ -3235,6 +3301,41 @@
         }
         if (b.getAttribute('contenteditable') !== 'true'){
           b.setAttribute('contenteditable', 'true');
+        }
+      });
+      // p26f: 다단 컬럼도 컨테이너로 마킹 (저장된 HTML 재진입 시 슬래시/드래그드랍 재사용)
+      var colCells = root.querySelectorAll('.ddl-column');
+      colCells.forEach(function(c){
+        if (c.getAttribute('data-block-container') !== 'true'){
+          c.setAttribute('data-block-container', 'true');
+        }
+      });
+      // p26f: columns 블록 wrapper 에 editor-block + ep-columns-block 클래스 복원
+      var colBlocks = root.querySelectorAll('.ddl-columns-block-wrap, [data-block-type="columns"]');
+      colBlocks.forEach(function(cb){
+        if (!cb.classList.contains('editor-block')) cb.classList.add('editor-block');
+        if (!cb.classList.contains('ep-columns-block')) cb.classList.add('ep-columns-block');
+        cb.classList.remove('ddl-columns-block-wrap');
+        cb.setAttribute('contenteditable', 'false');
+        // block-handle 이 없으면 추가
+        if (!cb.querySelector(':scope > .block-handle')) {
+          try { cb.insertBefore(makeBlockHandle(), cb.firstChild); } catch(_){}
+        }
+        // 리사이저 복원 (저장 시 삭제된 것)
+        var wrap2 = cb.querySelector(':scope > .ddl-columns-block');
+        if (wrap2) {
+          var cols2 = wrap2.querySelectorAll(':scope > .ddl-column');
+          for (var ci2 = 0; ci2 < cols2.length - 1; ci2++) {
+            var next2 = cols2[ci2].nextElementSibling;
+            if (!next2 || !next2.classList.contains('ddl-column-resizer')) {
+              var rs2 = document.createElement('div');
+              rs2.className = 'ddl-column-resizer';
+              rs2.setAttribute('contenteditable', 'false');
+              rs2.setAttribute('title', '드래그해서 컬럼 폭 조절');
+              rs2.setAttribute('data-column-resizer', String(ci2));
+              wrap2.insertBefore(rs2, next2);
+            }
+          }
         }
       });
       // 향후 접은글 등: '.collapse-body' 같은 새 컬래스도 여기서 붙입었음.
@@ -5031,9 +5132,62 @@
             insertFoldBlock(b);
           }
         }
-      }
+      },
+      // p26f: 다단 블록 (Notion-style columns) - 2/3/4단
+      { id:'columns2', label:'2단', desc:'컬럼 2개 · 노션 스타일. 각 컬럼 안에 모든 블록 삽입 가능 · 드래그로 폭 조절', icon:'▮▮',
+        keywords:['2단','2컬럼','columns','컬럼','multi','다단','2col','two column'],
+        exec:function(originBlock){
+          _insertColumnsFromSlash(originBlock, 2);
+        }
+      },
+      { id:'columns3', label:'3단', desc:'컬럼 3개 · 노션 스타일. 각 컬럼 안에 모든 블록 삽입 가능 · 드래그로 폭 조절', icon:'▮▮▮',
+        keywords:['3단','3컬럼','columns','컬럼','다단','3col','three column'],
+        exec:function(originBlock){
+          _insertColumnsFromSlash(originBlock, 3);
+        }
+      },
+      { id:'columns4', label:'4단', desc:'컬럼 4개 · 노션 스타일. 각 컬럼 안에 모든 블록 삽입 가능 · 드래그로 폭 조절', icon:'▮▮▮▮',
+        keywords:['4단','4컬럼','columns','컬럼','다단','4col','four column'],
+        exec:function(originBlock){
+          _insertColumnsFromSlash(originBlock, 4);
+        }
+      },
       // p20k: 표 슬래시 항목은 별도 라운드에서 재설계 (TABLE_v2_SPEC.md)
     ];
+  }
+
+  // p26f: 다단 삽입 공용 (콜아웃 body 안 · 접은글 body 안 · 그 외 모든 컨테이너 지원)
+  function _insertColumnsFromSlash(originBlock, nCols){
+    if (slashInCalloutBody) {
+      // 컨테이너 안이면 그 컨테이너 안에 삽입
+      var body = _prepareCalloutBodyForInsert();
+      var anchor = _slashAnchorForCalloutBody(originBlock);
+      if (anchor === body) {
+        var tmp = document.createElement('div');
+        tmp.className = 'editor-block';
+        tmp.setAttribute('data-block-type', 'p');
+        var tp = document.createElement('p');
+        tp.setAttribute('contenteditable', 'true');
+        tp.innerHTML = '<br>';
+        tmp.appendChild(makeBlockHandle());
+        tmp.appendChild(tp);
+        body.appendChild(tmp);
+        insertColumnsBlock(tmp, nCols);
+        if ((tp.textContent || '').trim() === '') { try { tmp.remove(); } catch(_){} }
+      } else {
+        var wasEmpty = anchor && (anchor.textContent || '').trim() === '' && anchor.getAttribute && anchor.getAttribute('data-block-type') === 'p';
+        insertColumnsBlock(anchor, nCols);
+        if (wasEmpty && anchor.parentNode) { try { anchor.remove(); } catch(_){} }
+      }
+      return;
+    }
+    var b = originBlock;
+    if (b && (b.textContent || '').trim() === '' && b.getAttribute && b.getAttribute('data-block-type') === 'p') {
+      insertColumnsBlock(b, nCols);
+      try { b.remove(); } catch(_){}
+    } else {
+      insertColumnsBlock(b, nCols);
+    }
   }
 
   // p20e: 콜아웃 body 감지 — 컨테이너 시스템으로 확장
@@ -20803,6 +20957,17 @@
             clone.removeAttribute('contenteditable');
             clone.querySelectorAll('[contenteditable]').forEach(function(x){ x.removeAttribute('contenteditable'); });
           }
+          // p26f: 다단 (columns) 블록
+          try {
+            if (clone.classList && clone.classList.contains('ep-columns-block')) {
+              enhanceColumnsForSite(clone);
+            } else {
+              var innerColBlks = clone.querySelectorAll && clone.querySelectorAll('.ep-columns-block');
+              if (innerColBlks && innerColBlks.length) {
+                innerColBlks.forEach(function(cb){ enhanceColumnsForSite(cb); });
+              }
+            }
+          } catch(_){}
           // p23g: 불릿 블록 사이트 반영 (data-bullet-style / 프레임 / 특수문자 마커)
           try {
             if (clone.getAttribute && clone.getAttribute('data-bullet-style')){
@@ -30028,7 +30193,203 @@
     return 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + op + ')';
   }
 
-  // ─── selectionchange · 클릭으로 selectedFold 관리 (콜아웃 미러) ───────────
+  // ═══════════════════════════════════════════════════════════
+  // p26f: 다단 블록 (Notion-style columns) - 2/3/4단
+  // ═══════════════════════════════════════════════════════════
+  //   구조:
+  //     <div.editor-block.ep-columns-block data-block-type="columns" data-columns-n="3">
+  //       <div.block-handle>⋮⋮</div>
+  //       <div.ddl-columns-block>
+  //         <div.ddl-column data-block-container="true">
+  //           <div.editor-block data-block-type="p"><p contenteditable="true"><br></p></div>
+  //         </div>
+  //         <div.ddl-column-resizer contenteditable="false"></div>
+  //         <div.ddl-column data-block-container="true">...</div>
+  //         ...
+  //       </div>
+  //     </div>
+  //   
+  //   각 컬럼은 data-block-container="true" → 슬래시/드래그드랍 시스템 자동 지원
+  //   컬럼 폭은 flex-basis 로 저장 (data-column-flex="1,1,1" 형태)
+  //   리사이저는 인접 두 컬럼의 flex-basis 를 % 로 조정 (합계 유지)
+
+  function insertColumnsBlock(afterBlock, nCols){
+    var n = Math.max(2, Math.min(4, parseInt(nCols, 10) || 2));
+
+    var block = document.createElement('div');
+    block.className = 'editor-block ep-columns-block';
+    block.setAttribute('data-block-type', 'columns');
+    block.setAttribute('data-columns-n', String(n));
+    block.setAttribute('contenteditable', 'false');
+    block.appendChild(makeBlockHandle());
+
+    var wrap = document.createElement('div');
+    wrap.className = 'ddl-columns-block';
+    // 초기 flex-basis: 모두 동일
+    var initFlex = [];
+    for (var i = 0; i < n; i++) initFlex.push(1);
+    block.setAttribute('data-column-flex', initFlex.join(','));
+
+    for (var j = 0; j < n; j++) {
+      // 컬럼
+      var col = document.createElement('div');
+      col.className = 'ddl-column';
+      col.setAttribute('data-block-container', 'true');
+      col.setAttribute('data-column-idx', String(j));
+      col.style.flex = '1 1 0';
+      // 컬럼 안에 빈 문단 블록 하나
+      var innerBlock = document.createElement('div');
+      innerBlock.className = 'editor-block';
+      innerBlock.setAttribute('data-block-type', 'p');
+      innerBlock.appendChild(makeBlockHandle());
+      var innerP = document.createElement('p');
+      innerP.setAttribute('contenteditable', 'true');
+      innerP.innerHTML = '<br>';
+      innerBlock.appendChild(innerP);
+      col.appendChild(innerBlock);
+      wrap.appendChild(col);
+
+      // 리사이저 (마지막 컬럼 뒤에는 안 넣음)
+      if (j < n - 1) {
+        var rs = document.createElement('div');
+        rs.className = 'ddl-column-resizer';
+        rs.setAttribute('contenteditable', 'false');
+        rs.setAttribute('title', '드래그해서 컬럼 폭 조절');
+        rs.setAttribute('data-column-resizer', String(j));  // 왼쪽 컬럼 idx
+        wrap.appendChild(rs);
+      }
+    }
+    block.appendChild(wrap);
+
+    // 삽입 위치
+    if (afterBlock && afterBlock.parentNode) {
+      afterBlock.parentNode.insertBefore(block, afterBlock.nextSibling);
+    } else if (contentEl) {
+      contentEl.appendChild(block);
+    }
+
+    // 커서 첫 컬럼으로
+    try {
+      var firstEditable = block.querySelector('.ddl-column p[contenteditable="true"]');
+      if (firstEditable) {
+        var range = document.createRange();
+        range.selectNodeContents(firstEditable);
+        range.collapse(true);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    } catch(_){}
+
+    return block;
+  }
+
+  // ─── 컬럼 리사이저 핸들러 (한 번만 body 위임 등록) ────────────────
+  (function(){
+    var _colResizeState = null;
+
+    function _colStart(e){
+      var handle = e.target && e.target.closest && e.target.closest('.ddl-column-resizer');
+      if (!handle) return;
+      var wrap = handle.parentNode;
+      if (!wrap || !wrap.classList.contains('ddl-columns-block')) return;
+      var block = wrap.parentNode;
+      var idx = parseInt(handle.getAttribute('data-column-resizer'), 10);
+      // 인접 두 컬럼 찾기
+      var cols = Array.prototype.filter.call(wrap.children, function(c){ return c.classList.contains('ddl-column'); });
+      if (idx < 0 || idx >= cols.length - 1) return;
+      var left = cols[idx], right = cols[idx + 1];
+      var lw = left.getBoundingClientRect().width;
+      var rw = right.getBoundingClientRect().width;
+      _colResizeState = {
+        handle: handle,
+        block: block,
+        wrap: wrap,
+        left: left,
+        right: right,
+        startX: e.clientX,
+        startLW: lw,
+        startRW: rw,
+        totalW: lw + rw
+      };
+      handle.classList.add('is-dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    function _colMove(e){
+      if (!_colResizeState) return;
+      var s = _colResizeState;
+      var dx = e.clientX - s.startX;
+      var newLW = s.startLW + dx;
+      var newRW = s.startRW - dx;
+      // 최소 폭 40px
+      if (newLW < 40) { newLW = 40; newRW = s.totalW - 40; }
+      if (newRW < 40) { newRW = 40; newLW = s.totalW - 40; }
+      // flex-basis 로 지정 (%)
+      var lpct = (newLW / s.totalW) * 100;
+      var rpct = (newRW / s.totalW) * 100;
+      // 다른 컬럼들의 flex 값은 유지하고, 이 둘의 비율만 조정
+      s.left.style.flex  = lpct.toFixed(2) + ' 0 0';
+      s.right.style.flex = rpct.toFixed(2) + ' 0 0';
+    }
+
+    function _colEnd(e){
+      if (!_colResizeState) return;
+      var s = _colResizeState;
+      s.handle.classList.remove('is-dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      // 최종 flex 값들을 block 의 data-column-flex 에 저장
+      var cols = Array.prototype.filter.call(s.wrap.children, function(c){ return c.classList.contains('ddl-column'); });
+      var flexVals = cols.map(function(c){
+        var v = (c.style.flex || '').split(' ')[0];
+        var fv = parseFloat(v);
+        return isNaN(fv) ? 1 : fv;
+      });
+      s.block.setAttribute('data-column-flex', flexVals.map(function(v){ return v.toFixed(2); }).join(','));
+      _colResizeState = null;
+    }
+
+    function _install(){
+      if (!document.body) { setTimeout(_install, 30); return; }
+      if (document.body._columnResizerInstalled) return;
+      document.body._columnResizerInstalled = true;
+      document.body.addEventListener('mousedown', _colStart, true);
+      document.body.addEventListener('mousemove', _colMove, true);
+      document.body.addEventListener('mouseup', _colEnd, true);
+    }
+    _install();
+  })();
+
+  // ─── 저장용 enhance: 편집기 잔재 제거, data-* 유지, 인라인 flex 반영 ───
+  function enhanceColumnsForSite(block){
+    if (!block) return;
+    // 블록 wrapper 클래스 정리
+    block.querySelectorAll('.block-handle').forEach(function(h){ h.parentNode && h.parentNode.removeChild(h); });
+    block.classList.remove('is-selected');
+    block.classList.remove('editor-block');
+    block.classList.remove('ep-columns-block');
+    block.classList.add('ddl-columns-block-wrap');
+    block.removeAttribute('contenteditable');
+
+    // 리사이저 제거 (저장 시엔 필요 없음)
+    block.querySelectorAll('.ddl-column-resizer').forEach(function(rs){ rs.parentNode && rs.parentNode.removeChild(rs); });
+
+    // 각 컬럼: contenteditable, data-block-container, data-column-idx 제거
+    block.querySelectorAll('.ddl-column').forEach(function(col){
+      col.removeAttribute('data-block-container');
+      col.removeAttribute('data-column-idx');
+      col.removeAttribute('contenteditable');
+      // inline flex 유지 (사용자 리사이즈 결과 보존)
+    });
+  }
+
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.insertColumnsBlock = insertColumnsBlock; } catch(_){}
+
+    // ─── selectionchange · 클릭으로 selectedFold 관리 (콜아웃 미러) ───────────
   var selectedFold = null;
   var foldPopupLock = null;
 
