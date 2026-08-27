@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26d
+ * 2vvena Editor Core - v2.0-β-p26e
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26d';
+  var VERSION = 'v2.0-β-p26e';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -11377,9 +11377,41 @@
       if (sizeBtn){
         bar.querySelectorAll('.mtb-size-btn').forEach(function(b){ b.classList.remove('is-active'); });
         sizeBtn.classList.add('is-active');
-        _modernToolbarState.activeSize = parseInt(sizeBtn.getAttribute('data-size'), 10) || 16;
-        // 실제 적용: fontSize execCommand (1-7으로 매핑 불가 → CSS style 방식은 다음 라운드)
-        try { document.execCommand('fontSize', false, '3'); } catch(_){}
+        var _newSize = parseInt(sizeBtn.getAttribute('data-size'), 10) || 16;
+        _modernToolbarState.activeSize = _newSize;
+        // p26e: 참거 실제 적용 (execCommand '3' 패턴 폐지 → CSS font-size 방식)
+        try {
+          var _sel = window.getSelection();
+          if (_sel && _sel.rangeCount > 0 && !_sel.isCollapsed){
+            var _r = _sel.getRangeAt(0);
+            var _sc = _r.startContainer;
+            var _startEl = _sc.nodeType === 1 ? _sc : _sc.parentElement;
+            // 이미 복사 상위가 span[data-ddl-fsize] 면 그 span만 갱신
+            var _wrapper = _startEl && _startEl.closest && _startEl.closest('span[data-ddl-fsize]');
+            if (_wrapper && _r.startContainer === _r.endContainer
+                && _wrapper.contains(_r.startContainer) && _wrapper.contains(_r.endContainer)) {
+              _wrapper.style.fontSize = _newSize + 'px';
+              _wrapper.setAttribute('data-ddl-fsize', String(_newSize));
+            } else {
+              var _span = document.createElement('span');
+              _span.setAttribute('data-ddl-fsize', String(_newSize));
+              _span.style.fontSize = _newSize + 'px';
+              try { _r.surroundContents(_span); }
+              catch(_e){
+                var _frag = _r.extractContents();
+                _span.appendChild(_frag);
+                _r.insertNode(_span);
+              }
+              // 선택 상태 유지
+              try {
+                var _nr = document.createRange();
+                _nr.selectNodeContents(_span);
+                _sel.removeAllRanges();
+                _sel.addRange(_nr);
+              } catch(__){}
+            }
+          }
+        } catch(err){ try { console.warn('[mtb-size]', err); } catch(__){} }
         return;
       }
       // p26a: '+' 커스텀 색 → openCustomColorPicker 颜믄 팭오버
@@ -13123,7 +13155,7 @@
           if (!v) return;
           current.style.color = v;
           big.style.background = v;
-          try { if (typeof _syncHero === 'function') _syncHero(); } catch(_){}
+          try { if (typeof renderPreview === 'function') renderPreview(); } catch(_){}
           // 스와치·hex 라벨도 함께 갱신 (있으면)
           try {
             var _bsw = tabContent.querySelector('.ep-color-swatch');
@@ -13185,7 +13217,7 @@
             _swBtn.style.background = v;
             _swHex.textContent = String(v).toUpperCase();
             big.style.background = v;
-            try { if (typeof _syncHero === 'function') _syncHero(); } catch(_){}
+            try { if (typeof renderPreview === 'function') renderPreview(); } catch(_){}
           }
           try {
             if (typeof openCustomColorPicker === 'function'){
@@ -16559,7 +16591,7 @@
           if (!v) return;
           current.spec.c1 = v;
           big.style.background = v;
-          try { if (typeof _syncHero === 'function') _syncHero(); } catch(_){}
+          try { if (typeof renderPreview === 'function') renderPreview(); } catch(_){}
           try {
             var _bsw = tabContent.querySelector('.ep-color-swatch');
             if (_bsw) _bsw.style.background = v;
@@ -16618,7 +16650,7 @@
             _swBtn.style.background = v;
             _swHex.textContent = String(v).toUpperCase();
             big.style.background = v;
-            try { if (typeof _syncHero === 'function') _syncHero(); } catch(_){}
+            try { if (typeof renderPreview === 'function') renderPreview(); } catch(_){}
           }
           try {
             if (typeof openCustomColorPicker === 'function'){
