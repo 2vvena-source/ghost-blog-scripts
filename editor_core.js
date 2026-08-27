@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25i';
+  var VERSION = 'v2.0-β-p25j';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -25135,31 +25135,69 @@
 
     // p25g: 현재 색 감지
     //   p25h: A 버튼 클릭으로 selection 이 소실될 수 있어, savedRange 도 함께 확인
+    //   p25j: 3단계 확장 감지 — (a) walkUp 이 <font color=""> 도 검사, (b) startContainer 뿐 아니라 commonAncestorContainer 도 walkUp,
+    //         (c) range 내부의 첫 색 있는 요소를 querySelectorAll 로 스캔 (이전 감지가 다 실패했을 때)
     //         우선순위: (1) savedRange (버튼 클릭 전 백업) → (2) 현재 window.getSelection() → (3) _lastTextColor
     function _detectCurrentColorForMini(){
       // 안쪽 어느 요소든 상위 방향으로 올라가며 인라인 color 를 찾음
+      // p25j: <font color="..."> 도 확인 (execCommand('foreColor') 가 브라우저에 따라 이 태그로 저장하기도 함)
       function _walkUpForColor(startEl){
         var el = startEl;
         if (el && el.nodeType === 3) el = el.parentNode;
         while (el && el.nodeType === 1){
+          // ① 인라인 style.color (가장 흔한 경우 · p25f 이후 rgba 도 여기에 저장)
           if (el.style && el.style.color) return el.style.color;
+          // ② <font color="..."> (일부 브라우저의 execCommand 결과)
+          if (el.tagName === 'FONT' && el.getAttribute && el.getAttribute('color')) {
+            return el.getAttribute('color');
+          }
+          // 편집기 밖으로 나가지 않도록 canvas 에서 중단
           if (el.classList && el.classList.contains('editor-canvas')) break;
           el = el.parentNode;
         }
         return null;
       }
-      // (1) savedRange (툴바 A 클릭 이전 백업)
+      // p25j 신설: range 내부의 첫 색 있는 요소를 스캔 (walkUp 이 못 찾을 때 최후 시도)
+      // 이유: selection 이 [span]텍스트[/span] 바깥에서 시작하면 startContainer 는 span 의 부모 → walkUp 은 부모의 color(없음) 만 봄.
+      //       이 때 range 와 겹치는 span 을 직접 찾아야 정확한 색을 얻을 수 있음.
+      function _findFirstColoredInRange(rng){
+        if (!rng) return null;
+        try {
+          var ca = rng.commonAncestorContainer;
+          if (ca && ca.nodeType === 3) ca = ca.parentNode;
+          if (!ca || !ca.querySelectorAll) return null;
+          var candidates = ca.querySelectorAll('[style*="color"], font[color]');
+          for (var i = 0; i < candidates.length; i++){
+            var c = candidates[i];
+            var hit = false;
+            try {
+              hit = rng.intersectsNode ? rng.intersectsNode(c) : true;
+            } catch(_) { hit = true; }
+            if (hit){
+              if (c.style && c.style.color) return c.style.color;
+              if (c.getAttribute && c.getAttribute('color')) return c.getAttribute('color');
+            }
+          }
+        } catch(_){}
+        return null;
+      }
+      // (1) savedRange (툴바 A 클릭 이전 백업) — p25j: 3단계 폴백 (startContainer → commonAncestor → findFirst)
       try {
         if (typeof savedRange !== 'undefined' && savedRange && savedRange.startContainer){
-          var c1 = _walkUpForColor(savedRange.startContainer);
+          var c1 = _walkUpForColor(savedRange.startContainer)
+                || _walkUpForColor(savedRange.commonAncestorContainer)
+                || _findFirstColoredInRange(savedRange);
           if (c1) return c1;
         }
       } catch(_){}
-      // (2) 현재 selection (savedRange 없거나 감지 실패 시)
+      // (2) 현재 selection (savedRange 없거나 감지 실패 시) — p25j: 여기도 3단계 폴백
       try {
         var sel = window.getSelection();
         if (sel && sel.rangeCount > 0){
-          var c2 = _walkUpForColor(sel.getRangeAt(0).startContainer);
+          var rng = sel.getRangeAt(0);
+          var c2 = _walkUpForColor(rng.startContainer)
+                || _walkUpForColor(rng.commonAncestorContainer)
+                || _findFirstColoredInRange(rng);
           if (c2) return c2;
         }
       } catch(_){}
