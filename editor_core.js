@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25l';
+  var VERSION = 'v2.0-β-p25m';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -5876,7 +5876,10 @@
       var _a2 = parseInt(box.getAttribute('data-bg-alpha2') || '100', 10);
       html += '<div class="row" style="margin-top:1em; border-top:1px dashed rgba(15,58,58,0.15); padding-top:0.8em;"><div class="row-label" style="font-weight:600;">색 2</div>'
         + '<div class="ep-color-row" style="display:flex; align-items:center; gap:8px;">'
-        + '<input type="color" data-cal-set="bg2" value="' + escapeAttr(curBg2Hex) + '">'
+        // p25m: bg2 도 커스텀 스와치로 교체 (bg 와 동일 패턴)
+        + '<button type="button" class="ep-color-swatch" data-cal-swatch="bg2" data-cur="' + escapeAttr(curBg2Hex) + '"'
+        + ' style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2); border-radius:4px; padding:0; cursor:pointer; background:' + escapeAttr(curBg2Hex) + '; flex-shrink:0;"'
+        + ' title="클릭해서 색 선택"></button>'
         + '<span style="font-size:0.75em; opacity:0.7; white-space:nowrap;">투명도 <span data-alpha-lbl="2">' + _a2 + '</span>%</span>'
         + '<input type="range" data-cal-alpha="2" min="0" max="100" step="5" value="' + _a2 + '" style="flex:1; min-width:80px;">'
         + '</div></div>';
@@ -6130,6 +6133,31 @@
             });
           }
         } catch(err){ try { console.warn('[cal-bg-swatch]', err); } catch(_){} }
+        return;
+      }
+
+      // p25m: 그라데이션/패턴의 '색 2' 스와치 — bg 와 동일 패턴
+      // 기존 data-cal-set='bg2' input 분기와 동일한 동작: data-bg2 속성 + applyCalloutBg
+      var bg2Swatch = e.target.closest('[data-cal-swatch="bg2"]');
+      if (bg2Swatch){
+        e.preventDefault(); e.stopPropagation();
+        var _curBg2 = bg2Swatch.getAttribute('data-cur') || box.getAttribute('data-bg2') || '#FFFFFF';
+        try {
+          if (typeof openCustomColorPicker === 'function'){
+            openCustomColorPicker({
+              initial: _curBg2,
+              context: 'bg',
+              detectFromSelection: false,
+              onDone: function(colorValue){
+                if (!colorValue) return;
+                box.setAttribute('data-bg2', colorValue);
+                try { applyCalloutBg(box); } catch(_){}
+                bg2Swatch.style.background = colorValue;
+                bg2Swatch.setAttribute('data-cur', colorValue);
+              }
+            });
+          }
+        } catch(err){ try { console.warn('[cal-bg2-swatch]', err); } catch(_){} }
         return;
       }
 
