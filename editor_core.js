@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26g
+ * 2vvena Editor Core - v2.0-β-p26h
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26g';
+  var VERSION = 'v2.0-β-p26h';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -831,7 +831,10 @@
     '  border: 1px solid rgba(15,58,58,0.2);',
     '  border-radius: 4px;',
     '  font-size: 1em;',
+    '  flex-shrink: 0;',
     '}',
+    /* p26h: 슬래시 아이콘 SVG 도 컨테이너에 맞게 */
+    '.ep-slash-icon > svg { max-width: 80%; max-height: 80%; }',
     '.ep-slash-desc { font-size: 0.75em; opacity: 0.55; margin-top: 0.15em; }',
 
     /* p10: 콜아웃 편집 섹션 (요소 탭) */
@@ -2681,7 +2684,7 @@
     '.ddl-column > *:last-child  { margin-bottom: 0; }',
     /* 컬럼 리사이저 (컬럼 사이 세로 손잡이) */
     '.ddl-column-resizer {',
-    '  flex: 0 0 12px;',
+    '  flex: 0 0 20px;',
     '  align-self: stretch;',
     '  cursor: col-resize;',
     '  position: relative;',
@@ -2699,8 +2702,10 @@
     '  transition: background 120ms ease;',
     '  border-radius: 1px;',
     '}',
-    '.ep-columns-block > .ddl-column-resizer::before { background: rgba(15,58,58,0.08); }',
-    '.ep-columns-block:hover > .ddl-column-resizer::before { background: rgba(15,58,58,0.22); }',
+    '.ep-columns-block > .ddl-column-resizer::before { background: rgba(15,58,58,0.12); }',
+    '.ep-columns-block:hover > .ddl-column-resizer::before { background: rgba(15,58,58,0.28); }',
+    /* p26h: 리사이저 자체 hover 시 배경도 살짝 표시 (히트 영역 시각화) */
+    '.ddl-column-resizer:hover { background: rgba(255,154,118,0.05); }',
     '.ddl-column-resizer:hover::before { background: var(--point, #FF9A76) !important; }',
     '.ddl-column-resizer.is-dragging::before { background: var(--point, #FF9A76) !important; }',
     /* 편집기 안 표시 마커 (저장 시 ep- 접두사 제거) */
@@ -3311,8 +3316,22 @@
           c.setAttribute('data-block-container', 'true');
         }
       });
-      // p26f: columns 블록 wrapper 에 editor-block + ep-columns-block 클래스 복원
-      var colBlocks = root.querySelectorAll('.ddl-columns-block-wrap, [data-block-type="columns"]');
+      // p26h: columns 블록 wrapper 복원 - 여러 셀렉터로 감지
+      //   1) data-block-type='columns' (새 저장 형식)
+      //   2) .ddl-columns-block-wrap (이전 클래스명, 하위 호환)
+      //   3) .ddl-columns-block 을 직속 자식으로 가진 요소 (data-block-type 이 잘못 저장된 경우 - p26g 이전 버그)
+      var _colByType = Array.from(root.querySelectorAll('[data-block-type="columns"], .ddl-columns-block-wrap'));
+      // .ddl-columns-block 이 있으면 그 부모를 wrapper 로 간주 - 잘못 저장된 것 자동 복원
+      var _colByChild = [];
+      root.querySelectorAll('.ddl-columns-block').forEach(function(inner){
+        var wrap = inner.parentElement;
+        if (wrap && _colByType.indexOf(wrap) < 0 && _colByChild.indexOf(wrap) < 0) {
+          // wrapper 로 승격 · data-block-type 교정
+          wrap.setAttribute('data-block-type', 'columns');
+          _colByChild.push(wrap);
+        }
+      });
+      var colBlocks = _colByType.concat(_colByChild);
       colBlocks.forEach(function(cb){
         if (!cb.classList.contains('editor-block')) cb.classList.add('editor-block');
         if (!cb.classList.contains('ep-columns-block')) cb.classList.add('ep-columns-block');
@@ -20872,17 +20891,21 @@
     contentEl.querySelectorAll('.editor-block').forEach(function(b){
       // p20d: 콜아웃 body 안에 중첩된 editor-block 은 부모 콜아웃이 통째로 저장하므로 top-level 에서는 스킵
       //         (이 가드 없으면 안에 있는 블록이 밖에도 또 한 번 저장되어 노션 스타일 중첩이 깨짐)
-      try { if (b.parentElement && b.parentElement.closest && b.parentElement.closest('.callout-body, .ddl-fold-body')) return; } catch(_){} // p20r: 접은글 body 안 nested block 도 skip (부모가 통째로 저장)
+      // p26h: 다단 컬럼(.ddl-column) 안 블록도 동일하게 스킵 (다단 wrapper 가 통째로 저장하므로)
+      try { if (b.parentElement && b.parentElement.closest && b.parentElement.closest('.callout-body, .ddl-fold-body, .ddl-column')) return; } catch(_){} // p20r: 접은글 body 안 nested block 도 skip (부모가 통째로 저장)
       var blockType = b.getAttribute('data-block-type') || '';
       var innerEls = Array.from(b.children).filter(function(c){ return !c.classList.contains('block-handle'); });
+      // p26h: 다단 감지 · 다단 wrapper 는 스스로가 columns 블록이므로 아래 감지들에서 배제
+      var isColumnsBlock = (b.classList && b.classList.contains('ep-columns-block')) || blockType === 'columns';
       // p13f: data-block-type 뿐 아니라 실제 .callout-box 존재 여부로도 판단 (더 견고)
-      var hasCalloutBox = !!(b.querySelector && b.querySelector('.callout-box'));
+      //   ★ 단, 다단 wrapper 는 이 판정에서 제외 - 안에 콜아웃이 있어도 wrapper 는 columns
+      var hasCalloutBox = !isColumnsBlock && !!(b.querySelector && b.querySelector('.callout-box'));
       // p15a: 이미지 블록도 커스텀 저장 경로 사용
-      var hasImageFig = !!(b.querySelector && b.querySelector('figure.editor-image-figure'));
-      var hasDivider = (b.classList && b.classList.contains('ep-divider-block'));
-      var hasButton = (b.classList && b.classList.contains('ep-button-block'));
-      // p20l: 접은글 감지
-      var hasFoldBlock = (b.classList && b.classList.contains('ddl-fold-block')) || !!(b.querySelector && b.querySelector('.ddl-fold-block'));
+      var hasImageFig = !isColumnsBlock && !!(b.querySelector && b.querySelector('figure.editor-image-figure'));
+      var hasDivider = !isColumnsBlock && (b.classList && b.classList.contains('ep-divider-block'));
+      var hasButton = !isColumnsBlock && (b.classList && b.classList.contains('ep-button-block'));
+      // p20l: 접은글 감지 (다단 wrapper 는 제외)
+      var hasFoldBlock = !isColumnsBlock && ((b.classList && b.classList.contains('ddl-fold-block')) || !!(b.querySelector && b.querySelector('.ddl-fold-block')));
       // p16e: 구분선은 블록 자체(.ep-divider-block)를 통째로 저장
       if (hasDivider) innerEls = [b];
       // p17a: 버튼도 블록 자체
@@ -20895,7 +20918,9 @@
       var hasBulletList = !!(b.getAttribute('data-bullet-style')) ||
                           !!(b.querySelector && b.querySelector(':scope > ul, :scope > ol'));
       if (hasBulletList) innerEls = [b]; // 블록 자체를 통째로 저장 (콜아웃 방식)
-      var isCustom = (blockType === 'callout' || hasCalloutBox || blockType === 'image' || hasImageFig || blockType === 'divider' || hasDivider || blockType === 'button' || hasButton || blockType === 'fold' || hasFoldBlock || hasBulletList);
+      var isCustom = (blockType === 'callout' || hasCalloutBox || blockType === 'image' || hasImageFig || blockType === 'divider' || hasDivider || blockType === 'button' || hasButton || blockType === 'fold' || hasFoldBlock || hasBulletList || isColumnsBlock);
+      // p26h: 다단 wrapper 는 통째로 저장
+      if (isColumnsBlock) innerEls = [b];
       // p13f: 감지 시 data-block-type 자동 교정
       if (hasCalloutBox && blockType !== 'callout') {
         log('[collectPostData] 콜아웃 감지, data-block-type 교정:', blockType, '→ callout');
@@ -30427,23 +30452,41 @@
   // ─── 저장용 enhance: 편집기 잔재 제거, data-* 유지, 인라인 flex 반영 ───
   function enhanceColumnsForSite(block){
     if (!block) return;
-    // 블록 wrapper 클래스 정리
+    // p26h: 블록 wrapper 정리 - data-block-type='columns' 유지, 편집 클래스만 제거
     block.querySelectorAll('.block-handle').forEach(function(h){ h.parentNode && h.parentNode.removeChild(h); });
     block.classList.remove('is-selected');
     block.classList.remove('editor-block');
     block.classList.remove('ep-columns-block');
-    block.classList.add('ddl-columns-block-wrap');
+    // p26h: 클래스는 그대로 두고 (wrapper 는 그냥 편집기 클래스만 제거), data-block-type='columns' 로 식별
+    //   ddl-columns-block-wrap 은 예전 코드 유물 - 이제 wrapper 자체는 그냥 <div data-block-type='columns'>
+    block.classList.remove('ddl-columns-block-wrap');
     block.removeAttribute('contenteditable');
 
     // 리사이저 제거 (저장 시엔 필요 없음)
     block.querySelectorAll('.ddl-column-resizer').forEach(function(rs){ rs.parentNode && rs.parentNode.removeChild(rs); });
 
-    // 각 컬럼: contenteditable, data-block-container, data-column-idx 제거
+    // p26h: 사이트 CSS 없이도 렌더되게 flex 인라인 스타일 강제 삽입
+    var wrap = block.querySelector(':scope > .ddl-columns-block');
+    if (wrap) {
+      wrap.style.setProperty('display', 'flex', 'important');
+      wrap.style.setProperty('gap', '8px', 'important');
+      wrap.style.setProperty('align-items', 'stretch', 'important');
+      wrap.style.setProperty('width', '100%', 'important');
+      wrap.style.setProperty('margin', '0.6em 0', 'important');
+      wrap.style.setProperty('box-sizing', 'border-box', 'important');
+    }
+
+    // 각 컬럼: 편집 마커 제거 + 인라인 flex 유지 (이미 style.flex 로 저장됨)
     block.querySelectorAll('.ddl-column').forEach(function(col){
       col.removeAttribute('data-block-container');
       col.removeAttribute('data-column-idx');
       col.removeAttribute('contenteditable');
-      // inline flex 유지 (사용자 리사이즈 결과 보존)
+      // p26h: min-width, min-height, padding, box-sizing 인라인으로 강제 (사이트 CSS 없어도 동작)
+      if (!col.style.flex) col.style.setProperty('flex', '1 1 0', 'important');
+      col.style.setProperty('min-width', '40px', 'important');
+      col.style.setProperty('min-height', '40px', 'important');
+      col.style.setProperty('padding', '2px 4px', 'important');
+      col.style.setProperty('box-sizing', 'border-box', 'important');
     });
   }
 
