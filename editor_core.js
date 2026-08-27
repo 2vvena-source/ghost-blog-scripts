@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25k';
+  var VERSION = 'v2.0-β-p25l';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -5856,11 +5856,15 @@
       + '</div></div>';
 
     // 이미지 모드가 아니면 색 1 섹션 (namespace: callout-bg)
+    // p25l: <input type="color"> → 커스텀 스와치 버튼으로 교체 (openCustomColorPicker 사용)
+    //       데이터 속성은 동일: data-cal-set="bg" · change/input 대신 버튼 클릭 시 커스텀 픽커 호출
     if (bgMode !== 'image') {
       var _a1 = parseInt(box.getAttribute('data-bg-alpha1') || '100', 10);
       html += '<div class="row"><div class="row-label">' + (bgMode==='gradient'||bgMode==='pattern'?'색 1':'배경색') + '</div>'
         + '<div class="ep-color-row" style="display:flex; align-items:center; gap:8px;">'
-        + '<input type="color" data-cal-set="bg" value="' + escapeAttr(curBgHex) + '">'
+        + '<button type="button" class="ep-color-swatch" data-cal-swatch="bg" data-cur="' + escapeAttr(curBgHex) + '"'
+        + ' style="width:40px; height:40px; border:1px solid rgba(15,58,58,0.2); border-radius:4px; padding:0; cursor:pointer; background:' + escapeAttr(curBgHex) + '; flex-shrink:0;"'
+        + ' title="클릭해서 색 선택"></button>'
         + '<span style="font-size:0.75em; opacity:0.7; white-space:nowrap;">투명도 <span data-alpha-lbl="1">' + _a1 + '</span>%</span>'
         + '<input type="range" data-cal-alpha="1" min="0" max="100" step="5" value="' + _a1 + '" style="flex:1; min-width:80px;">'
         + '</div></div>';
@@ -6098,6 +6102,36 @@
     body.addEventListener('click', function(e){
       var box = calPopupLock || selectedCallout;
       if (!box) return;
+
+      // p25l: 콜아웃 배경색 스와치 버튼 클릭 → 커스텀 픽커 호출
+      // 단색 모드 및 그라데이션/패턴의 '색 1' 스와치를 대체 (native <input type="color"> 대신)
+      // onDone 에서 기존과 동일한 로직 수행: data-bg-hex/data-bg + backgroundColor + applyCalloutBg
+      var bgSwatch = e.target.closest('[data-cal-swatch="bg"]');
+      if (bgSwatch){
+        e.preventDefault(); e.stopPropagation();
+        var _curBg = bgSwatch.getAttribute('data-cur') || box.getAttribute('data-bg-hex') || '#F5F5F5';
+        try {
+          if (typeof openCustomColorPicker === 'function'){
+            openCustomColorPicker({
+              initial: _curBg,
+              context: 'bg',
+              detectFromSelection: false,
+              onDone: function(colorValue){
+                if (!colorValue) return;
+                // 기존 data-cal-set='bg' input 분기와 동일한 동작
+                box.setAttribute('data-bg-hex', colorValue);
+                box.setAttribute('data-bg', colorValue);
+                box.style.backgroundColor = colorValue;
+                try { applyCalloutBg(box); } catch(_){}
+                // 스와치 자체 UI 갱신 (편집창이 그대로 열려 있을 때)
+                bgSwatch.style.background = colorValue;
+                bgSwatch.setAttribute('data-cur', colorValue);
+              }
+            });
+          }
+        } catch(err){ try { console.warn('[cal-bg-swatch]', err); } catch(_){} }
+        return;
+      }
 
       // p20a: 라이브러리 관리 직접 진입 (콜아웃 폰트 필드 옆)
       var libBtn = e.target.closest('[data-btn="open-font-library"]');
@@ -6441,6 +6475,9 @@
       var box = calPopupLock || selectedCallout;
       if (!box) return;
       var t = e.target;
+
+      // p25l: 커스텀 배경색 스와치는 로직이 click 이벤트에 있어 여기서는 스킵 (data-cal-swatch 속성)
+      if (t.getAttribute && t.getAttribute('data-cal-swatch')) { return; }
 
       // p18c: data-cal-set 입력 (슬라이더/색피커) 통합 처리
       if (t.getAttribute && t.getAttribute('data-cal-set')) {
