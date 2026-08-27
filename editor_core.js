@@ -1,5 +1,5 @@
 /*!
- * 2vvena Editor Core - v2.0-β-p26n
+ * 2vvena Editor Core - v2.0-β-p26o
  * GitHub: https://github.com/2vvena-source/ghost-blog-scripts
  * 외부 호스팅 정책: 지침 §외부호스팅 준수
  *   - IIFE 격리
@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26n';
+  var VERSION = 'v2.0-β-p26o';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -3547,15 +3547,26 @@
       var block = target.closest('.editor-block');
       if (!block) return;
 
-      // p26n: 다단 컬럼 안에서 Tab 키로 다음 컬럼 이동 (Shift+Tab 은 이전 컬럼).
-      //   커서가 다단 컬럼(.ddl-column) 안이면 → 인접 컬럼의 첫 <p> 로 포커스 이동.
-      //   마지막 컬럼에서 Tab 을 누르면 아무 것도 안 함 (다단 밖으로 나가지는 않음).
+      // p26o: Tab 다음 컬럼 이동 — p26n 버그(마지막 컬럼으로 점프) 수정.
+      //   원인: e.target 이 이벤트 원본 요소(현재 컬럼 안의 텍스트 노드 부모)여야 하는데
+      //         이벤트 버블 순서에 따라 target 이 다단 wrapper 로 잡히기도 함 → 이 경우
+      //         wrapper.closest('.ddl-column') 결과가 wrapper 자신 대신 마지막 컬럼일 수 있음.
+      //   수정: 커서의 실제 위치(window.getSelection().anchorNode)를 기준으로 컬럼을 결정하고,
+      //         focus() 호출 제거 (Selection API 만 사용 — focus() 가 브라우저의 Tab 순환 로직을 추가로 발동시킴).
       if (e.key === 'Tab') {
-        var _col = target.classList && target.classList.contains('ddl-column')
-                    ? target
-                    : (target.closest ? target.closest('.ddl-column') : null);
-        if (_col) {
+        var _sel0 = window.getSelection();
+        var _anchor = _sel0 && _sel0.anchorNode;
+        var _anchorEl = _anchor ? (_anchor.nodeType === 3 ? _anchor.parentElement : _anchor) : null;
+        var _col = _anchorEl && _anchorEl.closest ? _anchorEl.closest('.ddl-column') : null;
+        // fallback: target 기반
+        if (!_col && target.closest) {
+          _col = target.classList && target.classList.contains('ddl-column')
+                  ? target
+                  : target.closest('.ddl-column');
+        }
+        if (_col && contentEl.contains(_col)) {
           e.preventDefault();
+          e.stopPropagation();
           var _wrap = _col.parentNode;
           if (_wrap && _wrap.classList && _wrap.classList.contains('ddl-columns-block')) {
             var _cols = Array.prototype.filter.call(_wrap.children, function(c){
@@ -3563,12 +3574,16 @@
             });
             var _idx = _cols.indexOf(_col);
             var _next = e.shiftKey ? _cols[_idx - 1] : _cols[_idx + 1];
-            if (_next) {
+            if (_next && _idx >= 0) {
               try {
-                // 다음 컬럼의 첫 편집 가능 위치(첫 <p>) 로 커서 이동
-                var _firstP = _next.querySelector(':scope > p') || _next.firstElementChild || _next;
+                var _firstP = _next.querySelector(':scope > p') || _next.firstElementChild;
+                if (!_firstP) {
+                  // 컬럼이 비어있으면 <p><br></p> 하나 생성
+                  _firstP = document.createElement('p');
+                  _firstP.innerHTML = '<br>';
+                  _next.appendChild(_firstP);
+                }
                 var _r = document.createRange();
-                // 첫 <p> 안 텍스트 위치로. 비어있으면 그냥 첫 위치.
                 var _tn = _firstP.firstChild;
                 if (_tn && _tn.nodeType === 3) {
                   _r.setStart(_tn, 0);
@@ -3579,7 +3594,7 @@
                 var _s = window.getSelection();
                 _s.removeAllRanges();
                 _s.addRange(_r);
-                _next.focus({ preventScroll: false });
+                // focus() 호출 안 함 — Selection API 만으로 커서 이동, 브라우저 Tab 순환 방지
               } catch(_){}
             }
           }
