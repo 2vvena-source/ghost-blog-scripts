@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p25n';
+  var VERSION = 'v2.0-β-p25o';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -6127,29 +6127,32 @@
       if (!box) return;
 
       // p25l: 콜아웃 배경색 스와치 버튼 클릭 → 커스텀 픽커 호출
+      // p25o: onChange 콜백으로 실시간 미리보기 반영 · onCancel 시 원본 색 복원
       // 단색 모드 및 그라데이션/패턴의 '색 1' 스와치를 대체 (native <input type="color"> 대신)
-      // onDone 에서 기존과 동일한 로직 수행: data-bg-hex/data-bg + backgroundColor + applyCalloutBg
       var bgSwatch = e.target.closest('[data-cal-swatch="bg"]');
       if (bgSwatch){
         e.preventDefault(); e.stopPropagation();
         var _curBg = bgSwatch.getAttribute('data-cur') || box.getAttribute('data-bg-hex') || '#F5F5F5';
+        var _origBg = _curBg; // p25o: 진짜 취소 대비
+        // p25o: 실제 적용 로직 (onChange 와 onDone 공통)
+        var _applyBg = function(colorValue){
+          if (!colorValue) return;
+          box.setAttribute('data-bg-hex', colorValue);
+          box.setAttribute('data-bg', colorValue);
+          box.style.backgroundColor = colorValue;
+          try { applyCalloutBg(box); } catch(_){}
+          bgSwatch.style.background = colorValue;
+          bgSwatch.setAttribute('data-cur', colorValue);
+        };
         try {
           if (typeof openCustomColorPicker === 'function'){
             openCustomColorPicker({
               initial: _curBg,
               context: 'bg',
               detectFromSelection: false,
-              onDone: function(colorValue){
-                if (!colorValue) return;
-                // 기존 data-cal-set='bg' input 분기와 동일한 동작
-                box.setAttribute('data-bg-hex', colorValue);
-                box.setAttribute('data-bg', colorValue);
-                box.style.backgroundColor = colorValue;
-                try { applyCalloutBg(box); } catch(_){}
-                // 스와치 자체 UI 갱신 (편집창이 그대로 열려 있을 때)
-                bgSwatch.style.background = colorValue;
-                bgSwatch.setAttribute('data-cur', colorValue);
-              }
+              onChange: _applyBg,          // p25o: 실시간
+              onDone: _applyBg,            // p25o: 최종 확정 (같은 로직)
+              onCancel: function(){ _applyBg(_origBg); }  // p25o: 원본 복원
             });
           }
         } catch(err){ try { console.warn('[cal-bg-swatch]', err); } catch(_){} }
@@ -6157,26 +6160,29 @@
       }
 
       // p25m: 그라데이션/패턴의 '색 2' 스와치 — bg 와 동일 패턴
-      // 기존 data-cal-set='bg2' input 분기와 동일한 동작: data-bg2 속성 + applyCalloutBg
+      // p25o: onChange 콜백으로 실시간 미리보기 반영 · onCancel 시 원본 색 복원
       var bg2Swatch = e.target.closest('[data-cal-swatch="bg2"]');
       if (bg2Swatch){
         e.preventDefault(); e.stopPropagation();
         var _curBg2 = bg2Swatch.getAttribute('data-cur') || box.getAttribute('data-bg2') || '#FFFFFF';
+        var _origBg2 = _curBg2;
+        var _applyBg2 = function(colorValue){
+          if (!colorValue) return;
+          box.setAttribute('data-bg2', colorValue);
+          try { applyCalloutBg(box); } catch(_){}
+          bg2Swatch.style.background = colorValue;
+          bg2Swatch.setAttribute('data-cur', colorValue);
+          try { _updateGradientPreviewBar(box); } catch(_){}
+        };
         try {
           if (typeof openCustomColorPicker === 'function'){
             openCustomColorPicker({
               initial: _curBg2,
               context: 'bg',
               detectFromSelection: false,
-              onDone: function(colorValue){
-                if (!colorValue) return;
-                box.setAttribute('data-bg2', colorValue);
-                try { applyCalloutBg(box); } catch(_){}
-                bg2Swatch.style.background = colorValue;
-                bg2Swatch.setAttribute('data-cur', colorValue);
-                // p25n: 미리보기 바 갱신
-                try { _updateGradientPreviewBar(box); } catch(_){}
-              }
+              onChange: _applyBg2,
+              onDone: _applyBg2,
+              onCancel: function(){ _applyBg2(_origBg2); }
             });
           }
         } catch(err){ try { console.warn('[cal-bg2-swatch]', err); } catch(_){} }
@@ -6184,25 +6190,29 @@
       }
 
       // p25n: 테두리색 스와치 — bg/bg2 와 동일 패턴
-      // 기존 data-cal-set='borderColor' input 분기와 동일: data-border-color + data-border-hex + applyBorderToBox
+      // p25o: onChange 콜백으로 실시간 미리보기 반영 · onCancel 시 원본 색 복원
       var borderColorSwatch = e.target.closest('[data-cal-swatch="borderColor"]');
       if (borderColorSwatch){
         e.preventDefault(); e.stopPropagation();
         var _curBc = borderColorSwatch.getAttribute('data-cur') || box.getAttribute('data-border-hex') || box.getAttribute('data-border-color') || '#0F3A3A';
+        var _origBc = _curBc;
+        var _applyBc = function(colorValue){
+          if (!colorValue) return;
+          box.setAttribute('data-border-color', colorValue);
+          box.setAttribute('data-border-hex', colorValue);
+          try { applyBorderToBox(box); } catch(_){}
+          borderColorSwatch.style.background = colorValue;
+          borderColorSwatch.setAttribute('data-cur', colorValue);
+        };
         try {
           if (typeof openCustomColorPicker === 'function'){
             openCustomColorPicker({
               initial: _curBc,
               context: 'bg',
               detectFromSelection: false,
-              onDone: function(colorValue){
-                if (!colorValue) return;
-                box.setAttribute('data-border-color', colorValue);
-                box.setAttribute('data-border-hex', colorValue);
-                try { applyBorderToBox(box); } catch(_){}
-                borderColorSwatch.style.background = colorValue;
-                borderColorSwatch.setAttribute('data-cur', colorValue);
-              }
+              onChange: _applyBc,
+              onDone: _applyBc,
+              onCancel: function(){ _applyBc(_origBc); }
             });
           }
         } catch(err){ try { console.warn('[cal-border-swatch]', err); } catch(_){} }
@@ -17066,11 +17076,15 @@
       });
       // 큰 미리보기
       var outAlpha = state.alpha / 100;
-      previewInner.style.background = (state.alpha >= 100)
+      var _curValue = (state.alpha >= 100)
         ? _rgbToHex(state.r, state.g, state.b)
         : 'rgba(' + Math.round(state.r) + ',' + Math.round(state.g) + ',' + Math.round(state.b) + ',' + outAlpha.toFixed(2) + ')';
+      previewInner.style.background = _curValue;
       hexBig.textContent = 'HEX ' + ('#' + _rgbToHex(state.r, state.g, state.b).slice(1)).toUpperCase();
       rgbBig.textContent = 'rgb(' + Math.round(state.r) + ', ' + Math.round(state.g) + ', ' + Math.round(state.b) + ')';
+      // p25o: 실시간 콜백 — 픽커에서 색이 바뀔 때마다 (적용 버튼 안 눌러도) opts.onChange 호출
+      // 호출자 (스와치)는 여기서 실제 대상 DOM 에 색을 적용해 실시간 미리보기를 구현함
+      try { if (typeof opts.onChange === 'function') opts.onChange(_curValue); } catch(_){}
     }
 
     // hex → state
