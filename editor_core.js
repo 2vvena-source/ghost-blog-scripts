@@ -26,7 +26,7 @@
   // 0. 상수 / 유틸
   // ═══════════════════════════════════════════════════════════
 
-  var VERSION = 'v2.0-β-p26z';
+  var VERSION = 'v2.0-β-p27a';
   var LOG_PREFIX = '[2vvena-editor ' + VERSION + ']';
   var STORAGE_ADMIN_KEY = 'ghost_admin_key';
   var LOCAL_BACKUP_KEY = 'ddl-editor-draft-v2';
@@ -4173,21 +4173,105 @@
           } catch(err){ /* fail-safe: 기본 동작 */ }
           return;
         }
+        // p27a: 노션식 블록 분할 — 일반 블록(p/h1~h6/blockquote 등)에서 Enter
+        //   · 블록 중간에서 Enter → 커서 이후 내용을 잘라 새 블록으로 이동 (현재 블록엔 앞부분만 남음)
+        //   · 블록 맨 앞(atStart)에서 Enter → 전체 내용이 다음(새) 블록으로 이동, 원래 위치엔 빈 블록
+        //   · 블록 맨 끝에서 Enter → 기존과 동일 (새 빈 블록 생성)
         e.preventDefault();
-        var nb = insertNewBlock('p', '', block);
-        setTimeout(function(){
-          var inner = nb.querySelector('[contenteditable="true"]');
-          if (inner) {
-            inner.focus();
-            // 커서를 처음에
-            var r = document.createRange();
-            r.selectNodeContents(inner);
-            r.collapse(true);
-            var s = window.getSelection();
-            s.removeAllRanges();
-            s.addRange(r);
+        (function(){
+          var origTag = (target.tagName ? target.tagName.toLowerCase() : 'p');
+          // p27a 안전장패: figcaption · span · div 난 · 기타 새 블록으로 만들지 않을 태그는 p 로 강제
+          if (['figcaption','span','div','li','ul','ol','td','th','tr'].indexOf(origTag) > -1) origTag = 'p';
+          var sel27 = window.getSelection();
+          if (!sel27 || sel27.rangeCount === 0) {
+            // fallback: 셀렉션이 없으면 기존 동작(빈 블록 추가)
+            var nbFb = insertNewBlock('p', '', block);
+            setTimeout(function(){
+              var innerFb = nbFb.querySelector('[contenteditable="true"]');
+              if (innerFb) {
+                innerFb.focus();
+                var rFb = document.createRange();
+                rFb.selectNodeContents(innerFb);
+                rFb.collapse(true);
+                var sFb = window.getSelection();
+                sFb.removeAllRanges();
+                sFb.addRange(rFb);
+              }
+            }, 0);
+            return;
           }
-        }, 0);
+          var r27 = sel27.getRangeAt(0);
+          // 선택 영역이 있으면(드래그 중 Enter) 먼저 삭제 후 그 위치를 커서로
+          if (!r27.collapsed) {
+            try { r27.deleteContents(); r27.collapse(true); } catch(_){}
+          }
+
+          // 커서가 블록(target) 맨 앞인지 판정
+          var atStart27 = false;
+          try {
+            var probe27 = document.createRange();
+            probe27.selectNodeContents(target);
+            probe27.setEnd(r27.startContainer, r27.startOffset);
+            atStart27 = (probe27.toString().length === 0);
+          } catch(_){}
+
+          if (atStart27 && (target.textContent || '').length > 0) {
+            // 블록 맨 앞 + 내용 있음: 전체 내용을 다음 블록으로 이동, 현재 블록은 비움
+            var movedHtml27 = target.innerHTML;
+            target.innerHTML = '<br>';
+            var nb27 = insertNewBlock(origTag, movedHtml27, block);
+            setTimeout(function(){
+              var inner27 = nb27.querySelector('[contenteditable="true"]');
+              if (inner27) {
+                inner27.focus();
+                var rr27 = document.createRange();
+                rr27.selectNodeContents(inner27);
+                rr27.collapse(true);
+                var ss27 = window.getSelection();
+                ss27.removeAllRanges();
+                ss27.addRange(rr27);
+              }
+            }, 0);
+            return;
+          }
+
+          // 블록 중간 또는 끝: 커서 이후 내용을 잘라 새 블록으로
+          var afterRange27 = document.createRange();
+          try {
+            afterRange27.setStart(r27.startContainer, r27.startOffset);
+            afterRange27.setEnd(target, target.childNodes.length);
+          } catch(_){
+            // 범위 설정 실패 시 안전하게 기존 동작으로
+            var nbSafe = insertNewBlock('p', '', block);
+            setTimeout(function(){
+              var innerSafe = nbSafe.querySelector('[contenteditable="true"]');
+              if (innerSafe) { innerSafe.focus(); }
+            }, 0);
+            return;
+          }
+          var frag27 = afterRange27.extractContents();
+          var tmpDiv27 = document.createElement('div');
+          tmpDiv27.appendChild(frag27);
+          var newHtml27 = tmpDiv27.innerHTML;
+          if (!newHtml27 || newHtml27.trim() === '') newHtml27 = '<br>';
+          // 현재 블록(앞부분)이 비면 <br> 로 채워 편집 가능 상태 유지
+          if (target.childNodes.length === 0 || (target.textContent || '').length === 0) {
+            target.innerHTML = '<br>';
+          }
+          var nb27b = insertNewBlock(origTag, newHtml27, block);
+          setTimeout(function(){
+            var inner27b = nb27b.querySelector('[contenteditable="true"]');
+            if (inner27b) {
+              inner27b.focus();
+              var rr27b = document.createRange();
+              rr27b.selectNodeContents(inner27b);
+              rr27b.collapse(true);
+              var ss27b = window.getSelection();
+              ss27b.removeAllRanges();
+              ss27b.addRange(rr27b);
+            }
+          }, 0);
+        })();
         return;
       }
 
