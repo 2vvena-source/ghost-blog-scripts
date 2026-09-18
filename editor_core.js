@@ -1698,6 +1698,11 @@
     '  display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;',
     '  flex: 1 1 auto;',
     '}',
+    /* p27e: 서식지우기 + 배경색지우기 2칸 */
+    '.ep-modern-toolbar-row-cell-2 {',
+    '  display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px;',
+    '  flex: 0 0 auto;',
+    '}',
     '.ep-modern-toolbar-row button {',
     '  padding: 6px 0; background: transparent;',
     '  border: 1px solid transparent; border-radius: 4px;',
@@ -12097,6 +12102,8 @@
     var svgHl_m     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h6"/><path d="M8 14l6-6 4 4-6 6H8v-4z"/><path d="M14 8l3-3 3 3-3 3"/></svg>';
     var svgRuby_m   = '<svg width="16" height="14" viewBox="0 0 24 20" fill="none" stroke="#0F3A3A" stroke-width="1.4" stroke-linecap="round"><line x1="6" y1="3" x2="18" y2="3"/><text x="12" y="17" text-anchor="middle" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="12" fill="#0F3A3A" stroke="none">가</text></svg>';
     var svgClear_m  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h12"/><path d="M10 11l4 6"/><path d="M14 11l-4 6"/><path d="M18 4L4 18"/></svg>';
+    // p27e: 배경색 지우기 아이콘 — 채워진 사각형 + 사선 (형광펜/배경 삭제 전용, 서식지우기와 시각적으로 구분)
+    var svgBgClear_m = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2" fill="rgba(15,58,58,0.12)" stroke="#0F3A3A"/><path d="M4 19L20 5"/></svg>';
     var svgLetterSp = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round"><path d="M6 6v12M18 6v12"/><path d="M9 12h6"/><polyline points="9,10 6,12 9,14"/><polyline points="15,10 18,12 15,14"/></svg>';
     // 첨자 통합 아이콘 (X²)
     var svgSupSub_m = '<span style="font-size:12px;">X<sup style="font-size:9px;">2</sup></span>';
@@ -12148,8 +12155,9 @@
           '<button type="button" data-cmd="line-height"    data-expand="true" title="줄간격">' + svgLineH + '</button>' +
         '</div>' +
         '<div class="ep-modern-toolbar-vsep"></div>' +
-        '<div class="ep-modern-toolbar-row-cell">' +
+        '<div class="ep-modern-toolbar-row-cell ep-modern-toolbar-row-cell-2">' +
           '<button type="button" data-cmd="removeFormat"   title="서식 지우기">' + svgClear_m + '</button>' +
+          '<button type="button" data-cmd="clear-bg"       title="배경색 지우기">' + svgBgClear_m + '</button>' +
         '</div>' +
       '</div>' +
       '<div class="ep-modern-toolbar-sep"></div>' +
@@ -12330,6 +12338,10 @@
       }
       if (cmd === 'removeFormat'){
         try { clearInlineFormat(); } catch(_){}
+        return;
+      }
+      if (cmd === 'clear-bg'){
+        try { restoreRange(); removeBackgroundColorFromSelection(); } catch(err){ console.warn('[CLEAR-BG]', err); }
         return;
       }
       if (cmd === 'list-expand'){
@@ -23899,6 +23911,58 @@
     document.execCommand('unlink');
   }
 
+  // p27e: background 축약형이 CSSOM에서 longhand(background-image/position/size/repeat/origin/clip/attachment)로 풀린 경우까지 깨끗하게 제거.
+  function _stripAllBgLonghand(styleObj){
+    if (!styleObj) return;
+    ['background', 'background-color', 'background-image', 'background-position',
+     'background-size', 'background-repeat', 'background-origin', 'background-clip',
+     'background-attachment'].forEach(function(prop){
+      try { styleObj.removeProperty(prop); } catch(_){}
+    });
+  }
+
+  // p27e: 수동 배경색 지우기 — 선택 영역 안 모든 요소의 background/background-color 인라인 스타일과 bgcolor 속성을 제거함.
+  //   형광펜(mark.ddl-hl)은 저장 방식이 다르고 사용자가 의도적으로 넘은 서식이므로 보존(제거 대상에서 제외).
+  function removeBackgroundColorFromSelection(){
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) { try { _showStubToast('지울 영역을 먼저 선택하세요'); } catch(_){} return 0; }
+    var range = sel.getRangeAt(0);
+    var common = range.commonAncestorContainer;
+    var scope = common.nodeType === 1 ? common : common.parentElement;
+    if (!scope) return 0;
+    var editable = scope.closest && scope.closest('[contenteditable="true"], .callout-body');
+    if (editable) scope = editable;
+    var count = 0;
+    function stripOne(el){
+      if (!el || el.nodeType !== 1) return;
+      if (el.closest && el.closest('mark.ddl-hl')) return; // 형광펜 보존
+      if (el.tagName === 'MARK' && el.classList && el.classList.contains('ddl-hl')) return;
+      var changed = false;
+      if (el.style && (el.style.backgroundColor || el.style.background)) {
+        _stripAllBgLonghand(el.style);
+        if (el.getAttribute('style') === '') el.removeAttribute('style');
+        changed = true;
+      }
+      if (el.hasAttribute && el.hasAttribute('bgcolor')) {
+        el.removeAttribute('bgcolor');
+        changed = true;
+      }
+      if (changed) count++;
+    }
+    // scope 자체도 대상 (commonAncestor 가 요소인 경우)
+    if (scope.nodeType === 1 && range.intersectsNode(scope)) stripOne(scope);
+    var all = scope.querySelectorAll ? scope.querySelectorAll('*') : [];
+    Array.prototype.forEach.call(all, function(el){
+      if (!range.intersectsNode(el)) return;
+      stripOne(el);
+    });
+    try { saveRange(); } catch(_){}
+    try { captureSnapshot(true); } catch(_){}
+    try { _showStubToast(count > 0 ? ('배경색 ' + count + '곳 제거됨') : '제거할 배경색이 없습니다'); } catch(_){}
+    return count;
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.removeBackgroundColorFromSelection = removeBackgroundColorFromSelection; } catch(_){}
+
   // p19h: 루비 수정/삭제 핸들러
   //   편집기 캔버스 안 <mark class="ddl-ruby"> 클릭 시 미니 액션 팝오버.
   //   좌측 절반 = 수정, 우측 절반 = 삭제 (hover CSS 로 사용자에게 안내).
@@ -25927,6 +25991,8 @@
     // p18k: SVG 아이콘 (사이트 톤 얇은 실선)
     var _svg_link = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>';
     var _svg_clear = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h12"/><path d="M10 11l4 6"/><path d="M14 11l-4 6"/><path d="M18 4L4 18"/></svg>';
+    // p27e: 배경색 지우기 (클래식 툴바)
+    var _svg_bg_clear = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F3A3A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2" fill="rgba(15,58,58,0.12)" stroke="#0F3A3A"/><path d="M4 19L20 5"/></svg>';
     // 루비: 큰 "가" 위에 작은 두 점(방점 대신 위쪽 텍스트 표기 느낌) — 일본어 문자 대신 사이트 톤 마크
     var _svg_ruby = '<svg width="16" height="14" viewBox="0 0 24 20" fill="none" stroke="#0F3A3A" stroke-width="1.4" stroke-linecap="round"><line x1="6" y1="3" x2="18" y2="3"/><text x="12" y="17" text-anchor="middle" font-family="Cafe24Danjunghae, Gowun Batang, serif" font-size="12" fill="#0F3A3A" stroke="none">가</text></svg>';
     // 형광펜: 마커 펜 형태
@@ -25975,6 +26041,8 @@
       '<span class="ftb-sep"></span>' +
       // 13.5 링크 (p22h: 사용자 요청 — 코드 다음에 추가)
       '<button data-cmd="createLink" title="링크">' + _svg_link + '</button>' +
+      // 13.7 배경색 지우기 (p27e)
+      '<button data-cmd="clear-bg" title="배경색 지우기">' + _svg_bg_clear + '</button>' +
       // 14. 서식▾
       '<button data-cmd="open-presets" data-expand="true" title="서식 프리셋" style="display:inline-flex; align-items:center; gap:0.25em;">' + _svg_star + '<span>서식</span></button>' +
       // 15. ⚙ (설정)
@@ -26192,6 +26260,9 @@
         toggleSupSub(cmd);
       } else if (cmd === 'removeFormat') {
         clearInlineFormat();
+      } else if (cmd === 'clear-bg') {
+        restoreRange();
+        try { removeBackgroundColorFromSelection(); } catch(err){ console.warn('[CLEAR-BG]', err); }
       } else if (cmd === 'font-size-up' || cmd === 'font-size-down') {
         // p19m: 글자 크기 ±2px
         restoreRange();
@@ -30061,6 +30132,74 @@
     return html;
   }
 
+  // p27e: 자동 배경색 제거 — 붙여넣기로 들어온 흰색/밝은 무채색(회색~흰색) 계열 배경색만 공곊적으로 제거.
+  //   노랑/분홍/하늘색 같은 유채색(형광펜 등 의도적 서식)은 밝아도 건드리지 않음 → 밝기 + 채도 둘 다 확인.
+  //   기준: perceived brightness >= 220 (255기준) AND chroma(max-min) <= 20 이면 "흰색/회색 계열"으로 판단.
+  function _bgBrightness(colorStr){
+    if (!colorStr) return null;
+    try {
+      var probe = document.createElement('span');
+      probe.style.position = 'absolute';
+      probe.style.left = '-9999px';
+      probe.style.top = '-9999px';
+      probe.style.backgroundColor = colorStr;
+      document.body.appendChild(probe);
+      var resolved = getComputedStyle(probe).backgroundColor;
+      document.body.removeChild(probe);
+      var m = resolved && resolved.match(/rgba?\(([^)]+)\)/);
+      if (!m) return null;
+      var parts = m[1].split(',').map(function(s){ return parseFloat(s); });
+      var r = parts[0] || 0, g = parts[1] || 0, b = parts[2] || 0;
+      var a = (parts.length > 3) ? parts[3] : 1;
+      if (isNaN(a)) a = 1;
+      if (a < 0.03) return 255; // 거의 투명 → 시각적으로 색이 거의 안 보임 → 흰 종이와 동일하게 취급
+      // p27e: 큰 흰 배경(종이) 위에 올려놓은 것처럼 알파 블렌딩해 실제 보이는 밝기를 계산
+      //   (예: rgba(255,255,255,0.2) 는 거의 안 보임 → 밝기 높게 나와 자동 제거 대상에 포함되어야 함)
+      var br = r * a + 255 * (1 - a);
+      var bg = g * a + 255 * (1 - a);
+      var bb = b * a + 255 * (1 - a);
+      var brightness = (br * 299 + bg * 587 + bb * 114) / 1000;
+      var chroma = Math.max(br, bg, bb) - Math.min(br, bg, bb);
+      return { brightness: brightness, chroma: chroma };
+    } catch(_){ return null; }
+  }
+  // p27e: 밝은 무채색(흰색/연회색)인지 판단 — 유채색(노랑/분홍 등 의도적 형광펜 색)은 제외
+  function _isStrippableLightBg(colorStr){
+    var info = _bgBrightness(colorStr);
+    if (!info) return false;
+    return info.brightness >= 220 && info.chroma <= 20;
+  }
+
+  // root(붙여넣기로 들어온 새 노드) 안의 밝은 계열 배경색만 자동 제거. 반환값: 제거된 개수.
+  function _autoStripLightBackgrounds(root){
+    if (!root || root.nodeType !== 1) return 0;
+    var count = 0;
+    function maybeStrip(el){
+      if (!el || el.nodeType !== 1) return;
+      if (el.closest && el.closest('mark.ddl-hl')) return; // 형광펜 보존
+      if (el.tagName === 'MARK' && el.classList && el.classList.contains('ddl-hl')) return;
+      var changed = false;
+      var bg = el.style && (el.style.backgroundColor || el.style.background);
+      if (bg) {
+        if (_isStrippableLightBg(bg)) {
+          _stripAllBgLonghand(el.style);
+          if (el.getAttribute('style') === '') el.removeAttribute('style');
+          changed = true;
+        }
+      }
+      if (el.hasAttribute && el.hasAttribute('bgcolor')) {
+        if (_isStrippableLightBg(el.getAttribute('bgcolor'))) { el.removeAttribute('bgcolor'); changed = true; }
+      }
+      if (changed) count++;
+    }
+    maybeStrip(root);
+    if (root.querySelectorAll) {
+      Array.prototype.forEach.call(root.querySelectorAll('[style*="background"], [bgcolor]'), maybeStrip);
+    }
+    return count;
+  }
+  try { window.__DDL_EDITOR = window.__DDL_EDITOR || {}; window.__DDL_EDITOR.autoStripLightBackgrounds = _autoStripLightBackgrounds; } catch(_){}
+
   // 페이지 내 이미 붙은 li/p/h1-6 등 필수 가능한 요소가 contenteditable=false 로 오염되었다면 복구
   // p22y: 진단용 · Shift+Enter 후 백스페이스로 블록 통째로 지워지는 현상 원인 파악
   //   contentEl 에 mutation observer 를 걸어 editor-block 이 사라지면 로그
@@ -30223,7 +30362,23 @@
       var html = e.clipboardData ? e.clipboardData.getData('text/html') : '';
       if (!html) return;   // HTML 없으면 기본 처리
       // .editor-block wrapper 가 있는지 확인
-      if (html.indexOf('editor-block') === -1) return; // 그냥 기본 붙여넣기
+      if (html.indexOf('editor-block') === -1) {
+        // p27e: 외부 사이트에서 복사해온 HTML — 브라우저 기본 붙여넣기가 낌(preventDefault 안함),
+        //   붙여넣기 직후 해당 블록 안의 밝은/흰색 계열 배경색만 자동 제거
+        var pasteAnchorBlock = getCurrentEditorBlock();
+        setTimeout(function(){
+          try {
+            var scopeEl = pasteAnchorBlock || (window.getSelection && window.getSelection().anchorNode);
+            if (scopeEl && scopeEl.nodeType === 3) scopeEl = scopeEl.parentElement;
+            if (scopeEl && scopeEl.closest) scopeEl = scopeEl.closest('.editor-block') || scopeEl;
+            if (scopeEl) {
+              var stripped = _autoStripLightBackgrounds(scopeEl);
+              if (stripped > 0) log('[붙여넣기] 밝은 배경색 ' + stripped + '곳 자동 제거됨');
+            }
+          } catch(err){ console.warn('[PASTE-BG-STRIP]', err); }
+        }, 60);
+        return; // 그냥 기본 붙여넣기
+      }
 
       e.preventDefault();
 
@@ -30238,6 +30393,9 @@
       var anchor = sel && sel.anchorNode;
       var anchorEl = anchor ? (anchor.nodeType === 3 ? anchor.parentElement : anchor) : null;
       var currentBlock = anchorEl ? anchorEl.closest('.editor-block') : null;
+
+      // p27e: 블록 통째 붙여넣기에서도 밝은/흰색 배경색은 미리 자동 제거 (형광펜는 보존)
+      try { _autoStripLightBackgrounds(tmp); } catch(_){}
 
       var afterBlock = currentBlock;
       pastedBlocks.forEach(function(pb){
