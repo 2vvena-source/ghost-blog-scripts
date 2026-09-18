@@ -21668,6 +21668,77 @@
     }
   }
 
+  // p27b/p27c: 저장 직전 - 빈 블록/빈 줄(Shift+Enter)이 Ghost 저장 시 사라지지 않도록 안전한 nbsp 마커 삽입.
+  //   원인: <p><br></p> 처럼 자식이 <br> 뿐인 줄은 Ghost 파서가 "보이는 내용이 없는 줄"로 판단해
+  //         저장 시 제거/병합해버림. Shift+Enter 를 여러 번 눌러 빈 줄을 여러 개 만든 경우
+  //         (예: "내용1<br><br>내용2" 처럼 <br> 사이에 아무 것도 없는 구간)도 동일하게 사라짐.
+  //   개선(p27c): 블록 전체가 비었는지만 보던 p27b 방식은 "내용이 섞인 블록 중간의 빈 줄"은 못 잡아냈음.
+  //         이제 <br> 로 구분되는 각 "줄(구간)" 단위로 비어있는지 검사해서, 비어있는 구간마다
+  //         \u00A0(nbsp) 를 끼워 넣어 시각적 영향 없이 줄 수를 보존. 기존에 검증된
+  //         단일 완전-빈 블록(<p><br></p> 하나) 케이스는 그대로 유지(회귀 없음).
+  function _preserveEmptyLinesForSave(clone){
+    if (!clone) return;
+    try {
+      var candidates = [];
+      if (clone.matches && clone.matches('p, div, h1, h2, h3, h4, h5, h6, li, blockquote')) candidates.push(clone);
+      var inner = clone.querySelectorAll ? clone.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6, li, blockquote') : [];
+      inner.forEach(function(x){ candidates.push(x); });
+
+      function isBlankNode(n){
+        if (!n) return true;
+        if (n.nodeType === 3) return (n.nodeValue || '').replace(/[\s\u00A0]/g, '') === '';
+        return false; // BR이 아닌 엘리먼트(span 등)는 내용으로 간주 (보수적 처리)
+      }
+
+      candidates.forEach(function(elx){
+        // 이미지/figure/hr/iframe/video 등 구조적 요소가 있는 블록은 건드리지 않음
+        if (elx.querySelector && elx.querySelector('img,figure,hr,iframe,video')) return;
+
+        var nodes = Array.prototype.slice.call(elx.childNodes);
+        if (nodes.length === 0) { elx.appendChild(document.createTextNode('\u00A0')); return; }
+
+        // 기존(p27b) 검증된 케이스: 완전히 빈 블록(자식이 <br> 하나뿐) → 그대로 유지 (회귀 방지)
+        if (nodes.length === 1 && nodes[0].nodeType === 1 && nodes[0].tagName === 'BR') {
+          elx.innerHTML = '\u00A0';
+          return;
+        }
+
+        var brIdx = [];
+        nodes.forEach(function(n, i){ if (n.nodeType === 1 && n.tagName === 'BR') brIdx.push(i); });
+        if (brIdx.length === 0) {
+          // BR 이 없는데 전체가 공백뿐인 드문 케이스 보강
+          var allBlank = nodes.every(isBlankNode);
+          if (allBlank) { elx.innerHTML = '\u00A0'; }
+          return;
+        }
+
+        // <br> 로 구분되는 각 구간(줄)을 검사하여, 비어있는 구간의 시작 <br> 앞에 nbsp 삽입
+        var insertBeforeBr = [];
+        var prevEnd = -1;
+        for (var k = 0; k < brIdx.length; k++) {
+          var gapStart = prevEnd + 1, gapEnd = brIdx[k] - 1;
+          var gapNodes = (gapEnd >= gapStart) ? nodes.slice(gapStart, gapEnd + 1) : [];
+          if (gapNodes.every(isBlankNode)) insertBeforeBr.push(nodes[brIdx[k]]);
+          prevEnd = brIdx[k];
+        }
+        // 마지막 <br> 이후 구간(트레일링)이 비어있고, 블록 전체에 텍스트가 전혀 없는 경우
+        // (=순수 개행만으로 이루어진 블록) 마지막 줄도 보존
+        var tailNodes = nodes.slice(brIdx[brIdx.length - 1] + 1);
+        var tailBlank = tailNodes.every(isBlankNode);
+        var wholeHasText = nodes.some(function(n){
+          return (n.nodeType === 3 && (n.nodeValue || '').replace(/[\s\u00A0]/g,'') !== '') ||
+                 (n.nodeType === 1 && n.tagName !== 'BR');
+        });
+        if (tailBlank && !wholeHasText) {
+          elx.appendChild(document.createTextNode('\u00A0'));
+        }
+        insertBeforeBr.forEach(function(brNode){
+          elx.insertBefore(document.createTextNode('\u00A0'), brNode);
+        });
+      });
+    } catch(_){}
+  }
+
   function collectPostData(status){
     var title = (titleEl.textContent || '').trim() || '(제목 없음)';
     // p14c: 저장 직전 모든 블록의 정렬·폭 인라인 자식 스타일을 한번 더 강제 적용 (사이트 CSS 없이도 렌더되게)
@@ -21881,6 +21952,8 @@
           }
           // p13h: 리사이저 및 이물질 저장에서 제외
           clone.querySelectorAll && clone.querySelectorAll('.callout-resizer, .ddl-fold-resizer, .editor-image-resizer, input, select, textarea, button, form').forEach(function(x){ x.parentNode && x.parentNode.removeChild(x); });
+          // p27b: 콜아웃/접은글/다단 안 문단의 빈 줄도 동일하게 보존
+          try { _preserveEmptyLinesForSave(clone); } catch(_){}
           innerHtml += clone.outerHTML;
         });
         parts.push('<!--kg-card-begin: html-->\n' + innerHtml + '\n<!--kg-card-end: html-->');
@@ -21931,6 +22004,8 @@
           });
           // 클론이 통째로 base64 오염 figure면 스킵
           if (clone.tagName === 'FIGURE' && clone.querySelector('img[src*="<"]')) return;
+          // p27b: 빈 블록/빈 줄 저장 보존 마커 (Enter/Shift+Enter 빈 줄 보존)
+          try { _preserveEmptyLinesForSave(clone); } catch(_){}
           if (needsWrap) {
             innerHtmlPlain += clone.outerHTML;
           } else {
